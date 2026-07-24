@@ -1,0 +1,41 @@
+body {
+  width: 260px;
+  font-family: -apple-system, "Segoe UI", sans-serif;
+  padding: 12px;
+  color: #222;
+}
+h1 {
+  font-size: 14px;
+  margin: 0 0 10px;
+  color: #1c3f61;
+}
+#status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-unknown { background: #ccc; }
+.dot-ok { background: #2e7d32; }
+.dot-error { background: #c62828; }
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+#profileInfo {
+  font-size: 11px;
+  color: #555;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+  line-height: 1.6;
+}

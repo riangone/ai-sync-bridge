@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "AI-Sync Bridge",
+  "version": "1.0.0",
+  "description": "レガシーWebシステムを改変せずにAIサイドバーを付与する (OCR/セマンティック検索/チャット)",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "http://localhost:5010/*",
+    "http://localhost:5011/*",
+    "https://aisync.0101.click/*",
+    "https://aisync-api.0101.click/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "AI-Sync Bridge"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:5010/*", "https://aisync.0101.click/*"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

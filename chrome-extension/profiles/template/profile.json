@@ -1,0 +1,19 @@
+{
+  "profileId": "template",
+  "displayName": "新規レガシーシステム用プロファイル",
+  "legacyOrigin": "http://localhost:5010",
+  "apiBaseUrl": "http://localhost:5011",
+  "sidebarWidthPx": 380,
+  "panels": [
+    { "id": "chat", "label": "AIチャット", "enabled": true },
+    { "id": "customers", "label": "顧客検索", "enabled": true },
+    { "id": "ocr", "label": "OCR取込", "enabled": true },
+    { "id": "search", "label": "セマンティック検索", "enabled": true },
+    { "id": "analytics", "label": "予測分析", "enabled": true },
+    { "id": "workflows", "label": "ワークフロー", "enabled": true },
+    { "id": "notifications", "label": "通知", "enabled": true },
+    { "id": "admin", "label": "管理", "enabled": true }
+  ],
+  "injectSelector": "body",
+  "notes": "このファイルをコピーして profiles/<system-name>/profile.json を作成し、legacyOrigin と manifest.json の matches を対象システムに合わせて変更するだけで新規レガシーシステムに対応できる。"
+}

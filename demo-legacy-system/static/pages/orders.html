@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>受注管理 - 基幹業務システム(Legacy ERP)</title>
+<link rel="stylesheet" href="/static/css/legacy.css">
+</head>
+<body onload="loadOrders()">
+<div id="header">基幹業務システム LEGACY-ERP v3.2</div>
+<div id="nav">
+    <a href="/pages/customers.html">顧客管理</a>
+    <a href="/pages/orders.html">受注管理</a>
+</div>
+<div id="content">
+    <h2>受注一覧</h2>
+    <table class="grid">
+        <thead>
+        <tr><th>受注番号</th><th>顧客</th><th>品目</th><th>数量</th><th>金額</th><th>受注日</th></tr>
+        </thead>
+        <tbody id="orderRows"></tbody>
+    </table>
+
+    <fieldset>
+        <legend>新規受注登録</legend>
+        <form method="post" action="/legacy-api/orders">
+            <div><label>顧客ID</label><input type="number" name="customer_id" required></div>
+            <div><label>品目</label><input type="text" name="item" required></div>
+            <div><label>数量</label><input type="number" name="qty" required></div>
+            <div><label>金額</label><input type="number" name="amount" required></div>
+            <input type="submit" value="登録">
+        </form>
+    </fieldset>
+</div>
+<div id="footer">Copyright (C) Legacy Systems Inc. All Rights Reserved. (AIサポートなし・改変不可を想定したデモ画面)</div>
+<script src="/static/js/legacy.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>AI-Sync Bridge</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>AI-Sync Bridge</h1>
+  <div id="status">
+    <span id="status-dot" class="dot dot-unknown"></span>
+    <span id="status-text">APIサーバー確認中...</span>
+  </div>
+  <label class="row">
+    <span>サイドバー表示</span>
+    <input type="checkbox" id="sidebarToggle" checked>
+  </label>
+  <div id="profileInfo">
+    <div><b>Profile:</b> <span id="profileName">-</span></div>
+    <div><b>Legacy:</b> <span id="legacyOrigin">-</span></div>
+    <div><b>API:</b> <span id="apiBase">-</span></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
