@@ -1,6 +1,293 @@
 // AI-Sync Bridge content script
 // レガシーページに Shadow DOM (mode: 'closed') でサイドバーを注入する。
 // ホストページのCSS/JSと完全に分離し、幅は CSS変数で制御する。
+
+// content/sidebar.css のインライン複製。
+// 理由: chrome.runtime.getURL()+fetch() によるランタイム読み込みは
+// 拡張コンテキスト無効化のタイミング次第で "chrome-extension://invalid/"
+// エラーを起こし、CSSが適用されないことがあった。ビルドプロセスを持たない
+// この拡張では、ファイルを分けたままJS文字列としてインライン化するのが
+// 最も単純で確実な回避策。sidebar.css を編集したら、必ずこの定数にも
+// 同じ内容を反映すること。
+const AISB_SIDEBAR_CSS = `
+/* Shadow DOM 内スタイル。ホストページに一切影響を与えない */
+:host, #aisb-root {
+  all: initial;
+}
+#aisb-root * {
+  box-sizing: border-box;
+  font-family: -apple-system, "Segoe UI", "Hiragino Sans", sans-serif;
+}
+#aisb-toggle {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: #3a6ea5;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50% 0 0 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  z-index: 2147483647;
+  box-shadow: -2px 0 6px rgba(0,0,0,0.3);
+}
+#aisb-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: var(--aisb-width, 380px);
+  height: 100vh;
+  background: #fff;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  z-index: 2147483646;
+  transition: transform 0.2s ease;
+}
+.aisb-collapsed #aisb-panel {
+  transform: translateX(100%);
+}
+#aisb-header {
+  background: #1c3f61;
+  color: #fff;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+#aisb-header button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+#aisb-tabs {
+  display: flex;
+  border-bottom: 1px solid #ddd;
+  background: #f7f7f9;
+}
+.aisb-tab {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: #555;
+  border-bottom: 2px solid transparent;
+}
+.aisb-tab.active {
+  color: #1c3f61;
+  border-bottom-color: #3a6ea5;
+  font-weight: 600;
+}
+#aisb-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  font-size: 13px;
+  color: #222;
+}
+.aisb-card {
+  background: #f5f7fa;
+  border: 1px solid #e0e4e8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.aisb-badge {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1c3f61;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+#aisb-chat-log {
+  height: calc(100vh - 220px);
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.aisb-msg {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  max-width: 90%;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.aisb-msg-user {
+  background: #3a6ea5;
+  color: #fff;
+  margin-left: auto;
+}
+.aisb-msg-assistant {
+  background: #eef1f4;
+  color: #222;
+}
+#aisb-chat-input-row, #aisb-search-row {
+  display: flex;
+  gap: 6px;
+}
+#aisb-chat-input, #aisb-search-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+}
+#aisb-chat-send, #aisb-search-run, #aisb-ocr-run {
+  background: #3a6ea5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#aisb-ocr-result {
+  background: #f5f7fa;
+  border: 1px solid #e0e4e8;
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* ---- Analytics (Chart.js 等の外部ライブラリを使わず、純CSSバーチャートで表現) ---- */
+.aisb-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding: 8px 4px 0;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 6px;
+}
+.aisb-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+.aisb-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: #3a6ea5;
+}
+.aisb-bar.aisb-bar-forecast {
+  background: repeating-linear-gradient(45deg, #9db8d6, #9db8d6 4px, #c3d4e8 4px, #c3d4e8 8px);
+}
+.aisb-bar-label {
+  font-size: 9px;
+  color: #666;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.aisb-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 10px;
+}
+.aisb-legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ---- 再受注リスク / ワークフロー ---- */
+.aisb-risk-overdue { border-left: 4px solid #c0392b; }
+.aisb-risk-due_soon { border-left: 4px solid #d68910; }
+.aisb-risk-on_track { border-left: 4px solid #2e8b57; }
+.aisb-risk-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+.aisb-risk-overdue .aisb-risk-tag { background: #fdecea; color: #c0392b; }
+.aisb-risk-due_soon .aisb-risk-tag { background: #fdf2e0; color: #d68910; }
+.aisb-risk-on_track .aisb-risk-tag { background: #e8f5ec; color: #2e8b57; }
+
+.aisb-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c3f61;
+  margin: 10px 0 6px;
+}
+.aisb-btn-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.aisb-btn-row button {
+  background: #3a6ea5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.aisb-btn-row button.aisb-btn-secondary {
+  background: #eef1f4;
+  color: #1c3f61;
+}
+.aisb-event-card {
+  background: #fff8e6;
+  border: 1px solid #f0dca0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.aisb-event-time {
+  color: #999;
+  font-size: 10px;
+  display: block;
+  margin-top: 2px;
+}
+
+/* ---- 通知 / 管理 (Phase4) ---- */
+.aisb-notif-unread {
+  box-shadow: inset 3px 0 0 #3a6ea5;
+  background: #eef4fb;
+}
+.aisb-notif-read-btn {
+  margin-top: 6px;
+  background: #3a6ea5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 10px;
+}
+`;
+
 (async function () {
   // 拡張機能が再読み込み/更新された後、そのタブがまだリロードされていない場合、
   // このcontent.jsインスタンスは古い（無効化された）拡張コンテキストに紐づいたまま残る。
@@ -55,13 +342,19 @@
   document.documentElement.appendChild(host);
   const shadow = host.attachShadow({ mode: "closed" });
 
+  // sidebar.css は runtime fetch (chrome.runtime.getURL + fetch) をやめ、
+  // ビルド時にインライン化した文字列を直接使う。
+  // 理由: getURL/fetchによる読み込みは、拡張コンテキストが「トップの
+  // id チェック通過後・この行に到達するまでの間」に無効化された場合
+  // (例: 開発中に chrome://extensions で再読み込みした瞬間とページの
+  // document_idle 実行が重なるレース)、chrome.runtime.getURL() が
+  // "chrome-extension://invalid/..." を返し、fetch が失敗する。
+  // このfetch失敗はChromeがネットワーク層で無条件にコンソールへ出力する
+  // ため、try/catchで囲んでも赤いエラーログ自体は消せず、かつCSSも
+  // 適用されないままになっていた。インライン化によりfetch自体をなくし、
+  // この経路のエラーとスタイル未適用を両方解消する。
   const styleEl = document.createElement("style");
-  try {
-    const cssUrl = chrome.runtime.getURL("content/sidebar.css");
-    styleEl.textContent = await (await fetch(cssUrl)).text();
-  } catch (e) {
-    /* CSS読み込み失敗時もUIは最低限機能する */
-  }
+  styleEl.textContent = AISB_SIDEBAR_CSS;
   shadow.appendChild(styleEl);
 
   const root = document.createElement("div");
