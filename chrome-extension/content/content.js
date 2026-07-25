@@ -2,10 +2,25 @@
 // レガシーページに Shadow DOM (mode: 'closed') でサイドバーを注入する。
 // ホストページのCSS/JSと完全に分離し、幅は CSS変数で制御する。
 (async function () {
-  const { activeProfile, sidebarOpen } = await chrome.storage.local.get([
-    "activeProfile",
-    "sidebarOpen",
-  ]);
+  // 拡張機能が再読み込み/更新された後、そのタブがまだリロードされていない場合、
+  // このcontent.jsインスタンスは古い（無効化された）拡張コンテキストに紐づいたまま残る。
+  // その状態で chrome.runtime.getURL() 等を呼ぶと "chrome-extension://invalid/..." を返し
+  // net::ERR_FAILED が発生する。実害はない(サイドバー自体は表示される)が、
+  // コンソールにエラーが出続けるため、コンテキスト無効化を検知したら静かに終了する。
+  if (!chrome.runtime?.id) {
+    return;
+  }
+
+  let activeProfile, sidebarOpen;
+  try {
+    ({ activeProfile, sidebarOpen } = await chrome.storage.local.get([
+      "activeProfile",
+      "sidebarOpen",
+    ]));
+  } catch (e) {
+    // "Extension context invalidated" 等。安全に処理を打ち切る。
+    return;
+  }
   const profile = activeProfile || {
     apiBaseUrl: "http://localhost:5011",
     sidebarWidthPx: 380,
@@ -21,7 +36,17 @@
     ],
   };
 
-  const API_BASE = profile.apiBaseUrl;
+  // legacyOrigin (このページの実オリジン) から対応するAPIオリジンを引く。
+  // 保存済みprofile.apiBaseUrlはインストール時点の固定値のため、
+  // 例えばサーバー機ではlocalhost想定で保存されていても、ユーザーが
+  // 公開ドメイン https://aisync.0101.click 経由で自分のPCから開いている場合、
+  // localhost:5011はユーザー自身のPCを指してしまい接続不能になる。
+  // 実際に開いているorigin (location.origin) を優先して解決する。
+  const ORIGIN_API_MAP = {
+    "http://localhost:5010": "http://localhost:5011",
+    "https://aisync.0101.click": "https://aisync-api.0101.click",
+  };
+  const API_BASE = ORIGIN_API_MAP[location.origin] || profile.apiBaseUrl;
 
   // ---- ホスト要素 + Shadow DOM (closed) ----
   const host = document.createElement("div");
