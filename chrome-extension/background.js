@@ -9,16 +9,34 @@ const DEFAULT_PROFILE = {
   sidebarWidthPx: 380,
   panels: [
     { id: "chat", label: "AIチャット", enabled: true },
+    { id: "legacy", label: "業務データ", enabled: true },
     { id: "customers", label: "顧客検索", enabled: true },
     { id: "ocr", label: "OCR取込", enabled: true },
     { id: "search", label: "セマンティック検索", enabled: true },
+    { id: "analytics", label: "予測分析", enabled: true },
+    { id: "workflows", label: "ワークフロー", enabled: true },
+    { id: "notifications", label: "通知", enabled: true },
+    { id: "admin", label: "管理", enabled: true },
   ],
 };
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   const existing = await chrome.storage.local.get("activeProfile");
   if (!existing.activeProfile) {
     await chrome.storage.local.set({ activeProfile: DEFAULT_PROFILE, sidebarOpen: true });
+    return;
+  }
+  // 拡張の更新(reason === "update")では、既存プロファイル(表示名/幅/有効無効等の
+  // ユーザー設定)は保持したまま、新バージョンで追加されたパネル(例: 業務データ)だけを
+  // 末尾にマージする。ここで何もしないと、新パネルは古いストレージにずっと現れない。
+  if (details.reason === "update") {
+    const profile = existing.activeProfile;
+    const knownIds = new Set((profile.panels || []).map((p) => p.id));
+    const missing = DEFAULT_PROFILE.panels.filter((p) => !knownIds.has(p.id));
+    if (missing.length) {
+      profile.panels = [...(profile.panels || []), ...missing];
+      await chrome.storage.local.set({ activeProfile: profile });
+    }
   }
 });
 

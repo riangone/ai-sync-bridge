@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>メインメニュー</h2>
+<div class="summary-boxes">
+    <div class="summary-box"><div class="num">{{ summary.customers }}</div><div class="label">顧客数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.orders }}</div><div class="label">受注件数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.products }}</div><div class="label">商品点数</div></div>
+    <div class="summary-box"><div class="num">&yen;{{ "{:,}".format(summary.sales_total) }}</div><div class="label">受注合計金額</div></div>
+</div>
+
+<div class="menu-grid">
+    <a class="menu-button" href="/Customer/List">顧客管理</a>
+    <a class="menu-button" href="/Order/List">受注管理</a>
+    <a class="menu-button" href="/Product/Inquiry">商品在庫照会</a>
+    <a class="menu-button" href="/Supplier/List">仕入先管理</a>
+    <a class="menu-button" href="/Employee/List">従業員管理</a>
+    <a class="menu-button" href="/Estimate/List">見積管理</a>
+    <a class="menu-button" href="/Invoice/List">請求管理</a>
+    <a class="menu-button" href="/PurchaseOrder/List">発注管理</a>
+    <a class="menu-button" href="/InventoryTransaction/List">在庫トランザクション</a>
+    <a class="menu-button" href="/GoodsReceipt/List">入荷管理</a>
+    <a class="menu-button" href="/Property/List">物件管理</a>
+    <a class="menu-button" href="/ArAp/List">売掛買掛</a>
+    <a class="menu-button" href="/Profit/List">利益管理</a>
+</div>
+{% endblock %}

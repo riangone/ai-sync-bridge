@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>売掛買掛一覧</h2>
+<table class="grid">
+    <thead>
+    <tr><th>区分</th><th>取引先</th><th>残高</th></tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+        <td>{{ row.Type }}</td>
+        <td>{{ row.PartnerName }}</td>
+        <td>&yen;{{ "{:,}".format(row.Balance) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">データがありません</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

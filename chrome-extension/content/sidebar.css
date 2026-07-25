@@ -274,3 +274,82 @@
   cursor: pointer;
   font-size: 10px;
 }
+
+/* ---- 業務データ(レガシーERP全13エンティティ) パネル ---- */
+.aisb-inline-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.aisb-inline-row select {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #fff;
+}
+.aisb-inline-row input[type="text"] {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.aisb-inline-row button {
+  background: #3a6ea5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.aisb-context-banner {
+  background: #eef4fb;
+  border: 1px solid #b9d3ec;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.aisb-context-banner .aisb-summarize-btn {
+  margin-top: 6px;
+  background: #1c3f61;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.aisb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.aisb-table th, .aisb-table td {
+  border-bottom: 1px solid #e0e4e8;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.aisb-table th {
+  color: #555;
+  font-weight: 600;
+  background: #f5f7fa;
+  position: sticky;
+  top: 0;
+}
+.aisb-table tr:hover td {
+  background: #f5f9ff;
+}
+.aisb-link-btn {
+  background: transparent;
+  border: none;
+  color: #3a6ea5;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  text-decoration: underline;
+}

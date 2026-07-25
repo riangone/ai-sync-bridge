@@ -1,0 +1,210 @@
+/* 意図的に「古臭い」レガシー社内システム風デザイン (WebForms/イントラ 2005年頃を想定) */
+* { box-sizing: border-box; }
+body {
+    font-family: Tahoma, Verdana, "MS Pゴシック", sans-serif;
+    font-size: 12px;
+    background: #ece9d8;
+    margin: 0;
+    color: #000;
+}
+#header {
+    background: linear-gradient(#3a6ea5, #1c3f61);
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 16px;
+    font-weight: bold;
+    border-bottom: 3px solid #0a1f33;
+}
+#nav {
+    background: #d4d0c8;
+    border-bottom: 1px solid #808080;
+    padding: 4px 16px;
+}
+#nav a {
+    color: #003399;
+    margin-right: 14px;
+    text-decoration: underline;
+    font-size: 12px;
+    line-height: 2.2;
+}
+#content {
+    margin: 16px auto;
+    max-width: 1200px;
+    background: #fff;
+    border: 1px solid #808080;
+    padding: 16px;
+}
+h2 {
+    font-size: 15px;
+    border-bottom: 2px solid #3a6ea5;
+    padding-bottom: 4px;
+    margin-top: 0;
+}
+h3 {
+    font-size: 13px;
+    color: #1c3f61;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 3px;
+}
+
+/* ---- 一覧グリッド ---- */
+table.grid {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+}
+table.grid th {
+    background: #3a6ea5;
+    color: #fff;
+    padding: 4px 8px;
+    text-align: left;
+    font-size: 12px;
+    white-space: nowrap;
+}
+table.grid td {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+}
+table.grid tr:nth-child(even) {
+    background: #f0f0f0;
+}
+table.grid td.ops a {
+    margin-right: 8px;
+}
+tr.stock-warning td {
+    background: #ffe0e0;
+}
+
+/* ---- フォームテーブル ---- */
+table.form-table {
+    border-collapse: collapse;
+    margin-bottom: 16px;
+}
+table.form-table th {
+    background: #eef2f7;
+    border: 1px solid #ccc;
+    text-align: right;
+    padding: 6px 10px;
+    width: 140px;
+    font-weight: normal;
+    vertical-align: top;
+}
+table.form-table td {
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+}
+.required {
+    color: #c00;
+    margin-left: 4px;
+}
+
+input.textbox, select, textarea {
+    border: 1px inset #808080;
+    padding: 3px 5px;
+    font-family: inherit;
+    font-size: 12px;
+    min-width: 220px;
+}
+input.textbox.num {
+    min-width: 100px;
+    text-align: right;
+}
+textarea.textbox {
+    min-width: 320px;
+}
+
+/* ---- ボタン類 ---- */
+button, input[type=submit] {
+    background: #d4d0c8;
+    border: 1px outset #808080;
+    padding: 4px 14px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.button.small {
+    padding: 2px 8px;
+    font-size: 11px;
+}
+.button-link {
+    display: inline-block;
+    background: #d4d0c8;
+    border: 1px outset #808080;
+    padding: 4px 14px;
+    color: #000;
+    text-decoration: none;
+    font-size: 12px;
+    margin-right: 8px;
+}
+.form-actions, .toolbar {
+    margin: 10px 0;
+}
+
+/* ---- 受注/見積/発注 明細グリッド ---- */
+#item-table .amount-cell, #item-table .price-input {
+    text-align: right;
+}
+.total-line {
+    text-align: right;
+    font-size: 15px;
+    font-weight: bold;
+    margin: 10px 0;
+    color: #1c3f61;
+}
+
+/* ---- ダッシュボード ---- */
+.summary-boxes {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.summary-box {
+    flex: 1;
+    background: #eef2f7;
+    border: 1px solid #99b;
+    padding: 12px;
+    text-align: center;
+}
+.summary-box .num {
+    font-size: 22px;
+    font-weight: bold;
+    color: #1c3f61;
+}
+.summary-box .label {
+    font-size: 11px;
+    color: #444;
+}
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.menu-button {
+    display: block;
+    background: #3a6ea5;
+    color: #fff;
+    text-align: center;
+    padding: 16px 8px;
+    text-decoration: none;
+    font-size: 13px;
+    border: 1px solid #1c3f61;
+}
+.menu-button:hover {
+    background: #1c3f61;
+}
+
+/* ---- ページャ ---- */
+.pager {
+    text-align: center;
+    margin-bottom: 16px;
+}
+.pager a {
+    margin: 0 10px;
+    color: #003399;
+}
+
+#footer {
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+    padding: 8px;
+}

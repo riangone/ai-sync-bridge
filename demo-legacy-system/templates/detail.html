@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ heading }}</h2>
+<table class="form-table">
+    {% for f in fields %}
+    <tr>
+        <th>{{ f.label }}</th>
+        <td>{% if f.name in money_fields %}&yen;{{ "{:,}".format(values.get(f.name) or 0) }}{% else %}{{ values.get(f.name, "") }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% if items %}
+<h3>明細</h3>
+<table class="grid">
+    <thead><tr><th>商品</th><th>数量</th><th>単価</th><th>金額</th></tr></thead>
+    <tbody>
+    {% for it in items %}
+    <tr>
+        <td>{{ it.ProductName }}</td>
+        <td>{{ it.Quantity }}</td>
+        <td>&yen;{{ "{:,}".format(it.UnitPrice) }}</td>
+        <td>&yen;{{ "{:,}".format(it.Amount) }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+<div class="form-actions">
+    {% if show_entry %}<a class="button-link" href="/{{ entity_path }}/Entry/{{ record_id }}">編集</a>{% endif %}
+    <a class="button-link" href="/{{ entity_path }}/List">戻る</a>
+</div>
+{% endblock %}

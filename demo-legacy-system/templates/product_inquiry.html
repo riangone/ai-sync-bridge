@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>在庫照会</h2>
+<table class="grid">
+    <thead>
+    <tr><th>ID</th><th>商品名</th><th>カテゴリ</th><th>単価</th><th>在庫数</th><th>安全在庫</th><th>状態</th></tr>
+    </thead>
+    <tbody>
+    {% for p in products %}
+    <tr class="{{ 'stock-warning' if p.Stock <= p.SafetyStock else '' }}">
+        <td>{{ p.Id }}</td>
+        <td>{{ p.Name }}</td>
+        <td>{{ p.Category }}</td>
+        <td>&yen;{{ "{:,}".format(p.UnitPrice) }}</td>
+        <td>{{ p.Stock }}</td>
+        <td>{{ p.SafetyStock }}</td>
+        <td>{{ "要補充" if p.Stock <= p.SafetyStock else "適正" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
