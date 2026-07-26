@@ -124,6 +124,12 @@ class PredictionResponse(BaseModel):
     predictions: list[ReorderPrediction]
 
 
+# ---------- AI Insight (統計/ルール結果 -> AIによる解釈コメント) ----------
+class InsightResponse(BaseModel):
+    comment: str
+    provider: str  # 生成に使ったAiProvider名(mock|opencode|openai|gemini)
+
+
 # ---------- Workflow Engine ----------
 class WorkflowRule(BaseModel):
     id: int

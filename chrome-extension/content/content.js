@@ -113,6 +113,12 @@ const AISB_SIDEBAR_CSS = `
   font-size: 11px;
   margin-bottom: 8px;
 }
+.aisb-insight-card {
+  background: #fbf6ec;
+  border: 1px solid #e6d5a8;
+  border-left: 3px solid #c9971e;
+  white-space: pre-wrap;
+}
 #aisb-chat-log {
   height: calc(100vh - 220px);
   overflow-y: auto;
@@ -365,6 +371,56 @@ const AISB_SIDEBAR_CSS = `
   padding: 0;
   text-decoration: underline;
 }
+
+/* ---- リサイズハンドル / 最小化・最大化 (サイドバーUI改善) ---- */
+#aisb-resize-handle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 20;
+  background: transparent;
+}
+#aisb-resize-handle:hover,
+#aisb-resize-handle.aisb-resizing {
+  background: rgba(58, 110, 165, 0.35);
+}
+#aisb-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+#aisb-header-btns button {
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 3px;
+}
+#aisb-header-btns button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.aisb-maximized #aisb-panel {
+  width: min(920px, 92vw) !important;
+}
+.aisb-maximized #aisb-resize-handle {
+  cursor: default;
+  pointer-events: none;
+}
+.aisb-minimized #aisb-tabs,
+.aisb-minimized #aisb-body,
+.aisb-minimized #aisb-resize-handle {
+  display: none;
+}
+.aisb-minimized #aisb-panel {
+  height: auto;
+}
+/* パネル切替時も前回の表示内容を保持するため、非表示パネルは display:none のみで
+   DOM/JS状態(スクロール位置・入力値・取得済みデータ)を破棄しない */
+.aisb-panel-pane {
+  min-height: 40px;
+}
 `;
 
 (async function () {
@@ -452,9 +508,14 @@ const AISB_SIDEBAR_CSS = `
   root.innerHTML = `
     <div id="aisb-toggle" title="AI-Sync Bridge">🤖</div>
     <div id="aisb-panel">
+      <div id="aisb-resize-handle" title="ドラッグして幅を調整"></div>
       <div id="aisb-header">
         <span>AI-Sync Bridge</span>
-        <button id="aisb-close">×</button>
+        <div id="aisb-header-btns">
+          <button id="aisb-minimize" title="最小化">–</button>
+          <button id="aisb-maximize" title="最大化/元に戻す">⛶</button>
+          <button id="aisb-close" title="閉じる">×</button>
+        </div>
       </div>
       <div id="aisb-tabs">
         ${panelDefs.map((p, i) => `<button class="aisb-tab${i === 0 ? " active" : ""}" data-panel="${p.id}">${p.label}</button>`).join("")}
@@ -478,14 +539,77 @@ const AISB_SIDEBAR_CSS = `
     admin: renderAdminPanel,
   };
 
+  // パネル切替時に前回の表示内容(取得済みデータ・入力途中の値・スクロール位置)を
+  // 保持するため、タブごとのpaneはbodyEl配下に残したまま display:none で
+  // 出し入れするだけにする(以前は毎回 innerHTML="" で作り直していたため、
+  // 他パネルに切り替えて戻ると必ず再フェッチ＆状態リセットされていた)。
+  const panelEls = {};
   function showPanel(id) {
     tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.panel === id));
-    bodyEl.innerHTML = "";
-    (renderers[id] || renderUnknownPanel)(bodyEl);
+    Object.entries(panelEls).forEach(([pid, paneEl]) => {
+      paneEl.style.display = pid === id ? "" : "none";
+    });
+    if (!panelEls[id]) {
+      const paneEl = document.createElement("div");
+      paneEl.className = "aisb-panel-pane";
+      paneEl.dataset.panel = id;
+      bodyEl.appendChild(paneEl);
+      panelEls[id] = paneEl;
+      (renderers[id] || renderUnknownPanel)(paneEl);
+    }
   }
 
   tabButtons.forEach((b) => b.addEventListener("click", () => showPanel(b.dataset.panel)));
   if (panelDefs[0]) showPanel(panelDefs[0].id);
+
+  // ---- 幅リサイズ(ドラッグ) ----
+  const resizeHandle = root.querySelector("#aisb-resize-handle");
+  const MIN_WIDTH = 300;
+  const MAX_WIDTH_RATIO = 0.9;
+  let resizing = false;
+  let latestWidth = profile.sidebarWidthPx || 380;
+
+  async function persistWidth(px) {
+    try {
+      const { activeProfile: latest } = await chrome.storage.local.get("activeProfile");
+      const merged = { ...(latest || profile), sidebarWidthPx: px };
+      await chrome.storage.local.set({ activeProfile: merged });
+    } catch (e) {
+      // コンテキスト無効化等は無視(次回起動時に既定値へ戻るだけ)
+    }
+  }
+
+  resizeHandle.addEventListener("mousedown", (e) => {
+    if (root.classList.contains("aisb-maximized")) return;
+    resizing = true;
+    resizeHandle.classList.add("aisb-resizing");
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!resizing) return;
+    const maxWidth = Math.min(900, window.innerWidth * MAX_WIDTH_RATIO);
+    const newWidth = Math.min(Math.max(window.innerWidth - e.clientX, MIN_WIDTH), maxWidth);
+    latestWidth = newWidth;
+    host.style.setProperty("--aisb-width", `${newWidth}px`);
+  });
+  window.addEventListener("mouseup", () => {
+    if (!resizing) return;
+    resizing = false;
+    resizeHandle.classList.remove("aisb-resizing");
+    document.body.style.userSelect = "";
+    persistWidth(Math.round(latestWidth));
+  });
+
+  // ---- 最小化(ヘッダーのみに折りたたむ) / 最大化(広い固定幅) ----
+  root.querySelector("#aisb-minimize").addEventListener("click", () => {
+    root.classList.remove("aisb-maximized");
+    root.classList.toggle("aisb-minimized");
+  });
+  root.querySelector("#aisb-maximize").addEventListener("click", () => {
+    root.classList.remove("aisb-minimized");
+    root.classList.toggle("aisb-maximized");
+  });
 
   // ---- 通知タブに未読件数バッジを表示する(ワークフロー発火等をリアルタイムに気づけるように) ----
   const notifTab = tabButtons.find((b) => b.dataset.panel === "notifications");
@@ -595,6 +719,26 @@ const AISB_SIDEBAR_CSS = `
 
   function escapeHtml(v) {
     return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // 統計/ルール評価の結果をAIに解釈させる各パネル共通のボタン挙動。
+  // 分析(予測分析)/ワークフロー(発火傾向)/管理(統計コメント)の4箇所で使い回す。
+  // GET専用(サーバー側で対象データを取り直して都度プロンプトを組み立てるため、bodyは不要)。
+  async function runInsight(url, btn, outEl) {
+    btn.disabled = true;
+    const prevLabel = btn.textContent;
+    btn.textContent = "AI解釈を生成中...";
+    outEl.innerHTML = "";
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      outEl.innerHTML = `<div class="aisb-card aisb-insight-card">${escapeHtml(data.comment)}</div>`;
+    } catch (e) {
+      outEl.innerHTML = `<p>エラー: ${e}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+    }
   }
 
   function renderLegacyDataPanel(el) {
@@ -796,11 +940,25 @@ const AISB_SIDEBAR_CSS = `
     el.innerHTML = `
       <div class="aisb-section-title">売上予測(線形回帰)</div>
       <div id="aisb-forecast-chart">読込中...</div>
+      <div class="aisb-btn-row">
+        <button id="aisb-forecast-insight-btn" class="aisb-btn-secondary">AIでトレンドを解釈する</button>
+      </div>
+      <div id="aisb-forecast-insight"></div>
       <div class="aisb-section-title">再受注リスク予測</div>
       <div id="aisb-reorder-list">読込中...</div>
+      <div class="aisb-btn-row">
+        <button id="aisb-reorder-insight-btn" class="aisb-btn-secondary">AIでリスクを解釈する</button>
+      </div>
+      <div id="aisb-reorder-insight"></div>
     `;
     const chartEl = el.querySelector("#aisb-forecast-chart");
     const reorderEl = el.querySelector("#aisb-reorder-list");
+    el.querySelector("#aisb-forecast-insight-btn").addEventListener("click", (e) =>
+      runInsight(`${API_BASE}/api/analytics/forecast/insight?months_ahead=3`, e.target, el.querySelector("#aisb-forecast-insight"))
+    );
+    el.querySelector("#aisb-reorder-insight-btn").addEventListener("click", (e) =>
+      runInsight(`${API_BASE}/api/analytics/reorder-predictions/insight`, e.target, el.querySelector("#aisb-reorder-insight"))
+    );
     const riskLabel = { overdue: "要フォロー", due_soon: "近日予定", on_track: "順調" };
 
     fetch(`${API_BASE}/api/analytics/forecast?months_ahead=3`)
@@ -860,9 +1018,16 @@ const AISB_SIDEBAR_CSS = `
       </div>
       <div class="aisb-section-title">発火履歴</div>
       <div id="aisb-wf-history">読込中...</div>
+      <div class="aisb-btn-row">
+        <button id="aisb-wf-insight-btn" class="aisb-btn-secondary">AIで傾向を解釈する</button>
+      </div>
+      <div id="aisb-wf-insight"></div>
     `;
     const rulesEl = el.querySelector("#aisb-wf-rules");
     const historyEl = el.querySelector("#aisb-wf-history");
+    el.querySelector("#aisb-wf-insight-btn").addEventListener("click", (e) =>
+      runInsight(`${API_BASE}/api/workflows/history/insight`, e.target, el.querySelector("#aisb-wf-insight"))
+    );
 
     function loadRules() {
       fetch(`${API_BASE}/api/workflows/rules`)
@@ -977,12 +1142,17 @@ const AISB_SIDEBAR_CSS = `
       <div id="aisb-admin-stats">読込中...</div>
       <div class="aisb-btn-row">
         <button id="aisb-admin-reset" class="aisb-btn-secondary">デモデータをリセット</button>
+        <button id="aisb-admin-insight-btn" class="aisb-btn-secondary">AIで統計を解釈する</button>
       </div>
+      <div id="aisb-admin-insight"></div>
       <div class="aisb-section-title">監査ログ</div>
       <div id="aisb-admin-audit">読込中...</div>
     `;
     const statsEl = el.querySelector("#aisb-admin-stats");
     const auditEl = el.querySelector("#aisb-admin-audit");
+    el.querySelector("#aisb-admin-insight-btn").addEventListener("click", (e) =>
+      runInsight(`${API_BASE}/api/admin/stats/insight`, e.target, el.querySelector("#aisb-admin-insight"))
+    );
 
     function loadStats() {
       fetch(`${API_BASE}/api/admin/stats`)

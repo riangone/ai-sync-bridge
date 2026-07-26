@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.deps import get_admin_service, get_demo_store, get_notification_center, get_workflow_engine
-from app.models.schemas import WorkflowEvent, WorkflowRule, WorkflowRuleCreate, WorkflowRunResult
+from app.deps import get_admin_service, get_ai_provider, get_demo_store, get_notification_center, get_workflow_engine
+from app.models.schemas import InsightResponse, WorkflowEvent, WorkflowRule, WorkflowRuleCreate, WorkflowRunResult
+from app.services import insight_service
 from app.services.admin_service import AdminService
+from app.services.ai_client import AiProvider
 from app.services.demo_data import DemoDataStore
 from app.services.notification_service import NotificationCenter
 from app.services.workflow_service import WorkflowEngine
@@ -69,3 +71,15 @@ def run_workflows(
 @router.get("/history", response_model=list[WorkflowEvent])
 def get_history(limit: int = 50, engine: WorkflowEngine = Depends(get_workflow_engine)):
     return engine.get_history(limit)
+
+
+# ルール評価自体はAI非依存(条件式ベース)のまま。発火傾向の解釈だけをオプトインでAIに委譲する。
+@router.get("/history/insight", response_model=InsightResponse)
+async def history_insight(
+    limit: int = 50,
+    engine: WorkflowEngine = Depends(get_workflow_engine),
+    ai: AiProvider = Depends(get_ai_provider),
+):
+    history = engine.get_history(limit)
+    comment = await insight_service.interpret_workflow_history(ai, history)
+    return InsightResponse(comment=comment, provider=ai.name)

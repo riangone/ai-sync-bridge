@@ -101,6 +101,12 @@
   font-size: 11px;
   margin-bottom: 8px;
 }
+.aisb-insight-card {
+  background: #fbf6ec;
+  border: 1px solid #e6d5a8;
+  border-left: 3px solid #c9971e;
+  white-space: pre-wrap;
+}
 #aisb-chat-log {
   height: calc(100vh - 220px);
   overflow-y: auto;
@@ -352,4 +358,54 @@
   font-size: 11px;
   padding: 0;
   text-decoration: underline;
+}
+
+/* ---- リサイズハンドル / 最小化・最大化 (サイドバーUI改善) ---- */
+#aisb-resize-handle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 20;
+  background: transparent;
+}
+#aisb-resize-handle:hover,
+#aisb-resize-handle.aisb-resizing {
+  background: rgba(58, 110, 165, 0.35);
+}
+#aisb-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+#aisb-header-btns button {
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 3px;
+}
+#aisb-header-btns button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.aisb-maximized #aisb-panel {
+  width: min(920px, 92vw) !important;
+}
+.aisb-maximized #aisb-resize-handle {
+  cursor: default;
+  pointer-events: none;
+}
+.aisb-minimized #aisb-tabs,
+.aisb-minimized #aisb-body,
+.aisb-minimized #aisb-resize-handle {
+  display: none;
+}
+.aisb-minimized #aisb-panel {
+  height: auto;
+}
+/* パネル切替時も前回の表示内容を保持するため、非表示パネルは display:none のみで
+   DOM/JS状態(スクロール位置・入力値・取得済みデータ)を破棄しない */
+.aisb-panel-pane {
+  min-height: 40px;
 }
