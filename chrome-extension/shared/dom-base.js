@@ -480,6 +480,52 @@ window.AISB.domBase = (function () {
   color: #7a5410;
   font-size: 11px;
 }
+
+/* ---- クロス分析(与信リスク/在庫逼迫/滞留債権) 横棒ランキングチャート ---- */
+.aisb-hbar-chart {
+  display: block;
+  height: auto;
+  align-items: normal;
+  padding: 4px 0 0;
+  border-bottom: none;
+}
+.aisb-hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.aisb-hbar-label {
+  width: 92px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aisb-hbar-track {
+  flex: 1;
+  height: 10px;
+  background: #eef1f4;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.aisb-hbar-fill {
+  height: 100%;
+  background: #3a6ea5;
+  border-radius: 5px;
+}
+.aisb-hbar-track.aisb-hbar-warn .aisb-hbar-fill { background: #d68910; }
+.aisb-hbar-track.aisb-hbar-over .aisb-hbar-fill { background: #c0392b; }
+.aisb-hbar-value {
+  width: 118px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #444;
+  text-align: right;
+  white-space: nowrap;
+}
 `;
 
   function escapeHtml(v) {
@@ -498,5 +544,58 @@ window.AISB.domBase = (function () {
     return { entity, action, id: id || null };
   }
 
-  return { CSS, escapeHtml, detectLegacyContext };
+  // クロス分析(与信リスク/在庫逼迫/滞留債権)向けの「ランキング型横棒チャート」。
+  // Chart.js等は使わず既存のCSSバーチャート方針(analytics参照)を踏襲するが、狭い
+  // サイドバー幅では縦棒より横棒の方がラベル(顧客名/商品名)を読みやすいため、
+  // ai-api-server/cross_analysis_service.py が返す chart(type/unit/categories/series)
+  // 形式を汎用的に描画する専用関数として分離した。type=ranked-bar-grouped は
+  // 「限度額に対する使用量」のようなゲージ表現(series[0]=上限, series[1]=実績)、
+  // type=ranked-bar は単一指標のランキング表現。
+  function renderRankedBarChart(chart) {
+    const categories = chart?.categories || [];
+    if (!categories.length) return "<p>該当データがありません</p>";
+    const unit = chart.unit || "";
+
+    if (chart.type === "ranked-bar-grouped" && (chart.series || []).length >= 2) {
+      const limits = chart.series[0].values;
+      const actuals = chart.series[1].values;
+      const legend =
+        `<div class="aisb-legend">` +
+        `<span><span class="aisb-legend-dot" style="background:#c7d8ec"></span>${escapeHtml(chart.series[0].label)}</span>` +
+        `<span><span class="aisb-legend-dot" style="background:#3a6ea5"></span>${escapeHtml(chart.series[1].label)}</span>` +
+        `</div>`;
+      const rows = categories
+        .map((cat, i) => {
+          const limit = Number(limits[i]) || 0;
+          const actual = Number(actuals[i]) || 0;
+          const ratio = limit > 0 ? actual / limit : 0;
+          const pct = Math.max(2, Math.min(100, Math.round(ratio * 100)));
+          const stateClass = ratio >= 1 ? "aisb-hbar-over" : ratio >= 0.8 ? "aisb-hbar-warn" : "";
+          return `<div class="aisb-hbar-row">
+            <div class="aisb-hbar-label" title="${escapeHtml(cat)}">${escapeHtml(cat)}</div>
+            <div class="aisb-hbar-track ${stateClass}"><div class="aisb-hbar-fill" style="width:${pct}%"></div></div>
+            <div class="aisb-hbar-value">${Math.round(actual).toLocaleString()} / ${Math.round(limit).toLocaleString()}${unit}</div>
+          </div>`;
+        })
+        .join("");
+      return legend + rows;
+    }
+
+    const values = (chart.series && chart.series[0] && chart.series[0].values) || [];
+    const max = Math.max(...values.map((v) => Math.abs(Number(v) || 0)), 1);
+    return categories
+      .map((cat, i) => {
+        const v = values[i];
+        const pct = v == null ? 0 : Math.max(2, Math.min(100, Math.round((Math.abs(Number(v)) / max) * 100)));
+        const display = v == null ? "-" : `${Math.round(Number(v)).toLocaleString()}${unit}`;
+        return `<div class="aisb-hbar-row">
+          <div class="aisb-hbar-label" title="${escapeHtml(cat)}">${escapeHtml(cat)}</div>
+          <div class="aisb-hbar-track"><div class="aisb-hbar-fill" style="width:${pct}%"></div></div>
+          <div class="aisb-hbar-value">${display}</div>
+        </div>`;
+      })
+      .join("");
+  }
+
+  return { CSS, escapeHtml, detectLegacyContext, renderRankedBarChart };
 })();

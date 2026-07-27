@@ -68,6 +68,35 @@ async def interpret_workflow_history(ai: AiProvider, history: list) -> str:
     return await ai.complete(prompt)
 
 
+async def interpret_cross_analysis(ai: AiProvider, result: dict) -> str:
+    """与信リスク/在庫逼迫/滞留債権など、cross_analysis_service の各レポート共通の
+    解釈コメント生成。summary(集計値)とchart上位N件(既にランキング済み)だけを渡し、
+    生のrows全件はプロンプトに含めない(トークン節約、かつ既にサーバー側で
+    ソート・上位抽出済みのため十分)。"""
+    label = result.get("label", "")
+    summary = result.get("summary", {})
+    chart = result.get("chart", {})
+    categories = chart.get("categories", [])
+    if not categories:
+        return f"「{label}」に該当するデータがないため、傾向を解釈できません。"
+
+    summary_line = ", ".join(f"{k}={v}" for k, v in summary.items())
+    series_lines = []
+    for s in chart.get("series", []):
+        pairs = ", ".join(f"{c}={v}" for c, v in zip(categories, s.get("values", [])))
+        series_lines.append(f"{s.get('label')}: {pairs}")
+
+    prompt = (
+        f"以下は基幹システムの「{label}」の集計結果です"
+        "(複数の業務データを突き合わせた集計・閾値判定であり、AIの判断ではありません)。\n"
+        f"概況: {summary_line}\n"
+        f"上位項目の内訳:\n" + "\n".join(series_lines) + "\n\n"
+        "業務担当者向けに、特に注意すべき先・原因として考えられる点・次に取るべき"
+        "アクション案を日本語で3〜4行程度にまとめてください。"
+    )
+    return await ai.complete(prompt)
+
+
 async def interpret_admin_stats(ai: AiProvider, stats: dict) -> str:
     prompt = (
         "以下はシステムの現在の統計情報です。運用者向けに、注目すべき点があれば"

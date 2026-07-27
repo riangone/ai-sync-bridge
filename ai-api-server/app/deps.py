@@ -26,6 +26,7 @@ from app.services.predictive_service import PredictiveService
 from app.services.vector_index import VectorIndexManager
 from app.services.workflow_service import WorkflowEngine
 from app.services.nlsql_service import NLSQLService
+from app.services.cross_analysis_service import CrossAnalysisService
 
 
 @lru_cache
@@ -94,3 +95,7 @@ def get_admin_service() -> AdminService:
 
 def get_nlsql_service() -> NLSQLService:
     return NLSQLService(get_settings(), get_ai_provider())
+
+
+def get_cross_analysis_service() -> CrossAnalysisService:
+    return CrossAnalysisService(get_settings())

@@ -32,6 +32,7 @@
     API_BASE,
     LEGACY_ORIGIN,
     escapeHtml: window.AISB.domBase.escapeHtml,
+    renderRankedBarChart: window.AISB.domBase.renderRankedBarChart,
     LEGACY_ENTITIES: window.AISB.configBase.LEGACY_ENTITIES,
     detectLegacyContext: () => window.AISB.domBase.detectLegacyContext(window.AISB.configBase.LEGACY_ENTITIES),
     runInsight: client.runInsight,

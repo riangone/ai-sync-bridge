@@ -20,13 +20,12 @@
 import json
 import re
 
-import httpx
-
 from app.config import Settings
+from app.services import legacy_client
 from app.services.ai_client import AiProvider
 
 ALLOWED_OPS = {"eq", "ne", "gt", "gte", "lt", "lte", "contains", "in"}
-_MAX_ROWS_FETCHED = 500  # プロンプト肥大化/レイテンシ防止の上限
+_MAX_ROWS_FETCHED = legacy_client.MAX_ROWS_FETCHED  # プロンプト肥大化/レイテンシ防止の上限
 _MAX_SAMPLE_ROWS = 3
 
 
@@ -39,12 +38,7 @@ class NLSQLService:
     # 1. レガシー側から対象エンティティの実データを取得(読み取り専用API)
     # ---------------------------------------------------------------
     async def _fetch_rows(self, entity: str) -> tuple[list[dict], str]:
-        url = f"{self.settings.legacy_base_url}/api/{entity}/list"
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, params={"limit": _MAX_ROWS_FETCHED})
-            resp.raise_for_status()
-            data = resp.json()
-        return data.get("rows", []), data.get("label", entity)
+        return await legacy_client.fetch_rows(self.settings, entity)
 
     # ---------------------------------------------------------------
     # 1.5 低カーディナリティな文字列項目(ステータス/区分等)の実際の値一覧を集計する。

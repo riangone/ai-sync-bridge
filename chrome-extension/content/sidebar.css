@@ -466,3 +466,49 @@
   color: #7a5410;
   font-size: 11px;
 }
+
+/* ---- クロス分析(与信リスク/在庫逼迫/滞留債権) 横棒ランキングチャート ---- */
+.aisb-hbar-chart {
+  display: block;
+  height: auto;
+  align-items: normal;
+  padding: 4px 0 0;
+  border-bottom: none;
+}
+.aisb-hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.aisb-hbar-label {
+  width: 92px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aisb-hbar-track {
+  flex: 1;
+  height: 10px;
+  background: #eef1f4;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.aisb-hbar-fill {
+  height: 100%;
+  background: #3a6ea5;
+  border-radius: 5px;
+}
+.aisb-hbar-track.aisb-hbar-warn .aisb-hbar-fill { background: #d68910; }
+.aisb-hbar-track.aisb-hbar-over .aisb-hbar-fill { background: #c0392b; }
+.aisb-hbar-value {
+  width: 118px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #444;
+  text-align: right;
+  white-space: nowrap;
+}

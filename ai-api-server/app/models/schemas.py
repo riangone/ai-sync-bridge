@@ -165,6 +165,38 @@ class NLSQLQueryResponse(BaseModel):
     provider: str
 
 
+# ---------- クロス分析(複数エンティティを跨いだ集計・分析 + チャート) ----------
+# nlsql(単一エンティティの自然文フィルタ)では表現できない「与信リスク」
+# 「在庫逼迫」「滞留債権」等、複数エンティティの突き合わせが必要な定型レポート。
+# 算出ロジック自体はAI非依存(cross_analysis_service.py参照)。
+class CrossAnalysisReportMeta(BaseModel):
+    id: str
+    label: str
+    unit: str
+
+
+class ChartSeries(BaseModel):
+    label: str
+    values: list[float | int | None]
+
+
+class ChartData(BaseModel):
+    type: str  # ranked-bar | ranked-bar-grouped
+    unit: str
+    categories: list[str]
+    series: list[ChartSeries]
+
+
+class CrossAnalysisResponse(BaseModel):
+    report: str
+    label: str
+    generated_at: datetime
+    summary: dict
+    chart: ChartData
+    rows: list[dict]
+    warnings: list[str] = []
+
+
 # ---------- Workflow Engine ----------
 class WorkflowRule(BaseModel):
     id: int
