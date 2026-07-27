@@ -18,13 +18,12 @@
 要求しない(レガシー側は本機能の存在を知らない)。
 """
 import json
-import re
 
 from app.config import Settings
-from app.services import legacy_client
+from app.services import ai_json_util, filter_ops, legacy_client
 from app.services.ai_client import AiProvider
 
-ALLOWED_OPS = {"eq", "ne", "gt", "gte", "lt", "lte", "contains", "in"}
+ALLOWED_OPS = filter_ops.ALLOWED_OPS  # 後方互換のため引き続きこの名前でも参照可能にする
 _MAX_ROWS_FETCHED = legacy_client.MAX_ROWS_FETCHED  # プロンプト肥大化/レイテンシ防止の上限
 _MAX_SAMPLE_ROWS = 3
 
@@ -101,17 +100,7 @@ class NLSQLService:
     # ---------------------------------------------------------------
     @staticmethod
     def _extract_json(text: str) -> dict:
-        if not text:
-            return {}
-        cleaned = re.sub(r"```(?:json)?", "", text).strip()
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if not match:
-            return {}
-        try:
-            parsed = json.loads(match.group(0))
-            return parsed if isinstance(parsed, dict) else {}
-        except json.JSONDecodeError:
-            return {}
+        return ai_json_util.extract_json(text)
 
     # ---------------------------------------------------------------
     # 4. ホワイトリスト検証(ここを通過した条件だけが実際に評価される)
@@ -148,45 +137,12 @@ class NLSQLService:
         return {"conditions": conditions, "logic": logic, "sort": sort, "limit": limit}, warnings
 
     # ---------------------------------------------------------------
-    # 5. 検証済み条件のみを安全に評価(eval不使用)
+    # 5. 検証済み条件のみを安全に評価(eval不使用、実装は filter_ops に共通化)
     # ---------------------------------------------------------------
     @staticmethod
-    def _coerce_pair(actual, value):
-        """可能なら数値同士で比較、無理なら文字列同士で比較する。"""
-        try:
-            return float(actual), float(value)
-        except (TypeError, ValueError):
-            return str(actual), str(value)
-
-    @classmethod
-    def _match(cls, row: dict, cond: dict) -> bool:
+    def _match(row: dict, cond: dict) -> bool:
         field, op, value = cond["field"], cond["op"], cond["value"]
-        actual = row.get(field)
-        if actual is None:
-            return False
-        try:
-            if op == "eq":
-                return str(actual).lower() == str(value).lower()
-            if op == "ne":
-                return str(actual).lower() != str(value).lower()
-            if op == "contains":
-                return str(value).lower() in str(actual).lower()
-            if op == "in":
-                values = value if isinstance(value, list) else [value]
-                return str(actual).lower() in {str(v).lower() for v in values}
-            if op in ("gt", "gte", "lt", "lte"):
-                a, v = cls._coerce_pair(actual, value)
-                if op == "gt":
-                    return a > v
-                if op == "gte":
-                    return a >= v
-                if op == "lt":
-                    return a < v
-                if op == "lte":
-                    return a <= v
-        except (TypeError, ValueError):
-            return False
-        return False
+        return filter_ops.match_value(row.get(field), op, value)
 
     @classmethod
     def _apply_filter(cls, rows: list[dict], flt: dict) -> list[dict]:

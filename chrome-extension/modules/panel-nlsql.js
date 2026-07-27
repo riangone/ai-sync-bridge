@@ -33,7 +33,20 @@ const XA_SUMMARY_LABELS = {
   product_count: "商品数", urgent_count: "逼迫商品数", below_safety_count: "安全在庫割れ数",
   overdue_invoice_count: "延滞請求件数", overdue_total_amount: "延滞金額合計(円)",
   affected_customer_count: "対象顧客数",
+  // AI自動生成レポート(generate)のsummaryキー
+  matched_rows: "対象件数", group_count: "グループ数", primary_entity: "主エンティティ",
+  secondary_entity: "副エンティティ", agg: "集計方法",
 };
+
+// AI自動生成レポートのよく使う質問例(業種横断・在庫×入出庫等、定型3レポートでは
+// カバーしていない切り口の例を挙げておく。ワンクリックで生成→即実行)。
+const GENERATE_PRESETS = [
+  "業種別の与信限度額合計を高い順に",
+  "延滞している請求の金額を顧客の業種別に合計",
+  "商品カテゴリ別の入庫数量を多い順に",
+  "仕入先ごとの発注金額合計を高い順に10件",
+  "顧客ごとの受注件数を多い順に",
+];
 
 // エンティティごとのよく使う質問文プリセット。実データ(demo-legacy-system/data.py)の
 // 実在するステータス値・カテゴリ値・項目名に合わせてあるため、そのままクリック一発で
@@ -64,6 +77,16 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
     <div id="aisb-xa-buttons" class="aisb-btn-row">読込中...</div>
     <div id="aisb-xa-result"></div>
 
+    <div class="aisb-section-title">AIレポート自動生成(横断集計をAIが都度組み立て)</div>
+    <div class="aisb-hint">上の3レポートに無い切り口も、質問文からAIが「集計元データ・結合・グループ化・
+      集計方法」を組み立てて実行します(結合は許可された組み合わせのみ、生SQLは使いません)。</div>
+    <div id="aisb-gen-presets" class="aisb-chip-row"></div>
+    <textarea id="aisb-gen-q" placeholder="例: 延滞している請求の金額を顧客の業種別に合計"></textarea>
+    <div class="aisb-btn-row">
+      <button id="aisb-gen-run">AIでレポート生成</button>
+    </div>
+    <div id="aisb-gen-result"></div>
+
     <div class="aisb-section-title">AI検索(自然言語 → 構造化フィルタ)</div>
     <div class="aisb-inline-row">
       <select id="aisb-nlsql-entity">
@@ -79,6 +102,7 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
   `;
 
   initCrossAnalysis(el, ctx);
+  initDynamicAnalysis(el, ctx);
 
   const selectEl = el.querySelector("#aisb-nlsql-entity");
   const presetsEl = el.querySelector("#aisb-nlsql-presets");
@@ -251,4 +275,119 @@ function initCrossAnalysis(el, ctx) {
       btn.textContent = prevLabel;
     }
   }
+}
+
+// ---------------------------------------------------------------------
+// AIレポート自動生成(汎用集計エンジン、GET /api/cross-analysis/generate)
+// 定型3レポートと違い、どのエンティティを・どう結合し・何を軸に集計するかを
+// 質問文からAIがJSON(spec)として都度生成する。結合できる組み合わせは
+// ai-api-server/app/services/dynamic_analysis_service.py の JOIN_GRAPH に固定
+// されており(生SQL/eval不使用)、specはレスポンスにそのまま含まれるので
+// 「AIが実際に何を集計したか」を透明表示できる(nlsqlのapplied_filterと同じ思想)。
+// ---------------------------------------------------------------------
+function initDynamicAnalysis(el, ctx) {
+  const { escapeHtml, renderRankedBarChart } = ctx;
+  const presetsEl = el.querySelector("#aisb-gen-presets");
+  const qEl = el.querySelector("#aisb-gen-q");
+  const runBtn = el.querySelector("#aisb-gen-run");
+  const resultEl = el.querySelector("#aisb-gen-result");
+
+  presetsEl.innerHTML = GENERATE_PRESETS.map(
+    (q, i) => `<button type="button" class="aisb-chip" data-i="${i}">${escapeHtml(q)}</button>`
+  ).join("");
+  presetsEl.querySelectorAll(".aisb-chip").forEach((btn, i) => {
+    btn.addEventListener("click", () => {
+      qEl.value = GENERATE_PRESETS[i];
+      run();
+    });
+  });
+
+  function summaryBadges(summary) {
+    return Object.entries(summary || {})
+      .map(([k, v]) => `<span class="aisb-badge">${escapeHtml(XA_SUMMARY_LABELS[k] || k)}: ${escapeHtml(v)}</span>`)
+      .join(" ");
+  }
+
+  function fieldRefText(ref) {
+    if (!ref) return "";
+    return ref.scope === "secondary" ? `(副)${ref.field}` : ref.field;
+  }
+
+  function renderSpecSummary(spec) {
+    if (!spec) return "";
+    const parts = [`主エンティティ: ${spec.primary_entity}`];
+    if (spec.secondary_entity) parts.push(`結合: ${spec.secondary_entity}`);
+    if (spec.filters && spec.filters.length) {
+      parts.push(
+        "条件: " + spec.filters.map((f) => `${fieldRefText(f)} ${f.op} ${JSON.stringify(f.value)}`).join(" かつ ")
+      );
+    }
+    parts.push(`グループ化: ${fieldRefText(spec.group_by)}`);
+    parts.push(`集計: ${spec.agg}${spec.metric ? `(${fieldRefText(spec.metric)})` : ""}`);
+    return parts.join(" / ");
+  }
+
+  async function run() {
+    const question = qEl.value.trim();
+    if (!question) {
+      resultEl.innerHTML = "<p>質問を入力してください</p>";
+      return;
+    }
+    runBtn.disabled = true;
+    const prevLabel = runBtn.textContent;
+    runBtn.textContent = "AIが集計条件を組み立て中...(数十秒かかることがあります)";
+    resultEl.innerHTML = "";
+    try {
+      const data = await ctx.postJson(`${ctx.API_BASE}/api/cross-analysis/generate`, { question });
+      const warningsHtml = (data.warnings || [])
+        .map((w) => `<div class="aisb-card aisb-warning-card">${escapeHtml(w)}</div>`)
+        .join("");
+      const specHtml = `<div class="aisb-filter-summary">${escapeHtml(renderSpecSummary(data.spec))}</div>`;
+
+      if (!data.rows.length) {
+        resultEl.innerHTML = `${specHtml}${warningsHtml}<p>該当データがありません</p>`;
+        return;
+      }
+      const tableHtml = `
+        <table class="aisb-table">
+          <thead><tr><th>グループ</th><th>集計値</th><th>件数</th></tr></thead>
+          <tbody>
+            ${data.rows
+              .map((r) => `<tr><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.value)}</td><td>${escapeHtml(r.matched_count)}</td></tr>`)
+              .join("")}
+          </tbody>
+        </table>
+      `;
+      resultEl.innerHTML = `
+        <div class="aisb-card">
+          <b>${escapeHtml(data.label)}</b><br>
+          ${summaryBadges(data.summary)}
+        </div>
+        ${specHtml}${warningsHtml}
+        <div class="aisb-chart aisb-hbar-chart">${renderRankedBarChart(data.chart)}</div>
+        <div class="aisb-btn-row">
+          <button type="button" id="aisb-gen-insight-btn" class="aisb-btn-secondary">AIで解釈する</button>
+        </div>
+        <div id="aisb-gen-insight"></div>
+        ${tableHtml}
+      `;
+      resultEl.querySelector("#aisb-gen-insight-btn").addEventListener("click", (e) =>
+        ctx.runInsight(
+          `${ctx.API_BASE}/api/cross-analysis/generate/insight?question=${encodeURIComponent(question)}`,
+          e.target,
+          resultEl.querySelector("#aisb-gen-insight")
+        )
+      );
+    } catch (e) {
+      resultEl.innerHTML = `<p>エラー: ${escapeHtml(String(e))}</p>`;
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = prevLabel;
+    }
+  }
+
+  runBtn.addEventListener("click", run);
+  qEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
+  });
 }

@@ -473,6 +473,12 @@ window.AISB.domBase = (function () {
   white-space: pre-wrap;
   word-break: break-all;
 }
+.aisb-hint {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
 .aisb-warning-card {
   background: #fdf2e0;
   border: 1px solid #f0dca0;

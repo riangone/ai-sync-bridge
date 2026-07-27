@@ -22,3 +22,15 @@ async def fetch_rows(settings: Settings, entity: str, limit: int = MAX_ROWS_FETC
         resp.raise_for_status()
         data = resp.json()
     return data.get("rows", []), data.get("label", entity)
+
+
+async def fetch_entities(settings: Settings) -> list[dict]:
+    """GET /api/entities: 利用可能なentity一覧のメタ情報([{entity,label,hasDetail}, ...])。
+    dynamic_analysis_service がAIプロンプト用の「許可entity一覧」を動的に組み立てる際、
+    entity名の一覧をここでも二重管理しない(demo-legacy-system/main.py ENTITY_LABELS が
+    唯一の情報源であることを保つ)ために使う。"""
+    url = f"{settings.legacy_base_url}/api/entities"
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.json()

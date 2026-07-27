@@ -27,6 +27,7 @@ from app.services.vector_index import VectorIndexManager
 from app.services.workflow_service import WorkflowEngine
 from app.services.nlsql_service import NLSQLService
 from app.services.cross_analysis_service import CrossAnalysisService
+from app.services.dynamic_analysis_service import DynamicAnalysisService
 
 
 @lru_cache
@@ -99,3 +100,7 @@ def get_nlsql_service() -> NLSQLService:
 
 def get_cross_analysis_service() -> CrossAnalysisService:
     return CrossAnalysisService(get_settings())
+
+
+def get_dynamic_analysis_service() -> DynamicAnalysisService:
+    return DynamicAnalysisService(get_settings(), get_ai_provider())

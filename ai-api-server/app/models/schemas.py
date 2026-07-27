@@ -197,6 +197,50 @@ class CrossAnalysisResponse(BaseModel):
     warnings: list[str] = []
 
 
+# ---------- AI自動生成クロス分析(汎用集計エンジン) ----------
+# cross_analysis_service.py の3レポートはハードコードされた専用ロジックだが、
+# こちらはAIが「主エンティティ/副エンティティ/JOIN/GROUP BY/集計方法」を
+# 構造化パラメータ(JSON)として生成し、JOIN_GRAPH(dynamic_analysis_service.py)で
+# 固定された安全な結合キーのみを使って実行する汎用版。生SQL/evalは使わない。
+class DynamicAnalysisRequest(BaseModel):
+    question: str
+
+
+class DynamicAnalysisFieldRef(BaseModel):
+    scope: str  # primary|secondary
+    field: str
+
+
+class DynamicAnalysisFilter(DynamicAnalysisFieldRef):
+    op: str  # eq|ne|gt|gte|lt|lte|contains|in
+    value: str | float | int | bool | list | None = None
+
+
+class DynamicAnalysisSpec(BaseModel):
+    primary_entity: str
+    secondary_entity: str | None = None
+    filters: list[DynamicAnalysisFilter] = []
+    group_by: DynamicAnalysisFieldRef | None = None
+    metric: DynamicAnalysisFieldRef | None = None
+    agg: str = "count"  # sum|count|avg|min|max
+    sort_dir: str = "desc"
+    limit: int = 15
+    chart_label: str = "集計結果"
+
+
+class DynamicAnalysisResponse(BaseModel):
+    report: str = "generated"
+    label: str
+    question: str
+    spec: DynamicAnalysisSpec | None = None
+    generated_at: datetime
+    summary: dict
+    chart: ChartData
+    rows: list[dict]
+    warnings: list[str] = []
+    provider: str
+
+
 # ---------- Workflow Engine ----------
 class WorkflowRule(BaseModel):
     id: int
