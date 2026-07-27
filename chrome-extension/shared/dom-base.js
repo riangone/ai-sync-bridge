@@ -425,6 +425,31 @@ window.AISB.domBase = (function () {
 }
 
 /* ---- AI検索(自然言語→構造化フィルタ, 5.4.11差分実装) パネル ---- */
+.aisb-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.aisb-chip {
+  background: #eef4fb;
+  color: #1c3f61;
+  border: 1px solid #b9d3ec;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.4;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+.aisb-chip:hover {
+  background: #dce9f8;
+}
+.aisb-chip:active {
+  background: #cfe0f3;
+}
 #aisb-nlsql-q {
   width: 100%;
   min-height: 56px;

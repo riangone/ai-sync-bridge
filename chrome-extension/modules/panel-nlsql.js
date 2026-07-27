@@ -9,6 +9,26 @@
 window.AISB = window.AISB || {};
 window.AISB.panels = window.AISB.panels || {};
 
+// エンティティごとのよく使う質問文プリセット。実データ(demo-legacy-system/data.py)の
+// 実在するステータス値・カテゴリ値・項目名に合わせてあるため、そのままクリック一発で
+// ヒットする(=AIが値を捏造して0件になる事故を防ぐ意味もある)。ボタン(chip)クリックで
+// テキストエリアに反映した上でそのままAI検索を実行する。
+const QUERY_PRESETS = {
+  Customer: ["与信限度額が100万円を超える顧客を、限度額の高い順に5件", "与信限度額が低い順に10件"],
+  Order: ["出荷済の受注", "受注金額が50万円以上の受注を金額の高い順に10件", "キャンセルされた受注"],
+  Product: ["在庫数が10個未満の商品", "電子部品カテゴリの商品を単価の高い順に"],
+  Supplier: ["工具カテゴリの仕入先"],
+  Employee: ["営業部の従業員", "部長職の従業員"],
+  Estimate: ["承認された見積", "失注した見積"],
+  Invoice: ["延滞している請求", "未払いの請求を金額の高い順に"],
+  PurchaseOrder: ["発注中の発注", "キャンセルされた発注"],
+  InventoryTransaction: ["出庫の在庫トランザクション"],
+  GoodsReceipt: ["入荷数量が50個以上の入荷"],
+  Property: ["価格が5000万円以上の物件"],
+  ArAp: ["売掛金の残高が高い順に10件", "買掛金の一覧"],
+  Profit: ["粗利率が低い順に10件", "粗利額が高い順に5件"],
+};
+
 window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
   const { escapeHtml, LEGACY_ENTITIES } = ctx;
   const detected = ctx.detectLegacyContext();
@@ -20,6 +40,7 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
         ${LEGACY_ENTITIES.map((e) => `<option value="${e.id}">${e.label}</option>`).join("")}
       </select>
     </div>
+    <div id="aisb-nlsql-presets" class="aisb-chip-row"></div>
     <textarea id="aisb-nlsql-q" placeholder="例: 与信限度額が100万円を超える顧客を、限度額の高い順に5件"></textarea>
     <div class="aisb-btn-row">
       <button id="aisb-nlsql-run">AIで検索</button>
@@ -28,6 +49,7 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
   `;
 
   const selectEl = el.querySelector("#aisb-nlsql-entity");
+  const presetsEl = el.querySelector("#aisb-nlsql-presets");
   const qEl = el.querySelector("#aisb-nlsql-q");
   const runBtn = el.querySelector("#aisb-nlsql-run");
   const resultEl = el.querySelector("#aisb-nlsql-result");
@@ -39,6 +61,21 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
   function metaFor(entityId) {
     return LEGACY_ENTITIES.find((e) => e.id === entityId) || LEGACY_ENTITIES[0];
   }
+
+  function renderPresets() {
+    const presets = QUERY_PRESETS[selectEl.value] || [];
+    presetsEl.innerHTML = presets
+      .map((q, i) => `<button type="button" class="aisb-chip" data-i="${i}">${escapeHtml(q)}</button>`)
+      .join("");
+    presetsEl.querySelectorAll(".aisb-chip").forEach((btn, i) => {
+      btn.addEventListener("click", () => {
+        qEl.value = presets[i];
+        run();
+      });
+    });
+  }
+  selectEl.addEventListener("change", renderPresets);
+  renderPresets();
 
   function renderFilterSummary(applied) {
     const parts = [];
