@@ -1,3 +1,9 @@
+/* chrome-extension/content/sidebar.css からの移植(内容は同一)。
+   Shadow DOM 内スタイルなので、ホストページ(レガシーERP)のCSSには一切影響しない。
+   拡張機能側と違い、こちらは通常の同一オリジン static 配信なので
+   chrome.runtime.getURL() 由来の "chrome-extension://invalid/" 問題は起こらない
+   (だから <link rel="stylesheet"> でそのまま読み込める。sidebar.js 参照)。
+   見た目を両者で揃えたい場合のみ、変更をもう一方にも反映すること(必須ではない)。 */
 /* Shadow DOM 内スタイル。ホストページに一切影響を与えない */
 :host, #aisb-root {
   all: initial;

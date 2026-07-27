@@ -22,12 +22,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import data as db
+import aisb_embed  # AIサイドバー埋め込み(任意・トグル可能)。詳細は aisb_embed/__init__.py 参照。
+                    # レガシー側コードへの依存はこの2行のみ(ルート/テンプレートは無改造)。
 
 BASE_DIR = Path(__file__).parent
 
 app = FastAPI(title="Legacy ERP System (Demo)")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+aisb_embed.mount(app)
 
 
 # ---------------------------------------------------------------------------

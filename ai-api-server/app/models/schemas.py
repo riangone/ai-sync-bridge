@@ -130,6 +130,41 @@ class InsightResponse(BaseModel):
     provider: str  # 生成に使ったAiProvider名(mock|opencode|openai|gemini)
 
 
+# ---------- 自然言語 → 構造化フィルタ検索 (5.4.11 差分実装) ----------
+# 仕様書5.4.11は「AIが生成したSQLを直接実行する」方式を規定しているが、データ層が
+# 実SQLエンジンを持たないインメモリdict(demo-legacy-system/data.py)であることに加え、
+# インジェクション/誤操作のリスクを本質的に断つため、AIには構造化フィルタ(JSON)のみを
+# 生成させ、ホワイトリスト検証を通過した条件だけをコード側で評価する(evalも生SQLも使わない)。
+class NLSQLQueryRequest(BaseModel):
+    entity: str
+    question: str
+
+
+class NLSQLCondition(BaseModel):
+    field: str
+    op: str  # eq|ne|gt|gte|lt|lte|contains|in
+    value: str | float | int | bool | list | None = None
+
+
+class NLSQLFilter(BaseModel):
+    conditions: list[NLSQLCondition] = []
+    logic: str = "and"  # and|or
+    sort: dict | None = None  # {"field": ..., "dir": "asc"|"desc"}
+    limit: int = 50
+
+
+class NLSQLQueryResponse(BaseModel):
+    entity: str
+    label: str
+    question: str
+    applied_filter: NLSQLFilter
+    warnings: list[str] = []
+    total_scanned: int
+    count: int
+    rows: list[dict]
+    provider: str
+
+
 # ---------- Workflow Engine ----------
 class WorkflowRule(BaseModel):
     id: int

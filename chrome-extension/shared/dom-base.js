@@ -1,3 +1,17 @@
+// shared/dom-base.js
+// Shadow DOM/HTMLエスケープ等、DOM生成にまつわる純粋なユーティリティ。
+window.AISB = window.AISB || {};
+
+window.AISB.domBase = (function () {
+  // content/sidebar.css のインライン複製。
+  // 理由: chrome.runtime.getURL()+fetch() によるランタイム読み込みは
+  // 拡張コンテキスト無効化のタイミング次第で "chrome-extension://invalid/"
+  // エラーを起こし、CSSが適用されないことがあった。ビルドプロセスを持たない
+  // この拡張では、ファイルを分けたままJS文字列としてインライン化するのが
+  // 最も単純で確実な回避策。content/sidebar.css を編集したら、必ずこの定数にも
+  // 同じ内容を反映すること(以前は content/content.js 内で複製していたが、
+  // モジュール分割に伴いここに移動した)。
+  const CSS = `
 /* Shadow DOM 内スタイル。ホストページに一切影響を与えない */
 :host, #aisb-root {
   all: initial;
@@ -441,3 +455,23 @@
   color: #7a5410;
   font-size: 11px;
 }
+`;
+
+  function escapeHtml(v) {
+    return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // 今開いているレガシー画面のURL (例: /Order/Detail/ORD1003, /Customer/List) から
+  // エンティティ・画面種別・IDを読み取る。マッチしなければ null (ダッシュボード等)。
+  // legacyEntities は shared/config-base.js の LEGACY_ENTITIES を呼び出し側から渡す
+  // (dom-base はドメイン知識を持たない純粋なDOM/文字列ユーティリティに留める方針)。
+  function detectLegacyContext(legacyEntities) {
+    const m = location.pathname.match(/^\/([A-Za-z]+)\/(List|Entry|Detail|Search|Inquiry|Register)(?:\/([^/]+))?/);
+    if (!m) return null;
+    const [, entity, action, id] = m;
+    if (!legacyEntities.some((e) => e.id === entity)) return null;
+    return { entity, action, id: id || null };
+  }
+
+  return { CSS, escapeHtml, detectLegacyContext };
+})();

@@ -28,6 +28,11 @@ class Settings(BaseModel):
     # ベクトル検索エンジン選択 (8.3): sqlite-vec -> ann -> brute-force
     vector_backend: str = os.getenv("AISB_VECTOR_BACKEND", "brute-force")
 
+    # デモレガシーシステム(6章)のベースURL。自然言語→構造化フィルタ検索(5.4.11差分実装)が
+    # 対象データ(13エンティティ)を読みに行くためだけに使う。レガシー側はこの呼び出しの
+    # 存在を一切知らない(読み取り専用の既存 /api/{entity}/list を叩くだけ)。
+    legacy_base_url: str = os.getenv("AISB_LEGACY_BASE_URL", "http://localhost:5010")
+
     # CORS: Chrome拡張(content script)からのアクセスを許可
     cors_origins: list[str] = ["*"]
 

@@ -10,6 +10,7 @@ const DEFAULT_PROFILE = {
   panels: [
     { id: "chat", label: "AIチャット", enabled: true },
     { id: "legacy", label: "業務データ", enabled: true },
+    { id: "nlsql", label: "AI検索", enabled: true },
     { id: "customers", label: "顧客検索", enabled: true },
     { id: "ocr", label: "OCR取込", enabled: true },
     { id: "search", label: "セマンティック検索", enabled: true },

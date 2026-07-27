@@ -25,6 +25,7 @@ from app.services.search_service import SearchService
 from app.services.predictive_service import PredictiveService
 from app.services.vector_index import VectorIndexManager
 from app.services.workflow_service import WorkflowEngine
+from app.services.nlsql_service import NLSQLService
 
 
 @lru_cache
@@ -89,3 +90,7 @@ def get_admin_service() -> AdminService:
         get_notification_center(),
         get_audit_log(),
     )
+
+
+def get_nlsql_service() -> NLSQLService:
+    return NLSQLService(get_settings(), get_ai_provider())
