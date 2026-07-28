@@ -14,17 +14,20 @@ window.AISB.configBase = (function () {
   const DEFAULT_PROFILE = {
     apiBaseUrl: "http://localhost:5011",
     sidebarWidthPx: 380,
+    // AI関連機能に絞って表示する暫定措置(業務データ閲覧/顧客検索/通知/管理/ワークフローは
+    // 単純なCRUD・一覧表示でAIを本質的には使わないため一時的にenabled:falseにしている。
+    // 復活させたい場合はここをtrueに戻すだけでよい、パネル自体は削除していない)。
     panels: [
       { id: "chat", label: "AIチャット", enabled: true },
-      { id: "legacy", label: "業務データ", enabled: true },
+      { id: "legacy", label: "業務データ", enabled: false },
       { id: "nlsql", label: "AI検索", enabled: true },
-      { id: "customers", label: "顧客検索", enabled: true },
+      { id: "customers", label: "顧客検索", enabled: false },
       { id: "ocr", label: "OCR取込", enabled: true },
       { id: "search", label: "セマンティック検索", enabled: true },
       { id: "analytics", label: "予測分析", enabled: true },
-      { id: "workflows", label: "ワークフロー", enabled: true },
-      { id: "notifications", label: "通知", enabled: true },
-      { id: "admin", label: "管理", enabled: true },
+      { id: "workflows", label: "ワークフロー", enabled: false },
+      { id: "notifications", label: "通知", enabled: false },
+      { id: "admin", label: "管理", enabled: false },
     ],
   };
 
@@ -71,7 +74,12 @@ window.AISB.configBase = (function () {
     } catch (e) {
       return null;
     }
-    const profile = activeProfile || DEFAULT_PROFILE;
+    // panels(どのパネルを表示するか)はユーザーがカスタマイズするUIが存在しない
+    // コード管理の設定なので、保存済みプロファイルの他のフィールド(sidebarWidthPx等の
+    // ユーザー操作由来の状態)は保持しつつ、panelsだけは常にDEFAULT_PROFILE側を優先する。
+    // こうしないと、新しいパネルの追加や有効/無効の変更(例: AI以外の機能を一時的に
+    // 非表示にする)が既にストレージへ保存済みの古いプロファイルに反映されない。
+    const profile = { ...DEFAULT_PROFILE, ...(activeProfile || {}), panels: DEFAULT_PROFILE.panels };
     const API_BASE = ORIGIN_API_MAP[location.origin] || profile.apiBaseUrl;
     // レガシーシステム自身が持つ読み取り専用JSONエンドポイント（/api/{entity}/list 等）。
     // 拡張は常にこのページと同一オリジンから注入されているので、同一オリジン取得

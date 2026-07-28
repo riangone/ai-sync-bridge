@@ -167,6 +167,25 @@ class NLSQLService:
         return rows[: flt["limit"]]
 
     # ---------------------------------------------------------------
+    # 5.5 表示専用の疑似SQLプレビュー組み立て(実行はしない、詳細はfilter_ops参照)
+    # ---------------------------------------------------------------
+    @staticmethod
+    def _build_sql_preview(entity: str, flt: dict) -> str:
+        conditions = flt.get("conditions") or []
+        joiner = " OR " if flt.get("logic") == "or" else " AND "
+        where = joiner.join(
+            filter_ops.render_condition_sql(c["field"], c["op"], c["value"]) for c in conditions
+        )
+        sql = f"SELECT * FROM {entity}"
+        if where:
+            sql += f" WHERE {where}"
+        sort = flt.get("sort")
+        if sort:
+            sql += f" ORDER BY {sort['field']} {sort['dir'].upper()}"
+        sql += f" LIMIT {flt['limit']}"
+        return sql
+
+    # ---------------------------------------------------------------
     # エントリーポイント
     # ---------------------------------------------------------------
     async def query(self, entity: str, question: str) -> dict:
@@ -174,9 +193,11 @@ class NLSQLService:
         fields = set(rows[0].keys()) if rows else set()
 
         if not rows:
+            empty_filter = {"conditions": [], "logic": "and", "sort": None, "limit": 50}
             return {
                 "entity": entity, "label": label, "question": question,
-                "applied_filter": {"conditions": [], "logic": "and", "sort": None, "limit": 50},
+                "applied_filter": empty_filter,
+                "sql_preview": self._build_sql_preview(entity, empty_filter),
                 "warnings": ["対象データが空のため検索できません"],
                 "total_scanned": 0, "count": 0, "rows": [], "provider": self.ai.name,
             }
@@ -194,7 +215,8 @@ class NLSQLService:
         result_rows = self._apply_filter(rows, flt)
         return {
             "entity": entity, "label": label, "question": question,
-            "applied_filter": flt, "warnings": warnings,
+            "applied_filter": flt, "sql_preview": self._build_sql_preview(entity, flt),
+            "warnings": warnings,
             "total_scanned": len(rows), "count": len(result_rows), "rows": result_rows,
             "provider": self.ai.name,
         }

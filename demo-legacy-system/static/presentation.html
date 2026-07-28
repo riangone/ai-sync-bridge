@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ai-sync-bridge — プロジェクト紹介</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1c2438;
+    --ink:#eef1f8; --ink-dim:#9aa4bd;
+    --accent:#5b8cff; --accent2:#37c9a6; --warn:#f0a94e; --danger:#f0616f;
+    --line:#2a3350;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI","Hiragino Sans","Yu Gothic",system-ui,-apple-system,sans-serif;
+    overflow:hidden;
+  }
+  #deck{position:relative; width:100vw; height:100vh;}
+  .slide{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    padding:64px 88px;
+    opacity:0; pointer-events:none;
+    transform:translateX(40px);
+    transition:opacity .35s ease, transform .35s ease;
+  }
+  .slide.active{opacity:1; pointer-events:auto; transform:translateX(0);}
+  .slide.prev{transform:translateX(-40px);}
+  .kicker{
+    font-size:14px; letter-spacing:.18em; color:var(--accent);
+    text-transform:uppercase; font-weight:700; margin-bottom:14px;
+  }
+  h1{font-size:46px; margin:0 0 8px; line-height:1.25;}
+  h2{font-size:34px; margin:0 0 28px; line-height:1.3;}
+  .subtitle{font-size:19px; color:var(--ink-dim); margin:0 0 8px; line-height:1.6;}
+  .body{flex:1; display:flex; flex-direction:column; justify-content:center; gap:22px; overflow:auto;}
+  .grid{display:grid; gap:20px;}
+  .grid.cols-2{grid-template-columns:1fr 1fr;}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 24px;
+  }
+  .card h3{margin:0 0 10px; font-size:18px; color:var(--ink);}
+  .card p{margin:0; font-size:14.5px; color:var(--ink-dim); line-height:1.7;}
+  .card .tag{
+    display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em;
+    padding:3px 9px; border-radius:999px; margin-bottom:10px;
+  }
+  .tag.ai{background:rgba(91,140,255,.15); color:#8fb0ff;}
+  .tag.safe{background:rgba(55,201,166,.15); color:#5fe3c0;}
+  .tag.ui{background:rgba(240,169,78,.15); color:#f5be7c;}
+  ul.feat{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px;}
+  ul.feat li{
+    display:flex; gap:14px; align-items:flex-start;
+    font-size:16px; line-height:1.6; color:var(--ink);
+  }
+  ul.feat li .dot{
+    flex:0 0 8px; width:8px; height:8px; border-radius:50%;
+    background:var(--accent); margin-top:8px;
+  }
+  ul.feat li b{color:#fff;}
+  ul.feat li span.sub{display:block; color:var(--ink-dim); font-size:14px; margin-top:2px;}
+  .flow{display:flex; align-items:stretch; gap:0; margin-top:10px;}
+  .flow .step{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; position:relative; display:flex; flex-direction:column; gap:8px;
+  }
+  .flow .step .n{
+    width:28px; height:28px; border-radius:50%; background:var(--accent);
+    color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center;
+  }
+  .flow .step h4{margin:0; font-size:15.5px;}
+  .flow .step p{margin:0; font-size:13px; color:var(--ink-dim); line-height:1.6;}
+  .flow .arrow{
+    flex:0 0 46px; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-dim); font-size:22px;
+  }
+  .arch{display:grid; grid-template-columns:1fr 1fr 1fr; gap:22px; margin-top:6px;}
+  .arch .box{
+    border-radius:var(--radius); padding:22px; border:1px solid var(--line);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .arch .box.target{background:linear-gradient(160deg, rgba(91,140,255,.16), rgba(91,140,255,.02)); border-color:#3a4d8f;}
+  .arch .box.brain{background:linear-gradient(160deg, rgba(55,201,166,.14), rgba(55,201,166,.02)); border-color:#2e6a5c;}
+  .arch .box.rig{background:var(--panel);}
+  .arch .box h3{margin:0; font-size:17px;}
+  .arch .box .role{font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim);}
+  .arch .box p{margin:0; font-size:13.5px; color:var(--ink-dim); line-height:1.65;}
+  .arch .box code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:12.5px;}
+  .badge-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;}
+  .badge{font-size:12px; background:rgba(255,255,255,.06); border:1px solid var(--line); padding:5px 11px; border-radius:999px; color:var(--ink-dim);}
+  .callout{
+    border-radius:var(--radius); padding:22px 26px; border:1px solid #5a4620; background:rgba(240,169,78,.08);
+    display:flex; gap:16px; align-items:flex-start;
+  }
+  .callout .ico{font-size:26px;}
+  .callout b{color:#f5be7c;}
+  .callout.danger{border-color:#5a2226; background:rgba(240,97,111,.08);}
+  .callout.danger b{color:#f79ba2;}
+  .callout.safe{border-color:#1f5a48; background:rgba(55,201,166,.08);}
+  .callout.safe b{color:#5fe3c0;}
+  .mono{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    background:#0b0f1a; border:1px solid var(--line); border-radius:12px;
+    padding:16px 18px; font-size:13.5px; color:#9fe6c9; line-height:1.8; overflow:auto;
+  }
+  .mono .k{color:#8fb0ff;}
+  .mono .s{color:#f5be7c;}
+  table.demo{width:100%; border-collapse:collapse; font-size:14px;}
+  table.demo th, table.demo td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--line);}
+  table.demo th{color:var(--ink-dim); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em;}
+  .steps-num{counter-reset:s;}
+  .steps-num li{counter-increment:s; position:relative; padding-left:44px;}
+  .steps-num li::before{
+    content:counter(s); position:absolute; left:0; top:2px;
+    width:28px; height:28px; border-radius:8px; background:var(--panel2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:var(--accent2);
+  }
+  footer.pageinfo{
+    display:flex; justify-content:space-between; align-items:center;
+    padding-top:18px; border-top:1px solid var(--line); margin-top:24px;
+    font-size:12.5px; color:var(--ink-dim);
+  }
+  #nav{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:14px;
+    background:rgba(22,29,46,.9); backdrop-filter:blur(6px);
+    border:1px solid var(--line); border-radius:999px; padding:8px 10px;
+    z-index:50;
+  }
+  #nav button{
+    background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #nav button:hover{background:var(--accent); border-color:var(--accent);}
+  #nav #counter{font-size:13px; color:var(--ink-dim); min-width:56px; text-align:center;}
+  #progress{position:fixed; top:0; left:0; height:3px; background:var(--accent); z-index:60; transition:width .35s ease;}
+  .cover{justify-content:center; align-items:flex-start;}
+  .cover h1{font-size:64px;}
+  .cover .subtitle{font-size:22px;}
+  .logo{
+    display:inline-flex; align-items:center; gap:12px; margin-bottom:34px;
+  }
+  .logo .mark{
+    width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex; align-items:center; justify-content:center; font-weight:800; color:#0b0f1a; font-size:18px;
+  }
+  .cover ul.feat{margin-top:10px;}
+  @media (max-width:900px){
+    .slide{padding:40px 26px;}
+    .grid.cols-2,.grid.cols-3,.arch{grid-template-columns:1fr;}
+    .flow{flex-direction:column;}
+    .flow .arrow{transform:rotate(90deg);}
+    h1{font-size:34px;} .cover h1{font-size:38px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<div id="deck"></div>
+
+<div id="nav">
+  <button id="prevBtn" title="前へ (←)">‹</button>
+  <span id="counter">1 / 12</span>
+  <button id="nextBtn" title="次へ (→)">›</button>
+</div>
+
+<script>
+const slides = [];
+
+// ---------- 1. Cover ----------
+slides.push(`
+<div class="cover" style="justify-content:center;">
+  <div class="logo"><div class="mark">AI</div><div class="kicker" style="margin:0;">ai-sync-bridge</div></div>
+  <h1>既存の業務システムに、後付けでAIを繋ぐ</h1>
+  <p class="subtitle">レガシーな基幹システム（顧客・受注・請求・在庫…）を<b style="color:#fff;">一切改修せずに</b>、<br>
+  Chrome拡張とサイドパネルで自然文検索・AIレポート・チャットを追加するブリッジ。</p>
+  <div class="badge-row" style="margin-top:28px;">
+    <span class="badge">Chrome拡張（本命）</span>
+    <span class="badge">FastAPI × AIエージェント</span>
+    <span class="badge">構造化パラメータのみAIに生成させる安全設計</span>
+  </div>
+</div>`);
+
+// ---------- 2. Problem ----------
+slides.push(`
+<div class="kicker">課題</div>
+<h2>なぜ「レガシーシステム側」を触らないのか</h2>
+<div class="body">
+  <div class="grid cols-2">
+    <div class="card">
+      <span class="tag safe">現実</span>
+      <h3>既存システムは触れない・触りたくない</h3>
+      <p>長年運用されてきた基幹システムは、改修コスト・リグレッションリスクが高く、
+      ソースを触れない／触りたくないケースが多い。かといって使い勝手は今どき厳しい。</p>
+    </div>
+    <div class="card">
+      <span class="tag ai">要望</span>
+      <h3>それでもAIの力は使いたい</h3>
+      <p>「業種別に与信限度額を集計して」「延滞している請求を出して」を自然文で聞きたい。
+      チャットで質問したい。OCRで書類を取り込みたい。</p>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="ico">💡</div>
+    <div><b>ai-sync-bridge の答え：</b>既存システムのコードは一切変更せず、ブラウザ拡張機能として
+    「サイドパネル」を横付けし、そこからAI API サーバーを呼び出す。既存システムから見れば、
+    ただの追加のブラウザ機能でしかない。</div>
+  </div>
+</div>`);
+
+// ---------- 3. Architecture ----------
+slides.push(`
+<div class="kicker">アーキテクチャ</div>
+<h2>3つのコンポーネント</h2>
+<div class="body">
+  <div class="arch">
+    <div class="box target">
+      <span class="role">🎯 最終的な提供形態</span>
+      <h3>chrome-extension</h3>
+      <p>既存の業務システムのページを開くと、サイドパネルが自動注入される。
+      <code>content_scripts</code> でDOM構造から画面を推定し、AI検索・チャット・OCR等を追加。
+      対象システムの<b>コードは一行も変更しない。</b></p>
+    </div>
+    <div class="box brain">
+      <span class="role">🧠 AIロジック本体</span>
+      <h3>ai-api-server（FastAPI）</h3>
+      <p>自然文 → 構造化パラメータへのAI変換、ホワイトリスト検証、集計・フィルタ実行、
+      チャット、OCR、セマンティック検索、予測分析などを提供するバックエンド。
+      拡張機能からもレガシー埋め込みからも同じAPIを叩く。</p>
+    </div>
+    <div class="box rig">
+      <span class="role">🧪 検証用スタンドイン</span>
+      <h3>demo-legacy-system + aisb_embed</h3>
+      <p>「既存の古いシステム」を模した検証環境（顧客・受注・請求・在庫などのダミー業務データ）。
+      その中に <code>aisb_embed</code> として拡張機能と同一のUIを静的配信で埋め込み、
+      拡張のインストール無しに素早く動作確認するためのもの。</p>
+    </div>
+  </div>
+  <div class="callout danger">
+    <div class="ico">⚠️</div>
+    <div><b>重要：</b>今 <code>demo-legacy-system</code> に埋め込まれているUIはあくまで<b>開発中の検証手段</b>。
+    最終的な提供形態は <b>Chrome拡張機能</b> であり、実際の「既存の古いシステム」を改修することなく
+    AI機能を後付けするのが本プロジェクトの目的。</div>
+  </div>
+</div>`);
+
+// ---------- 4. Safety design ----------
+slides.push(`
+<div class="kicker">設計思想（核心）</div>
+<h2>AIには「実行可能なコード」を一切生成させない</h2>
+<div class="body">
+  <div class="grid cols-2">
+    <div class="card">
+      <span class="tag safe">安全設計</span>
+      <h3>AIの役割は「パラメータ選び」だけ</h3>
+      <p>自然文の質問をAIに渡しても、AIが返すのは <b>JSON構造</b>（field / op / value、
+      primary_entity / join / group_by 等）のみ。生SQLも <code>eval</code> も使わない。
+      返ってきたJSONはホワイトリストで検証してから、初めてPythonの純粋なロジックが実行する。</p>
+    </div>
+    <div class="card">
+      <span class="tag safe">JOIN_GRAPH</span>
+      <h3>結合キーはAIに選ばせない</h3>
+      <p>2エンティティを結合するAIレポート機能では、AIが選べるのは「どのエンティティ同士か」
+      という"名前"だけ。実際の結合キー（外部キー項目名）は、コード側に固定辞書として
+      持たせた <code>JOIN_GRAPH</code> から決定する。誤ったキーでの結合は原理的に発生しない。</p>
+    </div>
+  </div>
+  <div class="mono">
+<span class="k">JOIN_GRAPH</span> = {
+    (<span class="s">"Order"</span>, <span class="s">"Customer"</span>):     <span class="s">"CustomerId"</span>,
+    (<span class="s">"Invoice"</span>, <span class="s">"Customer"</span>):   <span class="s">"CustomerId"</span>,
+    (<span class="s">"Estimate"</span>, <span class="s">"Customer"</span>):  <span class="s">"CustomerId"</span>,
+    <span style="color:#6b7594"># ...この辞書に無い組み合わせをAIが指定 → 安全側にフォールバック（単一エンティティ解釈）</span>
+}</div>
+</div>`);
+
+// ---------- 5. Feature overview ----------
+slides.push(`
+<div class="kicker">機能一覧</div>
+<h2>サイドパネルに詰め込まれた5つのAI機能</h2>
+<div class="body">
+  <div class="grid cols-3">
+    <div class="card"><span class="tag ai">chat</span><h3>💬 AIチャット</h3><p>業務データの文脈を踏まえた自由対話。質問・相談の入口。</p></div>
+    <div class="card"><span class="tag ai">nlsql</span><h3>🔎 AI検索（自然文→構造化検索）</h3><p>「出荷済の受注」のような自然文を条件に変換し、単一エンティティを検索。疑似SQLも表示。</p></div>
+    <div class="card"><span class="tag ai">cross-analysis</span><h3>📊 AIレポート自動生成</h3><p>2エンティティ結合＋GROUP BY＋集計（sum/count/avg/min/max）まで自然文から自動生成。</p></div>
+    <div class="card"><span class="tag ai">ocr</span><h3>🧾 OCR取込</h3><p>紙の書類・画像から構造化データを取り込む。</p></div>
+    <div class="card"><span class="tag ai">search</span><h3>🧭 セマンティック検索</h3><p>キーワード一致でなく意味ベースでの類似検索。</p></div>
+    <div class="card"><span class="tag ai">analytics</span><h3>📈 予測分析</h3><p>与信・在庫・滞留債権などの傾向を予測的に分析。</p></div>
+  </div>
+  <div class="callout">
+    <div class="ico">🧹</div>
+    <div><b>UI整理：</b>「業務データ・顧客検索・ワークフロー・通知・管理」など、AIが本質でない
+    単純CRUD/一覧系パネルは<b>一時的に非表示</b>にし、AI機能に焦点を絞ったサイドパネル構成にしている
+    （<code>panels[].enabled</code> フラグのみの変更なので、いつでも復帰可能）。</div>
+  </div>
+</div>`);
+
+// ---------- 6. nlsql / cross-analysis flow ----------
+slides.push(`
+<div class="kicker">使い方 ①</div>
+<h2>自然文 →（AI）→ 構造化条件 →（コード）→ 結果</h2>
+<div class="body">
+  <div class="flow">
+    <div class="step"><div class="n">1</div><h4>質問を入力</h4><p>「延滞している請求の金額を顧客の業種別に合計」のように、日本語でそのまま聞く。</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">2</div><h4>AIが条件を組み立て</h4><p>主/副エンティティ・フィルタ・集計方法（group_by/metric/agg）をJSONで生成。</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">3</div><h4>ホワイトリスト検証</h4><p>フィールド名・演算子・JOIN_GRAPHとの整合性をコード側で検証。通らなければ安全側にフォールバック。</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">4</div><h4>実行＆可視化</h4><p>Pythonで集計を実行し、条件の透明表示・疑似SQLプレビュー・チャート・明細・AI解釈まで自動表示。</p></div>
+  </div>
+  <table class="demo" style="margin-top:8px;">
+    <thead><tr><th>質問例</th><th>内部処理</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td>業種別の与信限度額合計を高い順に</td><td>単一エンティティ集計</td><td>5業種を正しく集計</td></tr>
+      <tr><td>延滞している請求を顧客の業種別に合計</td><td>Invoice × Customer 結合</td><td>既存の坏账レポートと一致</td></tr>
+      <tr><td>商品カテゴリ別に顧客の与信限度額を合計</td><td>JOIN_GRAPHに存在しない組合せ</td><td>安全に単一エンティティへフォールバック（クラッシュなし）</td></tr>
+      <tr><td>月別の受注件数の推移</td><td>group_byが日付と機械判定</td><td>自動的に折れ線チャートへ切替</td></tr>
+    </tbody>
+  </table>
+</div>`);
+
+// ---------- 7. Transparency: sql_preview ----------
+slides.push(`
+<div class="kicker">使い方 ②</div>
+<h2>「何が実行されたか」を常に見せる透明性</h2>
+<div class="body">
+  <div class="grid cols-2">
+    <div class="card">
+      <span class="tag ui">条件の可視化</span>
+      <h3>AIが組み立てた条件をそのまま表示</h3>
+      <p>結果画面には、AIが選んだ主/副エンティティ・結合・フィルタ・集計方法を
+      隠さずそのまま表示。ブラックボックス化させない。</p>
+    </div>
+    <div class="card">
+      <span class="tag ui">疑似SQLプレビュー</span>
+      <h3>sql_preview（表示専用）</h3>
+      <p>本システムに実SQLエンジンは存在しない（データ層はインメモリ）。
+      そこで、検証済み・実行済みの構造化条件から<b>コード側（AI非関与）</b>が
+      機械的にSQL風文字列を組み立てて見せる、実行には使わない透明性機能。</p>
+    </div>
+  </div>
+  <div class="mono">
+<span class="k">SELECT</span> Customer.Industry, <span class="k">SUM</span>(Invoice.TotalAmount) <span class="k">AS</span> value
+<span class="k">FROM</span> Invoice
+<span class="k">JOIN</span> Customer <span class="k">ON</span> Invoice.CustomerId = Customer.Id
+<span class="k">WHERE</span> Invoice.Status = <span class="s">'延滞'</span>
+<span class="k">GROUP BY</span> Customer.Industry
+<span class="k">ORDER BY</span> value <span class="k">DESC</span> <span class="k">LIMIT</span> 15</div>
+</div>`);
+
+// ---------- 8. Charts / UI polish ----------
+slides.push(`
+<div class="kicker">使い方 ③</div>
+<h2>結果に応じて最適な見せ方を自動選択</h2>
+<div class="body">
+  <div class="grid cols-3">
+    <div class="card"><h3>📊 棒グラフ</h3><p>カテゴリ別の比較（業種別合計など）の既定表示。</p></div>
+    <div class="card"><h3>📈 折れ線グラフ</h3><p>group_byの結果が全てYYYY-MM-DD形式ならコード側が機械的に時系列と判定し、自動的に切替。</p></div>
+    <div class="card"><h3>▭ 積み上げ横棒</h3><p>与信リスク／在庫逼迫／滞留債権の定型3レポートで「正常/警戒/超過」等の内訳（part-to-whole）を表現。</p></div>
+  </div>
+  <div class="grid cols-2">
+    <div class="card">
+      <span class="tag ui">レイアウト改善</span>
+      <h3>サブタブ切替</h3>
+      <p>「定型レポート／AIレポート生成／自然文検索」が縦に積み上がって見づらかった問題を、
+      既存の外側パネルタブと同じサブタブ切替方式に変更。入力内容・結果は保持したまま。</p>
+    </div>
+    <div class="card">
+      <span class="tag ui">AI解釈の自動表示</span>
+      <h3>ボタンを押さなくても解釈が出る</h3>
+      <p>従来は「AIで解釈する」ボタンが必要だったが、結果表示と同時にAI解釈を自動取得。
+      再生成ボタンはオプションとして残している。</p>
+    </div>
+  </div>
+</div>`);
+
+// ---------- 9. Try it now (interactive demo pointer) ----------
+slides.push(`
+<div class="kicker">試してみる</div>
+<h2>検証環境（demo-legacy-system）で今すぐ動かせる</h2>
+<div class="body">
+  <ol class="steps-num" style="display:flex; flex-direction:column; gap:16px; margin:0; padding:0; font-size:16px;">
+    <li>ブラウザで <b>legacy埋め込み版</b>（<code>http://localhost:5010/</code>）を開く。</li>
+    <li>右サイドパネルの「AI検索」タブを開き、サブタブから「AIレポート生成」を選ぶ。</li>
+    <li>質問例チップをクリック、または自由入力で「延滞している請求の金額を顧客の業種別に合計」のように入力。</li>
+    <li>生成された条件・疑似SQL・チャート・明細・AI解釈がその場に表示される。</li>
+  </ol>
+  <div class="callout safe">
+    <div class="ico">🧩</div>
+    <div><b>本命はChrome拡張：</b>同じサイドパネルUIを <code>chrome-extension</code> としてもインストール可能。
+    こちらは実際の「既存システムのページ」にサイドパネルを注入する形で動作し、
+    対象システム側のコード変更は一切不要。両者はUIロジックを完全同期させている。</div>
+  </div>
+</div>`);
+
+// ---------- 10. Tech stack summary ----------
+slides.push(`
+<div class="kicker">技術構成</div>
+<h2>まとめ：何で出来ているか</h2>
+<div class="body">
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>フロントエンド（サイドパネルUI）</h3>
+      <p>Vanilla JS（<code>panel-nlsql.js</code> / <code>dom-base.js</code> / <code>config-base.js</code> 等）。
+      Chrome拡張版と埋め込み版（<code>aisb_embed</code>）でロジックを完全同一に保ち、
+      ストレージAPI・CSS読み込み方式のみ環境差として吸収。</p>
+    </div>
+    <div class="card">
+      <h3>バックエンド（ai-api-server）</h3>
+      <p>FastAPI。<code>routers/</code> 配下に chat / nlsql / cross-analysis / ocr / search /
+      analytics / orders / customers / workflows / notifications / admin。
+      AIプロバイダは差し替え可能な構成。</p>
+    </div>
+  </div>
+  <div class="badge-row">
+    <span class="badge">FastAPI</span><span class="badge">Chrome Extension (Manifest)</span>
+    <span class="badge">構造化JSON中間表現</span><span class="badge">ホワイトリスト検証</span>
+    <span class="badge">SVGチャート（外部ライブラリ非依存）</span>
+  </div>
+</div>`);
+
+// ---------- 11. Roadmap ----------
+slides.push(`
+<div class="kicker">現在地とこれから</div>
+<h2>ロードマップ</h2>
+<div class="body">
+  <div class="grid cols-2">
+    <div class="card">
+      <span class="tag safe">完了</span>
+      <h3>検証環境での機能一式</h3>
+      <p>AI検索・AIレポート自動生成（JOIN対応）・チャート多様化・レイアウト改善・
+      AI解釈自動表示・疑似SQL透明表示、chrome-extension／legacy埋め込み間の完全同期。</p>
+    </div>
+    <div class="card">
+      <span class="tag ai">次のステップ</span>
+      <h3>実システムでのChrome拡張運用</h3>
+      <p>実際の既存業務システムのDOM構造に対する適応（コンテンツスクリプトの汎用化）、
+      権限・セキュリティレビュー、対象システムごとのプロファイル追加。</p>
+    </div>
+  </div>
+</div>`);
+
+// ---------- 12. Closing ----------
+slides.push(`
+<div class="cover" style="justify-content:center;">
+  <div class="kicker">まとめ</div>
+  <h1>既存システムは変えずに、AIだけを足す。</h1>
+  <p class="subtitle">安全設計（構造化パラメータのみAI生成・JOIN_GRAPHホワイトリスト）を核に、<br>
+  自然文検索からAIレポート自動生成まで、サイドパネル一つで完結。</p>
+  <div class="badge-row" style="margin-top:26px;">
+    <span class="badge">ai-sync-bridge</span>
+    <span class="badge">Chrome拡張 → 既存の古いシステムへのAI後付け</span>
+  </div>
+</div>`);
+
+// ---------- render ----------
+const deck = document.getElementById("deck");
+slides.forEach((html, i) => {
+  const el = document.createElement("div");
+  el.className = "slide";
+  el.innerHTML = `${html}<footer class="pageinfo"><span>ai-sync-bridge</span><span>${i+1} / ${slides.length}</span></footer>`;
+  deck.appendChild(el);
+});
+
+let idx = 0;
+const els = document.querySelectorAll(".slide");
+const counter = document.getElementById("counter");
+const progress = document.getElementById("progress");
+
+function render(){
+  els.forEach((el, i) => {
+    el.classList.toggle("active", i === idx);
+    el.classList.toggle("prev", i < idx);
+  });
+  counter.textContent = `${idx+1} / ${els.length}`;
+  progress.style.width = `${((idx+1)/els.length)*100}%`;
+  history.replaceState(null, "", "#" + (idx+1));
+}
+function go(delta){
+  idx = Math.max(0, Math.min(els.length-1, idx+delta));
+  render();
+}
+document.getElementById("prevBtn").addEventListener("click", () => go(-1));
+document.getElementById("nextBtn").addEventListener("click", () => go(1));
+window.addEventListener("keydown", (e) => {
+  if (["ArrowRight","PageDown"," "].includes(e.key)) { go(1); e.preventDefault(); }
+  if (["ArrowLeft","PageUp"].includes(e.key)) { go(-1); e.preventDefault(); }
+  if (e.key === "Home") { idx = 0; render(); }
+  if (e.key === "End") { idx = els.length-1; render(); }
+});
+let touchX = null;
+window.addEventListener("touchstart", e => touchX = e.touches[0].clientX);
+window.addEventListener("touchend", e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+  touchX = null;
+});
+const initial = parseInt(location.hash.replace("#",""), 10);
+if (!isNaN(initial) && initial >= 1 && initial <= els.length) idx = initial - 1;
+render();
+</script>
+</body>
+</html>

@@ -30,6 +30,7 @@ AI自動生成クロス分析サービス
      オプトイン)のみ。
 """
 import asyncio
+import re
 from datetime import datetime
 
 from app.config import Settings
@@ -40,6 +41,10 @@ from app.services.nlsql_service import NLSQLService
 _TOP_N_CHART = 10
 _SCHEMA_SAMPLE_ROWS = 20  # フィールド名+低カーディナリティ値ヒント抽出用(集計自体には使わない)
 ALLOWED_AGGS = {"sum", "count", "avg", "min", "max"}
+# group_by の結果が全て YYYY-MM-DD 形式なら「時系列トレンド」とみなし、ランキング棒
+# ではなく折れ線で表現する(棒グラフ一択だった従来UIの改善。AIにチャート種別を
+# 決めさせるのではなく、集計結果の形からコード側で機械的に判定する=安全側踏襲)。
+_DATE_GROUP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # ---------------------------------------------------------------------------
 # JOIN_GRAPH: (主エンティティ, 副エンティティ) -> 主エンティティ側の外部キー項目名
@@ -146,15 +151,19 @@ class DynamicAnalysisService:
     # 3. ホワイトリスト検証(ここを通過したものだけが実際に実行される)
     # -----------------------------------------------------------------
     @staticmethod
-    def _resolve_field_ref(raw_field, primary_fields: set, secondary: str | None, secondary_fields: set):
-        """"field" または "SecondaryEntity.field" 形式の文字列を
+    def _resolve_field_ref(raw_field, primary: str, primary_fields: set, secondary: str | None, secondary_fields: set):
+        """"field" 、"PrimaryEntity.field"、"SecondaryEntity.field" 形式の文字列を
         {"scope": "primary"|"secondary", "field": bare_field} に解決する。
-        存在しない項目・許可されていないentity参照はNoneを返す(=呼び出し側で無視)。"""
+        存在しない項目・許可されていないentity参照はNoneを返す(=呼び出し側で無視)。
+        AIが主エンティティ自身の名前を接頭辞に付けてくる(例: "Order.CreatedAt")ことが
+        あるため、副エンティティ接頭辞と同様に主エンティティ接頭辞も剥がしてから照合する。"""
         if not isinstance(raw_field, str) or not raw_field:
             return None
         if secondary and raw_field.startswith(f"{secondary}."):
             bare = raw_field[len(secondary) + 1 :]
             return {"scope": "secondary", "field": bare} if bare in secondary_fields else None
+        if raw_field.startswith(f"{primary}."):
+            raw_field = raw_field[len(primary) + 1 :]
         return {"scope": "primary", "field": raw_field} if raw_field in primary_fields else None
 
     def _validate_spec(self, raw: dict, entities_meta: dict, schema_rows: dict) -> tuple[dict | None, list[str]]:
@@ -185,7 +194,7 @@ class DynamicAnalysisService:
         secondary_fields = set(schema_rows[secondary][0].keys()) if secondary else set()
 
         def resolve(raw_field):
-            return self._resolve_field_ref(raw_field, primary_fields, secondary, secondary_fields)
+            return self._resolve_field_ref(raw_field, primary, primary_fields, secondary, secondary_fields)
 
         filters = []
         for c in raw.get("filters") or []:
@@ -232,6 +241,38 @@ class DynamicAnalysisService:
         return spec, warnings
 
     # -----------------------------------------------------------------
+    # 3.5 表示専用の疑似SQLプレビュー組み立て(実行はしない)
+    #     実際の集計は本クラスの純Pythonロジックが行い、JOINキーもJOIN_GRAPHから
+    #     コード側で決めている(AIはこの文字列を一切生成しない)。検証済みspecから
+    #     機械的に整形するだけの、ユーザー向け透明性表示。
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _build_sql_preview(spec: dict) -> str:
+        primary = spec["primary_entity"]
+        secondary = spec["secondary_entity"]
+
+        def ref_sql(ref):
+            if ref is None:
+                return None
+            prefix = secondary if ref["scope"] == "secondary" else primary
+            return f"{prefix}.{ref['field']}"
+
+        agg = spec["agg"]
+        metric_expr = "COUNT(*)" if agg == "count" else f"{agg.upper()}({ref_sql(spec['metric'])})"
+        group_sql = ref_sql(spec["group_by"])
+        sql = f"SELECT {group_sql}, {metric_expr} AS value FROM {primary}"
+        if secondary:
+            fk = JOIN_GRAPH[(primary, secondary)]
+            sql += f" JOIN {secondary} ON {primary}.{fk} = {secondary}.Id"
+        where = " AND ".join(
+            filter_ops.render_condition_sql(ref_sql(f), f["op"], f["value"]) for f in spec["filters"]
+        )
+        if where:
+            sql += f" WHERE {where}"
+        sql += f" GROUP BY {group_sql} ORDER BY value {spec['sort_dir'].upper()} LIMIT {spec['limit']}"
+        return sql
+
+    # -----------------------------------------------------------------
     # 4. 検証済みspecの安全な実行(eval不使用、JOIN_GRAPH固定キーのみ使用)
     # -----------------------------------------------------------------
     @staticmethod
@@ -248,15 +289,20 @@ class DynamicAnalysisService:
 
         warnings: list[str] = []
         if not raw:
+            # AI応答からJSONを抽出できなかった場合、raw={}のまま_validate_specへ渡すと
+            # 「不明な主エンティティ'None'」という二重・混乱を招くメッセージが追加で出る
+            # (空dict.get()がNoneを返すため)。ここで打ち切り、単一の分かりやすい警告のみ返す。
             warnings.append("AI応答から分析条件を解釈できませんでした")
-        spec, spec_warnings = self._validate_spec(raw, entities_meta, schema_rows)
-        warnings.extend(spec_warnings)
+            spec = None
+        else:
+            spec, spec_warnings = self._validate_spec(raw, entities_meta, schema_rows)
+            warnings.extend(spec_warnings)
 
         empty_chart = {"type": "ranked-bar", "unit": "", "categories": [], "series": []}
         if spec is None or spec["group_by"] is None:
             return {
                 "report": "generated", "label": "AI自動生成レポート", "question": question,
-                "spec": spec, "generated_at": datetime.utcnow(),
+                "spec": spec, "sql_preview": None, "generated_at": datetime.utcnow(),
                 "summary": {"matched_rows": 0, "group_count": 0}, "chart": empty_chart,
                 "rows": [], "warnings": warnings, "provider": self.ai.name,
             }
@@ -319,10 +365,18 @@ class DynamicAnalysisService:
         if not result_rows:
             warnings.append("条件に一致するデータがありませんでした")
 
-        top = result_rows[:_TOP_N_CHART]
         unit = "件" if spec["agg"] == "count" else ""
+        is_trend = len(result_rows) >= 3 and all(_DATE_GROUP_RE.match(r["group"]) for r in result_rows)
+        if is_trend:
+            # 時系列: 値の大小ではなく日付順(古い→新しい)に並べ、直近_TOP_N_CHART件を見せる
+            chron_rows = sorted(result_rows, key=lambda r: r["group"])
+            top = chron_rows[-_TOP_N_CHART:]
+            chart_type = "trend-line"
+        else:
+            top = result_rows[:_TOP_N_CHART]
+            chart_type = "ranked-bar"
         chart = {
-            "type": "ranked-bar", "unit": unit,
+            "type": chart_type, "unit": unit,
             "categories": [r["group"] for r in top],
             "series": [{"label": spec["chart_label"], "values": [r["value"] for r in top]}],
         }
@@ -336,7 +390,7 @@ class DynamicAnalysisService:
         label = f"{primary_label}" + (f"×{sec_label}" if sec_label else "") + " 分析(AI自動生成)"
         return {
             "report": "generated", "label": label, "question": question,
-            "spec": spec, "generated_at": datetime.utcnow(),
+            "spec": spec, "sql_preview": self._build_sql_preview(spec), "generated_at": datetime.utcnow(),
             "summary": summary, "chart": chart, "rows": result_rows,
             "warnings": warnings, "provider": self.ai.name,
         }

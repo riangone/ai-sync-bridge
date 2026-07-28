@@ -7,17 +7,18 @@ const DEFAULT_PROFILE = {
   legacyOrigin: "http://localhost:5010",
   apiBaseUrl: "http://localhost:5011",
   sidebarWidthPx: 380,
+  // AI関連機能に絞って表示する暫定措置。shared/config-base.js のコメント参照。
   panels: [
     { id: "chat", label: "AIチャット", enabled: true },
-    { id: "legacy", label: "業務データ", enabled: true },
+    { id: "legacy", label: "業務データ", enabled: false },
     { id: "nlsql", label: "AI検索", enabled: true },
-    { id: "customers", label: "顧客検索", enabled: true },
+    { id: "customers", label: "顧客検索", enabled: false },
     { id: "ocr", label: "OCR取込", enabled: true },
     { id: "search", label: "セマンティック検索", enabled: true },
     { id: "analytics", label: "予測分析", enabled: true },
-    { id: "workflows", label: "ワークフロー", enabled: true },
-    { id: "notifications", label: "通知", enabled: true },
-    { id: "admin", label: "管理", enabled: true },
+    { id: "workflows", label: "ワークフロー", enabled: false },
+    { id: "notifications", label: "通知", enabled: false },
+    { id: "admin", label: "管理", enabled: false },
   ],
 };
 
@@ -27,18 +28,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await chrome.storage.local.set({ activeProfile: DEFAULT_PROFILE, sidebarOpen: true });
     return;
   }
-  // 拡張の更新(reason === "update")では、既存プロファイル(表示名/幅/有効無効等の
-  // ユーザー設定)は保持したまま、新バージョンで追加されたパネル(例: 業務データ)だけを
-  // 末尾にマージする。ここで何もしないと、新パネルは古いストレージにずっと現れない。
-  if (details.reason === "update") {
-    const profile = existing.activeProfile;
-    const knownIds = new Set((profile.panels || []).map((p) => p.id));
-    const missing = DEFAULT_PROFILE.panels.filter((p) => !knownIds.has(p.id));
-    if (missing.length) {
-      profile.panels = [...(profile.panels || []), ...missing];
-      await chrome.storage.local.set({ activeProfile: profile });
-    }
-  }
+  // 拡張の更新(reason === "update")では、既存プロファイルのユーザー操作由来の状態
+  // (表示名/sidebarWidthPx等)は保持する。panels(どのパネルを表示するか)はユーザーが
+  // カスタマイズするUIが存在しないコード管理の設定なので、ここでマージする必要はない
+  // — shared/config-base.js の loadContext() が読み込み時に常にDEFAULT_PROFILE.panels
+  // で上書きする(新パネルの追加や有効/無効の変更を、古いストレージの内容に関わらず
+  // 即座に反映するため)。
 });
 
 // popup からのメッセージ (サイドバー表示切替) を content script へ中継

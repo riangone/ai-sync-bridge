@@ -465,6 +465,27 @@
   line-height: 1.5;
   margin-bottom: 6px;
 }
+/* AIが実際に生成・実行したSQLは存在しない(実SQLエンジン不在、AIは構造化フィルタ/
+   specのみ生成)ため、検証済み条件から機械的に組み立てた疑似SQL(表示専用、実行
+   しない)を、実行結果と見分けやすいよう .aisb-filter-summary とは別のコード風
+   (ダーク背景)スタイルで見せる。 */
+.aisb-sql-preview {
+  background: #1e2530;
+  color: #d7dde5;
+  border: 1px solid #333c48;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+.aisb-sql-preview code {
+  font-family: inherit;
+  background: none;
+}
 .aisb-warning-card {
   background: #fdf2e0;
   border: 1px solid #f0dca0;
@@ -517,4 +538,102 @@
   color: #444;
   text-align: right;
   white-space: nowrap;
+}
+
+/* ---- 時系列トレンド(折れ線, AIレポート自動生成でgroup_byが日付の場合) ---- */
+.aisb-trend-svg {
+  width: 100%;
+  height: 100px;
+  display: block;
+}
+.aisb-trend-axis {
+  stroke: #ddd;
+  stroke-width: 1;
+}
+.aisb-trend-area {
+  fill: rgba(58, 110, 165, 0.1);
+  stroke: none;
+}
+.aisb-trend-line {
+  fill: none;
+  stroke: #3a6ea5;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.aisb-trend-dot {
+  fill: #3a6ea5;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.aisb-trend-endlabel {
+  font-size: 9px;
+  fill: #1c3f61;
+  font-weight: 600;
+}
+.aisb-trend-xlabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #888;
+  margin: 2px 0 6px;
+}
+
+/* ---- 状態分類の構成比(part-to-whole, 積み上げ横棒1本+凡例) ---- */
+.aisb-dist-bar {
+  display: flex;
+  height: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eef1f4;
+  margin-bottom: 6px;
+}
+.aisb-dist-seg {
+  height: 100%;
+  border-right: 2px solid #fff;
+}
+.aisb-dist-seg:last-child {
+  border-right: none;
+}
+.aisb-dist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #444;
+  margin-bottom: 10px;
+}
+.aisb-dist-legend-item {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* ---- AI検索パネルのサブタブ(定型レポート/AIレポート生成/自然文検索を切替) ---- */
+.aisb-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e0e4e8;
+}
+.aisb-subtab {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: #555;
+  border-bottom: 2px solid transparent;
+}
+.aisb-subtab.active {
+  color: #1c3f61;
+  border-bottom-color: #3a6ea5;
+  font-weight: 600;
+}
+.aisb-subpanel {
+  display: none;
+}
+.aisb-subpanel.active {
+  display: block;
 }

@@ -158,6 +158,10 @@ class NLSQLQueryResponse(BaseModel):
     label: str
     question: str
     applied_filter: NLSQLFilter
+    # 表示専用の疑似SQL(実行はしない。データ層に実SQLエンジンは存在しない。
+    # applied_filterを人間が読みやすいSQL風に機械的に整形しただけの透明性表示。
+    # 詳細は filter_ops.render_condition_sql / nlsql_service._build_sql_preview 参照)
+    sql_preview: str
     warnings: list[str] = []
     total_scanned: int
     count: int
@@ -181,10 +185,24 @@ class ChartSeries(BaseModel):
 
 
 class ChartData(BaseModel):
-    type: str  # ranked-bar | ranked-bar-grouped
+    type: str  # ranked-bar | ranked-bar-grouped | trend-line
     unit: str
     categories: list[str]
     series: list[ChartSeries]
+
+
+# 棒グラフ(ranked-bar/-grouped)だけでは「内訳(part-to-whole)」が読み取りにくいため、
+# 与信リスク/在庫逼迫/滞留債権のような状態分類は積み上げ横棒(構成比)でも表現する。
+# statusは既存の .aisb-risk-* 配色(good=正常/warning=警戒/critical=超過等)と揃える。
+class DistributionSlice(BaseModel):
+    label: str
+    count: int
+    status: str  # good | warning | critical
+
+
+class DistributionData(BaseModel):
+    title: str
+    slices: list[DistributionSlice]
 
 
 class CrossAnalysisResponse(BaseModel):
@@ -193,6 +211,7 @@ class CrossAnalysisResponse(BaseModel):
     generated_at: datetime
     summary: dict
     chart: ChartData
+    distribution: DistributionData | None = None
     rows: list[dict]
     warnings: list[str] = []
 
@@ -233,6 +252,9 @@ class DynamicAnalysisResponse(BaseModel):
     label: str
     question: str
     spec: DynamicAnalysisSpec | None = None
+    # 表示専用の疑似SQL(実行はしない。specから機械的に整形しただけの透明性表示。
+    # 詳細は dynamic_analysis_service._build_sql_preview 参照)。spec同様、解釈失敗時はNone。
+    sql_preview: str | None = None
     generated_at: datetime
     summary: dict
     chart: ChartData

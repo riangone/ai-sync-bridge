@@ -532,6 +532,104 @@ window.AISB.domBase = (function () {
   text-align: right;
   white-space: nowrap;
 }
+
+/* ---- 時系列トレンド(折れ線, AIレポート自動生成でgroup_byが日付の場合) ---- */
+.aisb-trend-svg {
+  width: 100%;
+  height: 100px;
+  display: block;
+}
+.aisb-trend-axis {
+  stroke: #ddd;
+  stroke-width: 1;
+}
+.aisb-trend-area {
+  fill: rgba(58, 110, 165, 0.1);
+  stroke: none;
+}
+.aisb-trend-line {
+  fill: none;
+  stroke: #3a6ea5;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.aisb-trend-dot {
+  fill: #3a6ea5;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.aisb-trend-endlabel {
+  font-size: 9px;
+  fill: #1c3f61;
+  font-weight: 600;
+}
+.aisb-trend-xlabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #888;
+  margin: 2px 0 6px;
+}
+
+/* ---- 状態分類の構成比(part-to-whole, 積み上げ横棒1本+凡例) ---- */
+.aisb-dist-bar {
+  display: flex;
+  height: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eef1f4;
+  margin-bottom: 6px;
+}
+.aisb-dist-seg {
+  height: 100%;
+  border-right: 2px solid #fff;
+}
+.aisb-dist-seg:last-child {
+  border-right: none;
+}
+.aisb-dist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #444;
+  margin-bottom: 10px;
+}
+.aisb-dist-legend-item {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* ---- AI検索パネルのサブタブ(定型レポート/AIレポート生成/自然文検索を切替) ---- */
+.aisb-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e0e4e8;
+}
+.aisb-subtab {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: #555;
+  border-bottom: 2px solid transparent;
+}
+.aisb-subtab.active {
+  color: #1c3f61;
+  border-bottom-color: #3a6ea5;
+  font-weight: 600;
+}
+.aisb-subpanel {
+  display: none;
+}
+.aisb-subpanel.active {
+  display: block;
+}
 `;
 
   function escapeHtml(v) {
@@ -550,13 +648,22 @@ window.AISB.domBase = (function () {
     return { entity, action, id: id || null };
   }
 
-  // クロス分析(与信リスク/在庫逼迫/滞留債権)向けの「ランキング型横棒チャート」。
+  // クロス分析(与信リスク/在庫逼迫/滞留債権)・AIレポート自動生成 向けのチャート描画。
   // Chart.js等は使わず既存のCSSバーチャート方針(analytics参照)を踏襲するが、狭い
   // サイドバー幅では縦棒より横棒の方がラベル(顧客名/商品名)を読みやすいため、
-  // ai-api-server/cross_analysis_service.py が返す chart(type/unit/categories/series)
-  // 形式を汎用的に描画する専用関数として分離した。type=ranked-bar-grouped は
-  // 「限度額に対する使用量」のようなゲージ表現(series[0]=上限, series[1]=実績)、
-  // type=ranked-bar は単一指標のランキング表現。
+  // ai-api-server側が返す chart(type/unit/categories/series) 形式を type ごとに
+  // 描画し分ける入口として renderChart() にまとめている(旧名renderRankedBarChartから
+  // 改名: 棒グラフ専用ではなくなったため)。
+  //   type=ranked-bar-grouped : 「限度額に対する使用量」のようなゲージ表現
+  //                             (series[0]=上限, series[1]=実績)
+  //   type=trend-line         : group_byが日付(YYYY-MM-DD)の場合の時系列トレンド
+  //                             (dynamic_analysis_service.pyが機械的に判定、AI非依存)
+  //   type=ranked-bar (既定)   : 単一指標のランキング表現
+  function renderChart(chart) {
+    if (chart && chart.type === "trend-line") return renderTrendLineChart(chart);
+    return renderRankedBarChart(chart);
+  }
+
   function renderRankedBarChart(chart) {
     const categories = chart?.categories || [];
     if (!categories.length) return "<p>該当データがありません</p>";
@@ -603,5 +710,83 @@ window.AISB.domBase = (function () {
       .join("");
   }
 
-  return { CSS, escapeHtml, detectLegacyContext, renderRankedBarChart };
+  // 時系列トレンド(折れ線)。純SVGで描画(ライブラリ不使用の既定方針を踏襲)。
+  // 直近値のみ数値を直接ラベル表示し(全点ラベルは読みづらいため)、両端の
+  // カテゴリ(日付)はX軸ラベルとして下に添える。単一系列のみ対応(凡例は
+  // 系列名がタイトル側で示されるため省略、単一系列は凡例なしで良いという
+  // dataviz方針に合わせている)。
+  function renderTrendLineChart(chart) {
+    const categories = chart?.categories || [];
+    const values = (chart.series && chart.series[0] && chart.series[0].values) || [];
+    if (!categories.length || !values.length) return "<p>該当データがありません</p>";
+    const unit = chart.unit || "";
+    const W = 280, H = 90, PAD_L = 4, PAD_R = 4, PAD_T = 12, PAD_B = 4;
+    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+    const nums = values.map((v) => Number(v) || 0);
+    const max = Math.max(...nums, 0);
+    const min = Math.min(...nums, 0);
+    const range = max - min || 1;
+    const stepX = categories.length > 1 ? plotW / (categories.length - 1) : 0;
+    const pts = nums.map((v, i) => [
+      PAD_L + stepX * i,
+      PAD_T + plotH - ((v - min) / range) * plotH,
+    ]);
+    const zeroY = PAD_T + plotH - ((0 - min) / range) * plotH;
+    const linePath = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const last = pts[pts.length - 1];
+    const areaPath = `${linePath} L${last[0].toFixed(1)},${zeroY.toFixed(1)} L${pts[0][0].toFixed(1)},${zeroY.toFixed(1)} Z`;
+    const dots = pts
+      .map(([x, y], i) => {
+        const r = i === pts.length - 1 ? 4 : 2.5;
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" class="aisb-trend-dot"/>`;
+      })
+      .join("");
+    const lastLabel = `${Math.round(nums[nums.length - 1]).toLocaleString()}${unit}`;
+    const labelAnchor = last[0] > W - 40 ? "end" : "middle";
+    return `
+      <svg viewBox="0 0 ${W} ${H}" class="aisb-trend-svg" preserveAspectRatio="none">
+        <line x1="${PAD_L}" y1="${zeroY.toFixed(1)}" x2="${W - PAD_R}" y2="${zeroY.toFixed(1)}" class="aisb-trend-axis"/>
+        <path d="${areaPath}" class="aisb-trend-area"></path>
+        <path d="${linePath}" class="aisb-trend-line"></path>
+        ${dots}
+        <text x="${last[0].toFixed(1)}" y="${Math.max(10, last[1] - 8).toFixed(1)}" text-anchor="${labelAnchor}" class="aisb-trend-endlabel">${escapeHtml(lastLabel)}</text>
+      </svg>
+      <div class="aisb-trend-xlabels"><span>${escapeHtml(categories[0])}</span><span>${escapeHtml(categories[categories.length - 1])}</span></div>
+    `;
+  }
+
+  // 状態分類の構成比(part-to-whole)を積み上げ横棒1本+凡例で表現する。
+  // 与信リスク(正常/警戒/超過)・在庫逼迫(正常/逼迫/割れ)・滞留債権(延滞日数帯)向け。
+  // ランキング棒だけでは「全体に対してどれくらいの割合が危険域か」が読めないため、
+  // 棒グラフとは別ジョブ(part-to-whole)の表現として追加した(ai-api-server側の
+  // distribution.slices は既存の .aisb-risk-* 配色と揃えた status(good/warning/critical)
+  // を持つ)。色はテキストではなく凡例のドット(スウォッチ)側にのみ使う。
+  const STATUS_COLOR = { good: "#2e8b57", warning: "#d68910", critical: "#c0392b" };
+  function renderStatusDistributionChart(distribution) {
+    const slices = (distribution && distribution.slices) || [];
+    const total = slices.reduce((s, x) => s + (Number(x.count) || 0), 0);
+    if (!total) return "";
+    const bar = slices
+      .filter((s) => s.count > 0)
+      .map((s) => {
+        const pct = (s.count / total) * 100;
+        const color = STATUS_COLOR[s.status] || "#8a94a6";
+        return `<div class="aisb-dist-seg" style="width:${pct.toFixed(2)}%;background:${color}" title="${escapeHtml(s.label)}: ${s.count}件(${Math.round(pct)}%)"></div>`;
+      })
+      .join("");
+    const legend = slices
+      .map((s) => {
+        const color = STATUS_COLOR[s.status] || "#8a94a6";
+        const pct = Math.round((s.count / total) * 100);
+        return `<span class="aisb-dist-legend-item"><span class="aisb-legend-dot" style="background:${color}"></span>${escapeHtml(s.label)} ${s.count}件(${pct}%)</span>`;
+      })
+      .join("");
+    return `
+      <div class="aisb-section-title">${escapeHtml(distribution.title || "内訳")}</div>
+      <div class="aisb-dist-bar">${bar}</div>
+      <div class="aisb-dist-legend">${legend}</div>
+    `;
+  }
+
+  return { CSS, escapeHtml, detectLegacyContext, renderChart, renderStatusDistributionChart };
 })();

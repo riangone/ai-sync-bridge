@@ -116,10 +116,18 @@ class CrossAnalysisService:
             "total_exposure": round(sum(r["Exposure"] for r in rows), 2),
             "total_limit": round(sum(r["CreditLimit"] for r in rows), 2),
         }
+        distribution = {
+            "title": "リスク区分の内訳(全顧客)",
+            "slices": [
+                {"label": "正常", "count": sum(1 for r in rows if r["RiskLevel"] == "正常"), "status": "good"},
+                {"label": "警戒(80%以上)", "count": summary["warning_count"], "status": "warning"},
+                {"label": "超過", "count": summary["exceeded_count"], "status": "critical"},
+            ],
+        }
         return {
             "report": "credit-risk", "label": "与信リスク分析(顧客×請求)",
             "generated_at": datetime.utcnow(), "summary": summary, "chart": chart,
-            "rows": rows, "warnings": warnings,
+            "distribution": distribution, "rows": rows, "warnings": warnings,
         }
 
     # -----------------------------------------------------------------
@@ -171,10 +179,24 @@ class CrossAnalysisService:
             "urgent_count": sum(1 for r in rows if r["Urgent"]),
             "below_safety_count": sum(1 for r in rows if r["BelowSafetyStock"]),
         }
+        # 安全在庫割れ(最重度) > 逼迫(urgentだが安全在庫は割れていない) > 正常、の3区分。
+        # rows["Urgent"]は「below_safetyまたは残日数14日未満」の合成条件なので、
+        # ここで排他的なバケットに分け直す(内訳の合計が商品数と一致するように)。
+        below = summary["below_safety_count"]
+        urgent_not_below = sum(1 for r in rows if r["Urgent"] and not r["BelowSafetyStock"])
+        normal = len(rows) - below - urgent_not_below
+        distribution = {
+            "title": "在庫状態の内訳(全商品)",
+            "slices": [
+                {"label": "正常", "count": normal, "status": "good"},
+                {"label": "逼迫(要注意)", "count": urgent_not_below, "status": "warning"},
+                {"label": "安全在庫割れ", "count": below, "status": "critical"},
+            ],
+        }
         return {
             "report": "stock-tension", "label": "在庫逼迫分析(商品×在庫トランザクション)",
             "generated_at": datetime.utcnow(), "summary": summary, "chart": chart,
-            "rows": rows, "warnings": warnings,
+            "distribution": distribution, "rows": rows, "warnings": warnings,
         }
 
     # -----------------------------------------------------------------
@@ -222,10 +244,20 @@ class CrossAnalysisService:
             "overdue_total_amount": round(sum(r["TotalAmount"] for r in rows), 2),
             "affected_customer_count": len(by_customer),
         }
+        # 延滞日数の経過度合いで3区分(日数不明分はカウントに含めない)。
+        aging = [r["DaysOverdue"] for r in rows if r["DaysOverdue"] is not None]
+        distribution = {
+            "title": "延滞経過日数の内訳(延滞請求)",
+            "slices": [
+                {"label": "30日未満", "count": sum(1 for d in aging if d < 30), "status": "good"},
+                {"label": "30〜60日", "count": sum(1 for d in aging if 30 <= d < 60), "status": "warning"},
+                {"label": "60日以上", "count": sum(1 for d in aging if d >= 60), "status": "critical"},
+            ],
+        }
         return {
             "report": "bad-debt", "label": "滞留債権(延滞)分析(請求×顧客)",
             "generated_at": datetime.utcnow(), "summary": summary, "chart": chart,
-            "rows": rows, "warnings": warnings,
+            "distribution": distribution, "rows": rows, "warnings": warnings,
         }
 
     async def run(self, report: str) -> dict:
