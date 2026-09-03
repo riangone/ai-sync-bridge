@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Sync Bridge ― システムアーキテクチャ概要</title>
+<style>
+  :root{
+    --bg-0:#f6f8fc;
+    --bg-1:#eef1f8;
+    --panel:#ffffff;
+    --panel-2:#f4f6fb;
+    --line:rgba(16,24,43,.10);
+    --ink:#10182b;
+    --ink-dim:#4c5670;
+    --ink-faint:#8891a8;
+    --accent:#3b63e0;
+    --accent-2:#0f9d78;
+    --warn:#c8631f;
+    --danger:#d1425f;
+    --good:#0f9d78;
+    --radius:18px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg-0);
+    color:var(--ink);
+    font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    overflow:hidden;
+  }
+  #deck{
+    height:100vh;
+    width:100vw;
+    scroll-snap-type:y mandatory;
+    overflow-y:scroll;
+    overflow-x:hidden;
+    scroll-behavior:smooth;
+  }
+  .slide{
+    height:100vh;
+    width:100vw;
+    scroll-snap-align:start;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+    padding:6vh 8vw;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(91,140,255,.16), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(126,224,195,.10), transparent 55%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1));
+  }
+  .slide-inner{
+    width:100%;
+    max-width:1180px;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:.5em;
+    font-size:.85rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    font-weight:700;
+    margin-bottom:1.1em;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px;height:2px;
+    background:var(--accent-2);
+    display:inline-block;
+  }
+  h1{
+    font-size:clamp(2.2rem, 5vw, 4.4rem);
+    line-height:1.15;
+    margin:0 0 .3em;
+    font-weight:800;
+    letter-spacing:-.01em;
+  }
+  h2{
+    font-size:clamp(1.7rem, 3.4vw, 2.7rem);
+    line-height:1.28;
+    margin:0 0 .55em;
+    font-weight:800;
+    letter-spacing:-.01em;
+  }
+  .lead{
+    font-size:clamp(1.05rem, 1.6vw, 1.35rem);
+    color:var(--ink-dim);
+    line-height:1.75;
+    max-width:56ch;
+  }
+  .accent{color:var(--accent-2);}
+  .accent-b{color:var(--accent);}
+  .grid{
+    display:grid;
+    gap:20px;
+    margin-top:1.6em;
+  }
+  .grid-2{grid-template-columns:1fr 1fr;}
+  .grid-3{grid-template-columns:repeat(3,1fr);}
+  .card{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:1.4em 1.5em;
+    box-shadow:0 10px 30px -18px rgba(16,24,43,.18);
+  }
+  .card h3{
+    margin:0 0 .45em;
+    font-size:1.12rem;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:.5em;
+  }
+  .card p{
+    margin:0;
+    color:var(--ink-dim);
+    font-size:.94rem;
+    line-height:1.7;
+  }
+  .tag{
+    display:inline-block;
+    font-size:.72rem;
+    font-weight:700;
+    letter-spacing:.04em;
+    padding:.25em .65em;
+    border-radius:999px;
+    margin-bottom:.6em;
+  }
+  .tag.pain{background:rgba(255,107,129,.14); color:var(--danger);}
+  .tag.fix{background:rgba(126,224,195,.14); color:var(--good);}
+  .tag.note{background:rgba(91,140,255,.14); color:var(--accent);}
+  ul.plain{list-style:none; margin:0; padding:0;}
+  ul.plain li{
+    padding:.55em 0;
+    border-bottom:1px solid var(--line);
+    color:var(--ink-dim);
+    font-size:1rem;
+    line-height:1.6;
+    display:flex;
+    gap:.7em;
+  }
+  ul.plain li:last-child{border-bottom:none;}
+  ul.plain li::before{
+    content:"—";
+    color:var(--ink-faint);
+    flex:none;
+  }
+  .num{
+    font-weight:900;
+    color:var(--accent-2);
+    font-variant-numeric:tabular-nums;
+    margin-right:.15em;
+  }
+  .kicker-badge{
+    position:absolute;
+    top:6vh; left:8vw;
+    font-size:.8rem;
+    color:var(--ink-faint);
+    letter-spacing:.08em;
+  }
+  .arrowflow{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:1.4em;
+  }
+  .arrowflow .box{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:1em 1.3em;
+    font-weight:700;
+    font-size:.95rem;
+    text-align:center;
+    min-width:150px;
+  }
+  .arrowflow .box small{
+    display:block;
+    font-weight:400;
+    color:var(--ink-faint);
+    margin-top:.3em;
+    font-size:.78rem;
+  }
+  .arrowflow .arrow{color:var(--accent); font-size:1.4rem;}
+  .compare{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+    margin-top:1.6em;
+  }
+  .compare .col{
+    border-radius:var(--radius);
+    padding:1.6em;
+    border:1px solid var(--line);
+  }
+  .compare .before{background:linear-gradient(180deg, rgba(91,140,255,.09), rgba(91,140,255,.02));}
+  .compare .after{background:linear-gradient(180deg, rgba(126,224,195,.10), rgba(126,224,195,.02));}
+  .compare h4{
+    margin:0 0 .8em;
+    font-size:1.05rem;
+    display:flex; align-items:center; gap:.5em;
+  }
+  .compare ul{list-style:none; margin:0; padding:0;}
+  .compare li{
+    padding:.5em 0;
+    color:var(--ink-dim);
+    font-size:.95rem;
+    display:flex;
+    gap:.6em;
+    border-bottom:1px dashed var(--line);
+  }
+  .compare li:last-child{border-bottom:none;}
+  .dot-x{color:var(--danger); flex:none;}
+  .dot-c{color:var(--good); flex:none;}
+  .diagram{
+    display:flex;
+    align-items:stretch;
+    gap:16px;
+    margin-top:1.8em;
+    flex-wrap:wrap;
+  }
+  .diagram .node{
+    flex:1;
+    min-width:220px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:1.4em;
+  }
+  .diagram .node.core{
+    border:1px solid rgba(91,140,255,.5);
+    box-shadow:0 0 0 1px rgba(91,140,255,.15) inset, 0 20px 50px -20px rgba(91,140,255,.35);
+  }
+  .diagram .node h5{
+    margin:0 0 .5em;
+    font-size:.95rem;
+    color:var(--accent-2);
+    letter-spacing:.04em;
+  }
+  .diagram .node p{margin:0; color:var(--ink-dim); font-size:.86rem; line-height:1.65;}
+  .diagram .conn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--ink-faint);
+    font-size:1.5rem;
+    min-width:24px;
+  }
+  .arch-diagram{
+    margin-top:1.6em;
+  }
+  .arch-browser{
+    border:2px dashed rgba(59,99,224,.45);
+    border-radius:20px;
+    padding:1.6em 1.6em 1.4em;
+    background:rgba(59,99,224,.04);
+    position:relative;
+  }
+  .arch-browser-label{
+    position:absolute;
+    top:-.85em; left:1.4em;
+    background:var(--bg-0);
+    padding:0 .6em;
+    font-size:.82rem;
+    font-weight:800;
+    color:var(--accent);
+    letter-spacing:.03em;
+  }
+  .arch-browser-inner{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:.6em;
+  }
+  .arch-node{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:1.1em 1.3em;
+  }
+  .arch-node.highlight{
+    border:1px solid rgba(59,99,224,.5);
+    box-shadow:0 0 0 1px rgba(59,99,224,.12) inset;
+  }
+  .arch-node h5{
+    margin:0 0 .4em;
+    font-size:.92rem;
+    color:var(--accent-2);
+    letter-spacing:.02em;
+  }
+  .arch-node p{margin:0; color:var(--ink-dim); font-size:.85rem; line-height:1.6;}
+  .arch-arrows{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin:.9em 0;
+  }
+  .arch-arrows .arch-arrow{
+    text-align:center;
+    color:var(--ink-faint);
+    font-size:.82rem;
+    font-weight:700;
+  }
+  .arch-servers{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  .arch-node.server{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+  }
+  .arch-node.server.core{
+    border:1px solid rgba(15,157,120,.5);
+    box-shadow:0 0 0 1px rgba(15,157,120,.14) inset, 0 20px 50px -24px rgba(15,157,120,.35);
+  }
+  .arch-node.server.core h5{color:var(--accent-2);}
+  @media (max-width:860px){
+    .arch-browser-inner, .arch-arrows, .arch-servers{grid-template-columns:1fr;}
+  }
+  .foot-brand{
+    position:absolute;
+    bottom:5vh; left:8vw;
+    font-size:.78rem;
+    color:var(--ink-faint);
+    letter-spacing:.08em;
+    display:flex;
+    gap:.6em;
+    align-items:center;
+  }
+  .foot-brand .sq{
+    width:8px;height:8px;background:var(--accent);
+    display:inline-block; border-radius:2px;
+  }
+  .cta{
+    margin-top:2em;
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .cta .btn{
+    padding:.9em 1.6em;
+    border-radius:999px;
+    font-weight:800;
+    font-size:.95rem;
+    text-decoration:none;
+    display:inline-block;
+  }
+  .btn.primary{
+    background:linear-gradient(120deg, var(--accent), var(--accent-2));
+    color:#08101f;
+  }
+  .btn.ghost{
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+  }
+  .step-num{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:2em;height:2em;
+    border-radius:50%;
+    background:rgba(91,140,255,.16);
+    color:var(--accent-2);
+    font-weight:900;
+    font-size:1rem;
+    margin-right:.5em;
+    flex:none;
+  }
+  .code-chip{
+    display:inline-block;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.82rem;
+    background:rgba(16,24,43,.05);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:.15em .5em;
+    color:var(--accent-2);
+  }
+  /* progress + nav */
+  #progress{
+    position:fixed; top:0; left:0; height:3px;
+    background:linear-gradient(90deg, var(--accent), var(--accent-2));
+    z-index:50; transition:width .35s ease;
+  }
+  #navdots{
+    position:fixed;
+    right:22px; top:50%;
+    transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:9px;
+    z-index:50;
+  }
+  #navdots button{
+    width:8px; height:8px; border-radius:50%;
+    background:rgba(16,24,43,.16);
+    border:none; cursor:pointer; padding:0;
+    transition:all .25s ease;
+  }
+  #navdots button.active{
+    background:var(--accent-2);
+    height:22px; border-radius:5px;
+  }
+  #counter{
+    position:fixed; left:22px; bottom:18px;
+    font-size:.78rem; color:var(--ink-faint);
+    letter-spacing:.08em; z-index:50;
+    font-variant-numeric:tabular-nums;
+  }
+  #hint{
+    position:fixed; right:22px; bottom:16px;
+    font-size:.72rem; color:var(--ink-faint);
+    letter-spacing:.03em; z-index:50;
+  }
+  .logo-mark{
+    display:inline-flex; align-items:center; gap:.5em;
+    font-weight:900; font-size:1rem;
+    color:var(--ink);
+    letter-spacing:.02em;
+  }
+  .logo-mark .dot{
+    width:10px;height:10px;border-radius:50%;
+    background:linear-gradient(120deg, var(--accent), var(--accent-2));
+    display:inline-block;
+  }
+  @media (max-width: 860px){
+    .grid-2, .grid-3, .compare{grid-template-columns:1fr;}
+    .diagram{flex-direction:column;}
+    .diagram .conn{transform:rotate(90deg);}
+  }
+  @media print{
+    #progress,#navdots,#counter,#hint{display:none;}
+    #deck{overflow:visible; height:auto;}
+    .slide{
+      height:100vh;
+      page-break-after:always;
+      scroll-snap-align:none;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress" style="width:0%"></div>
+<div id="navdots"></div>
+<div id="counter">01 / 10</div>
+<div id="hint">↑↓ または PageUp/Down・Space で移動</div>
+
+<div id="deck">
+
+  <!-- 1. Title -->
+  <section class="slide" id="s1">
+    <div class="kicker-badge"><span class="logo-mark"><span class="dot"></span>AI-SYNC BRIDGE</span></div>
+    <div class="slide-inner" style="text-align:center; display:flex; flex-direction:column; align-items:center;">
+      <div class="eyebrow" style="justify-content:center;">System Architecture Overview</div>
+      <h1>AIサイドパネルは、<br><span class="accent">どう動いているのか。</span></h1>
+      <p class="lead" style="max-width:54ch; text-align:center;">
+        Chrome拡張機能がレガシー画面にサイドパネルを注入し、別プロセスのAI APIサーバーと
+        やり取りして応答を返すまでの流れを、細部を省いて大づかみに解説します。
+      </p>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 2. 全体像 -->
+  <section class="slide" id="s2">
+    <div class="slide-inner">
+      <div class="eyebrow">01 ― 全体像</div>
+      <h2>登場人物は4つ。ブラウザの中と外。</h2>
+      <p class="lead">ブラウザの中では、レガシー画面とChrome拡張が注入したパネルが同じページに同居する。その外側に、無改造の既存システムと、別プロセスのAI APIサーバーが独立して立っている。</p>
+      <div class="arch-diagram">
+        <div class="arch-browser">
+          <div class="arch-browser-label">🖥 ① クライアント（ブラウザ）</div>
+          <div class="arch-browser-inner">
+            <div class="arch-node">
+              <h5>レガシー画面</h5>
+              <p>③現有システムがそのまま配信するHTML/JS。1行も改変しない。</p>
+            </div>
+            <div class="arch-node highlight">
+              <h5>🧩 ② Chrome拡張が注入したAIサイドパネル</h5>
+              <p>同じページのDOMに追加されたUI。検索・チャット・入力支援を提供。</p>
+            </div>
+          </div>
+        </div>
+        <div class="arch-arrows">
+          <div class="arch-arrow">↓ 画面取得（HTTP・既存の通信そのまま）</div>
+          <div class="arch-arrow">↓ AI呼び出し（fetch・別オリジン）</div>
+        </div>
+        <div class="arch-servers">
+          <div class="arch-node server">
+            <h5>🏢 ③ 現有システム（レガシー業務サーバー）</h5>
+            <p>ERP／自動車ディーラーDMSなど既存Webシステム本体。DBもロジックも無改造。</p>
+          </div>
+          <div class="arch-node server core">
+            <h5>🤖 ④ ai-api-server（AI APIサーバー）</h5>
+            <p>別プロセスのFastAPIサービス。NL→SQL変換・要約・チャット等を担当し、AIプロバイダを呼び出す。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 3. Step1: 注入 -->
+  <section class="slide" id="s3">
+    <div class="slide-inner">
+      <div class="eyebrow">02 ― どうやって画面に入り込むか</div>
+      <h2><span class="step-num">1</span>拡張が対象ページを見つけて、忍び込む。</h2>
+      <p class="lead">Chrome拡張の<span class="code-chip">manifest.json</span>には「どのURLに何を注入するか」が宣言されているだけ。サーバー側の変更は一切不要です。</p>
+      <div class="arrowflow">
+        <div class="box">対象ページを開く<small>host_permissions が許可した<br>オリジンのみ</small></div>
+        <div class="arrow">→</div>
+        <div class="box">content_scripts が自動注入<small>document_idle のタイミング</small></div>
+        <div class="arrow">→</div>
+        <div class="box">shared/*.js + panel-*.js<small>設定・DOM操作・各機能タブ</small></div>
+        <div class="arrow">→</div>
+        <div class="box">画面右下にAIボタン出現<small>bootstrap.js が起動</small></div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 4. Step2: 組み立て -->
+  <section class="slide" id="s4">
+    <div class="slide-inner">
+      <div class="eyebrow">03 ― サイドパネルの組み立て方</div>
+      <h2><span class="step-num">2</span>パネルは自己登録、bootstrapが束ねる。</h2>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>🧩 shared/config-base.js</h3>
+          <p>どの業務システム(ERP／DMS)か、AI APIサーバーのURLはどこか、といった設定値を用意する。</p>
+        </div>
+        <div class="card">
+          <h3>📑 modules/panel-*.js</h3>
+          <p>チャット・自然文検索・在庫・請求書など機能ごとに1ファイル。読み込まれると自分の描画関数を登録するだけの自己完結型。</p>
+        </div>
+        <div class="card">
+          <h3>🚀 modules/bootstrap.js</h3>
+          <p>最後に実行される起点。共有の<span class="code-chip">ctx</span>オブジェクト(API接続・DOMヘルパー等)を組み立て、登録済み全パネルをまとめてサイドバーとして起動する。</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 5. Step3: AI呼び出し -->
+  <section class="slide" id="s5">
+    <div class="slide-inner">
+      <div class="eyebrow">04 ― AIを呼び出す瞬間</div>
+      <h2><span class="step-num">3</span>パネルの操作が、AI応答になって返ってくる。</h2>
+      <p class="lead">検索・チャット・「AIで解釈する」ボタンなどの操作は、すべて同じ経路をたどります。</p>
+      <div class="arrowflow">
+        <div class="box">ユーザーがパネルを操作<small>自然文検索/チャット/解釈ボタン</small></div>
+        <div class="arrow">→</div>
+        <div class="box">fetch で ai-api-server へ<small>別オリジンのFastAPI</small></div>
+        <div class="arrow">→</div>
+        <div class="box">ルータ→サービス層<small>NL→SQL変換・集計・要約</small></div>
+        <div class="arrow">→</div>
+        <div class="box">AIプロバイダを呼び出し<small>差し替え可能な接続先</small></div>
+        <div class="arrow">→</div>
+        <div class="box">JSON応答をパネルに描画</div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 6. AI APIサーバー ⇔ AIモデル -->
+  <section class="slide" id="s6">
+    <div class="slide-inner">
+      <div class="eyebrow">05 ― AI APIサーバーとAIモデルの間</div>
+      <h2><span class="step-num">4</span>プロバイダは差し替え可能。呼び出し側は違いを知らない。</h2>
+      <p class="lead"><span class="code-chip">AiProvider</span> という抽象クラス1枚を挟むことで、chat_service・search_serviceなどの呼び出し側は「今どのAIモデルと話しているか」を意識せずに済みます。環境変数 <span class="code-chip">AISB_AI_PROVIDER</span>（mock/opencode/openai/gemini）ひとつで実体を切り替えます。</p>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>🧪 mock</h3>
+          <p>APIキー未設定時や検証時のフォールバック。外部通信を一切行わず、決定論的な擬似応答・擬似埋め込みを返す。</p>
+        </div>
+        <div class="card">
+          <h3>☁️ openai / gemini</h3>
+          <p>OpenAI Chat Completions(gpt-4o-mini)、Gemini generateContent(gemini-1.5-flash)を<span class="code-chip">httpx</span>で直接呼び出すSaaS型API。</p>
+        </div>
+        <div class="card">
+          <h3>🖥 opencode（既定）</h3>
+          <p>ローカル/自前運用のOpenCode CLIサーバー(既定 http://localhost:4096)。セッション方式でモデルを呼び分ける、標準の接続先。</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 7. OpenCodeサーバーとの実通信 -->
+  <section class="slide" id="s7">
+    <div class="slide-inner">
+      <div class="eyebrow">06 ― OpenCodeサーバーとの実通信</div>
+      <h2>1回の質問が、内部では3段階のHTTPになる。</h2>
+      <p class="lead">既定プロバイダ opencode は単純な1本の<span class="code-chip">/chat</span>エンドポイントを持たない。使い捨てセッションを作って会話し、応答をparts配列から抽出する設計。</p>
+      <div class="arrowflow">
+        <div class="box">POST /session<small>使い捨てセッションを作成</small></div>
+        <div class="arrow">→</div>
+        <div class="box">POST /session/{id}/message<small>model指定＋履歴を1本のpromptに<br>埋め込んで送信</small></div>
+        <div class="arrow">→</div>
+        <div class="box">parts[] からtext抽出<small>type:"text" のpartを連結</small></div>
+        <div class="arrow">→</div>
+        <div class="box">info.error を確認<small>HTTP200でも上流エラーは<br>ここに潜む</small></div>
+      </div>
+      <div class="grid grid-2" style="margin-top:1.6em;">
+        <div class="card">
+          <h3>🛡 失敗しても画面は壊れない</h3>
+          <p>タイムアウトやAPIエラーは例外を投げず、<span class="code-chip">[opencode-error-fallback] ...</span>のような文字列として返す設計。パネルは常にJSONで応答を受け取れる。</p>
+        </div>
+        <div class="card">
+          <h3>🖼 画像入力は別モデル指定</h3>
+          <p>既定モデルは画像非対応なことが多いため、<span class="code-chip">vision_model_id</span>を別枠で持ち、画像は<span class="code-chip">FilePart(data URL)</span>として添付する。</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 8. 補足: 拡張なしでも同じ機能 -->
+  <section class="slide" id="s8">
+    <div class="slide-inner">
+      <div class="eyebrow">07 ― 補足：拡張機能をインストールしなくても</div>
+      <h2>同じパネルコードが、2つの経路で配信される。</h2>
+      <p class="lead">panel-*.js 自体は環境に依存しないため、「どこに注入するか」だけを差し替えれば、拡張機能なしでも同じ機能を提供できます。</p>
+      <div class="compare">
+        <div class="col before">
+          <h4>🧩 Chrome拡張機能</h4>
+          <ul>
+            <li><span class="dot-c">✓</span>ブラウザの content_scripts が注入</li>
+            <li><span class="dot-c">✓</span>利用者ごとにON/OFF可能</li>
+            <li><span class="dot-c">✓</span>インストールが必要</li>
+          </ul>
+        </div>
+        <div class="col after">
+          <h4>🔌 サーバー埋め込み方式(aisb_embed)</h4>
+          <ul>
+            <li><span class="dot-c">✓</span>サーバー側ミドルウェアがHTML応答の<span class="code-chip">&lt;/body&gt;</span>直前にスクリプトを差し込む</li>
+            <li><span class="dot-c">✓</span>拡張機能のインストール不要</li>
+            <li><span class="dot-c">✓</span>管理画面から即座にON/OFF切替</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 9. 業務ドメインの出し分け -->
+  <section class="slide" id="s9">
+    <div class="slide-inner">
+      <div class="eyebrow">08 ― ERP／DMS、2つの業務を1つのコードで</div>
+      <h2>同じパネルが、業種ごとに語彙を切り替える。</h2>
+      <p class="lead">パネルは <span class="code-chip">ctx.INSTANCE</span>(erp / dealer)を見て、表示ラベルやAI検索の例文を出し分けます。バックエンドは完全に別プロセス・別データベースとして分離されており、互いに影響しません。</p>
+      <div class="diagram">
+        <div class="node">
+          <h5>ERPインスタンス</h5>
+          <p>顧客・受注・仕入・売掛買掛など<br>製造業向けの語彙・データ</p>
+        </div>
+        <div class="conn">⇔</div>
+        <div class="node core">
+          <h5>共通のパネルコード</h5>
+          <p>ctx.INSTANCE で表示・例文を分岐<br>本体ロジックは1本化</p>
+        </div>
+        <div class="conn">⇔</div>
+        <div class="node">
+          <h5>DMSインスタンス</h5>
+          <p>車両在庫・整備/車検・仕入先など<br>自動車販売向けの語彙・データ</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 10. まとめ -->
+  <section class="slide" id="s10">
+    <div class="slide-inner" style="text-align:center;">
+      <div class="eyebrow" style="justify-content:center;">Summary</div>
+      <h1 style="max-width:20ch; margin:0 auto .4em;">3行でまとめると。</h1>
+      <div class="grid grid-3" style="text-align:left;">
+        <div class="card">
+          <h3><span class="num">01</span>無改造</h3>
+          <p>レガシー側のコードは一切書き換えない。</p>
+        </div>
+        <div class="card">
+          <h3><span class="num">02</span>後付け注入</h3>
+          <p>UIはChrome拡張、またはサーバー埋め込みの2経路で後から差し込む。</p>
+        </div>
+        <div class="card">
+          <h3><span class="num">03</span>AIは別プロセス</h3>
+          <p>AI処理はai-api-serverに分離し、業務システム本体には触れない。</p>
+        </div>
+      </div>
+      <div class="cta" style="justify-content:center; margin-top:2.2em;">
+        <a class="btn primary" href="/">デモ選択ページに戻る</a>
+        <a class="btn ghost" href="/erp/ai-panel">AI機能一覧を見る</a>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const navdots = document.getElementById('navdots');
+
+  slides.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', 'スライド ' + (i+1));
+    b.addEventListener('click', () => slides[i].scrollIntoView({behavior:'smooth'}));
+    navdots.appendChild(b);
+  });
+  const dots = Array.from(navdots.children);
+
+  function pad(n){ return String(n).padStart(2,'0'); }
+
+  function currentIndex(){
+    let idx = 0, best = Infinity;
+    const mid = deck.scrollTop + deck.clientHeight/2;
+    slides.forEach((s,i) => {
+      const d = Math.abs((s.offsetTop + s.clientHeight/2) - mid);
+      if(d < best){ best = d; idx = i; }
+    });
+    return idx;
+  }
+
+  function update(){
+    const idx = currentIndex();
+    dots.forEach((d,i) => d.classList.toggle('active', i===idx));
+    counter.textContent = pad(idx+1) + ' / ' + pad(total);
+    progress.style.width = (((idx+1)/total)*100) + '%';
+  }
+
+  deck.addEventListener('scroll', () => {
+    window.requestAnimationFrame(update);
+  }, {passive:true});
+
+  window.addEventListener('keydown', (e) => {
+    const idx = currentIndex();
+    if(['ArrowDown','PageDown',' '].includes(e.key)){
+      e.preventDefault();
+      if(idx < total-1) slides[idx+1].scrollIntoView({behavior:'smooth'});
+    } else if(['ArrowUp','PageUp'].includes(e.key)){
+      e.preventDefault();
+      if(idx > 0) slides[idx-1].scrollIntoView({behavior:'smooth'});
+    } else if(e.key === 'Home'){
+      slides[0].scrollIntoView({behavior:'smooth'});
+    } else if(e.key === 'End'){
+      slides[total-1].scrollIntoView({behavior:'smooth'});
+    }
+  });
+
+  update();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<div class="ai-intro">
+
+    <div class="ai-intro-hero">
+        <div class="ai-intro-hero-badge">🤖 AI SIDE PANEL</div>
+        <h1>レガシー画面はそのまま。<br>操作はAIにまかせる。</h1>
+        <p class="ai-intro-hero-sub">
+            画面遷移もマニュアルもなし。右下の🤖ボタンを押して、日本語で話しかけるだけで
+            検索・入力・要約・異常察知までこの1枚のパネルで完結します。
+        </p>
+        <div class="ai-intro-hero-cta">今すぐ試す ▶ 画面右下の <strong>🤖</strong> ボタンをクリック</div>
+        <div class="ai-intro-hero-stats">
+            <div class="ai-intro-hero-stat"><strong>14</strong><span>AI機能</span></div>
+            <div class="ai-intro-hero-stat"><strong>5</strong><span>カテゴリ</span></div>
+            <div class="ai-intro-hero-stat"><strong>3</strong><span>ステップ</span></div>
+            <div class="ai-intro-hero-stat"><strong>0</strong><span>学習コスト</span></div>
+        </div>
+    </div>
+
+    <div class="ai-intro-section">
+        <h2 class="ai-intro-h2">なぜ使うのか</h2>
+        <div class="ai-intro-benefits">
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">⌨️</div>
+                <h3>探す・入れるが1発で終わる</h3>
+                <p>「A社の未回収を教えて」で検索完了。画面遷移やメニュー探しが不要に。</p>
+            </div>
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">📊</div>
+                <h3>その場でAIが要約</h3>
+                <p>在庫・売掛買掛・利益などの数字を、開いたまま自然文で聞いて即確認。</p>
+            </div>
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">🔔</div>
+                <h3>見落としを先に知らせる</h3>
+                <p>需要予測やアラートが、気づきにくい在庫切れ・滞留債権を先回りで通知。</p>
+            </div>
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">🗣️</div>
+                <h3>操作は全部、日本語</h3>
+                <p>専用コマンドやマニュアル学習は不要。話しかける感覚でそのまま伝わる。</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-intro-section">
+        <h2 class="ai-intro-h2">使い方（3ステップ）</h2>
+        <div class="ai-intro-steps">
+            <div class="ai-intro-step">
+                <div class="ai-intro-step-num">1</div>
+                <div>
+                    <h3>🤖ボタンを開く</h3>
+                    <p>どの画面からでも、右下の🤖ボタンでいつでもパネルが開きます。</p>
+                </div>
+            </div>
+            <div class="ai-intro-step-arrow">→</div>
+            <div class="ai-intro-step">
+                <div class="ai-intro-step-num">2</div>
+                <div>
+                    <h3>目的のタブを選ぶ</h3>
+                    <p>「AIチャット」「AI検索」など、上部タブからやりたいことを選択。</p>
+                </div>
+            </div>
+            <div class="ai-intro-step-arrow">→</div>
+            <div class="ai-intro-step">
+                <div class="ai-intro-step-num">3</div>
+                <div>
+                    <h3>日本語で話しかける</h3>
+                    <p>知りたいこと・やりたいことをそのまま入力・送信するだけ。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-intro-section">
+        <div class="ai-intro-list-head">
+            <h2 class="ai-intro-h2">できること一覧</h2>
+            <p class="ai-intro-list-hint">👆 各カードをクリックすると、機能ごとの「できること」「使い方」「入力例」が開きます</p>
+        </div>
+
+        <div class="ai-intro-group cat-search">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">🔎</span>探す・聞く</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">AIチャット</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">業務全般を自然文で相談・質問できる基本タブ</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>検索・入力・数字確認などカテゴリを問わず、業務の疑問をそのまま日本語で相談できる万能窓口。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「AIチャット」タブ → 下の入力欄に質問を入力 →「送信」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「今月の売掛金の状況を教えて」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">AI検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">「先月の受注一覧」等を自動でデータ検索に変換</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>日本語の検索条件をAIが安全な絞り込み条件に変換して検索。与信リスク・在庫逼迫・滞留債権などの定型レポートやAIレポート自動生成も同じタブから使える。適用された条件は画面に表示されるので安心。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「AI検索」タブ → 条件を日本語で入力 → 実行</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「与信限度額が100万円を超える顧客を、限度額の高い順に5件」「延滞している請求の金額を顧客の業種別に合計」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">セマンティック検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">キーワードが多少あいまいでも意味で探し当てる</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>完全一致でなくても、言葉の意味が近い顧客・商品・案件などをAIが探し出す。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「セマンティック検索」タブ → 自然文またはキーワードを入力 →「検索」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「配送が遅れがちな取引先」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">類似検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">似た商品・案件をAIが自動でピックアップ</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>顧客・受注・商品の中から、指定した1件に近いレコードを文字類似度ベースで自動抽出。任意で一致理由の説明を付けられ、「AIで関連性を解釈する」を押すとその結果の意味を本物のAIが解説する。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「類似検索」タブ → 対象テーブル(顧客/受注/商品)とID・件数を指定 →「説明を付与」の要否を選択 → 実行 → 必要なら「AIで関連性を解釈する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>テーブル「顧客(customers)」+ ID「12」+ 件数「5」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">企業・物件検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">外部情報も横断して調べ、登録用データ化</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>会社名や物件名から外部情報も含めて調べ、レガシー画面の項目に合わせた登録用データまで自動生成。フォームへの反映は用意するだけで、送信は必ず自分で行う設計。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「企業・物件検索」タブ →「会社検索」/「物件検索」を選択 → キーワードを入力して検索 → 必要なら「登録用データを作る」または「新規登録ページを開いて自動入力」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「トヨタ自動車」「六本木ヒルズ」</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-input">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">✍️</span>入力を楽にする</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">自然言語入力</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">「◯◯を顧客登録して」で入力フォームを自動作成</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>話し言葉のまま伝えた依頼内容を、対象画面(受注入力/顧客登録/見積管理/請求管理/仕入先管理)の項目に自動でマッピング。結果は一覧表示のみで、実フォームへの書き込み・送信は行わない(内容確認は必ず人が行う)。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「自然言語入力」タブ → 対象画面を選択 → 依頼内容を日本語で入力 → マッピング結果を確認</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「山田商事にポンプA-100を3個、来週納品で発注したい」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">OCR取込</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">紙の伝票や名刺を画像から読み取り自動入力</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>伝票・名刺・PDFなどの画像をAIビジョンが読み取り、テキスト化して抽出。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「OCR取込」タブ → 画像/PDFファイルを選択 →「OCR実行」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>見積書や請求書を撮影した写真、スキャンPDF</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-numbers">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">📈</span>数字をすぐ確認</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">在庫管理</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">在庫状況・不足リスクをその場で要約</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>在庫一覧を開くだけで即確認でき、「異常検知」で発注点を割り込んでいる商品をワンクリックで洗い出す。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「在庫管理」タブ → 一覧が自動表示 → 必要なら「異常検知を実行」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。開くだけで一覧・異常検知が使える。</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">発注管理</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">発注状況の確認や提案をAIがサポート</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>発注一覧の確認・新規発注登録に加え、「発注提案を生成」で発注すべき商品・数量をルールベースで算出。「AIで発注提案を解釈する」でその提案の妥当性を本物のAIが解説し、仕入先評価の確認もできる。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「発注管理」タブ → 一覧確認、または商品ID/仕入先/数量/納期を入力して「発注登録」→ 必要なら「発注提案を生成」→「AIで発注提案を解釈する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>商品ID「103」+ 仕入先「山田商事」+ 数量「50」+ 納期「2026-09-01」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">利益・粗利</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">商品・案件別の利益率を自然文で問い合わせ</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>商品・案件別の利益率を、期間を指定して自動集計・確認。「AIで収益性を解釈する」で集計結果の意味を本物のAIが解説。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「利益・粗利」タブ → 対象期間(YYYY-MM、空欄で全期間)を入力 → 実行 → 必要なら「AIで収益性を解釈する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「2026-07」、または空欄のまま全期間集計</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">売掛買掛</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">未回収・支払予定をまとめて即座に把握</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>取引先ごとの売掛金・買掛金を期日前～91日以上でエイジング分析し、リスク(低/中/高)をルールベースで判定。「AIでリスクを解釈する」で数字の背景を本物のAIが解説。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「売掛買掛」タブ →「エイジング分析を実行」→ 必要なら「AIでリスクを解釈する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。ボタン1つで全取引先分を集計。</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-alert">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">🚨</span>見落としを防ぐ</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">予測分析</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">需要・売上の先行きをAIが予測しグラフ表示</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>売上を線形回帰で予測しグラフ表示、再受注リスクも予測。「AIでトレンドを解釈する」「AIでリスクを解釈する」で数字の意味をAIが解説。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「予測分析」タブ → グラフ/リストが自動表示 → 必要なら各「AIで解釈する」ボタン</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。開くだけで予測グラフが表示される。</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">アラート</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">在庫切れ・滞留債権などの異常を自動検知</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>在庫異常と売掛買掛の高リスクをまとめてワンクリックで確認。「AIで対応優先度を解釈する」で何から対応すべきかを本物のAIが解説し、この端末を通知購読しておくこともできる。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「アラート」タブ →「アラートを確認」→ 必要なら「AIで対応優先度を解釈する」または「この端末を購読する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。ボタン1つで在庫・売掛買掛の異常をまとめて確認。</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-support">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">💬</span>総合サポート</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">AIアシスタント</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">操作案内から業務相談まで幅広くサポート</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>今開いている画面の情報を自動で読み取りながら会話形式でサポート。操作案内から業務相談まで幅広く対応し、直近20往復までの会話を保持。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「AIアシスタント」タブ → 質問や依頼を入力 →「送信」(↺で会話をリセット可能)</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「この画面の使い方を教えて」</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-intro-footer-cta">
+        <div class="ai-intro-footer-icon">🤖</div>
+        <p>準備は完了しています。<strong>画面右下の🤖ボタン</strong>を押して、いつでも話しかけてください。</p>
+        <a class="ai-intro-back" href="{{ bp }}/">← メインメニューに戻る</a>
+    </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.querySelectorAll(".ai-intro-cards .ai-intro-card").forEach(function (card) {
+    card.addEventListener("click", function () {
+      var open = card.classList.toggle("is-open");
+      card.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  });
+</script>
+{% endblock %}

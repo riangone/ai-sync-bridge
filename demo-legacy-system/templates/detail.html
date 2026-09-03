@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% set bp = base_path(request) %}
 <h2>{{ heading }}</h2>
 <table class="form-table">
     {% for f in fields %}
@@ -26,7 +27,7 @@
 </table>
 {% endif %}
 <div class="form-actions">
-    {% if show_entry %}<a class="button-link" href="/{{ entity_path }}/Entry/{{ record_id }}">編集</a>{% endif %}
-    <a class="button-link" href="/{{ entity_path }}/List">戻る</a>
+    {% if show_entry %}<a class="button-link" href="{{ bp }}/{{ entity_path }}/Entry/{{ record_id }}">編集</a>{% endif %}
+    <a class="button-link" href="{{ bp }}/{{ entity_path }}/List">戻る</a>
 </div>
 {% endblock %}

@@ -3,6 +3,7 @@
 OpenCode CLI / OpenAI / Gemini / Mock を単一インターフェースで吸収する。
 呼び出し側 (chat_service, search_service) はプロバイダの違いを意識しない。
 """
+import base64
 from abc import ABC, abstractmethod
 import httpx
 from app.config import Settings
@@ -10,19 +11,25 @@ from app.config import Settings
 
 class AiProvider(ABC):
     name: str
+    supports_vision: bool = False
 
     @abstractmethod
-    async def complete(self, prompt: str, history: list[dict] | None = None) -> str: ...
+    async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str: ...
 
     @abstractmethod
     async def embed(self, text: str) -> list[float]: ...
+
+    async def complete_vision(self, prompt: str, image_bytes: bytes, mime: str) -> str:
+        """画像を添付してAIに問い合わせる。既定は非対応(呼び出し側は supports_vision を
+        先に確認する設計だが、直接呼ばれた場合も安全に倒せるようここで明示的に弾く)。"""
+        raise NotImplementedError(f"{self.name} プロバイダは画像入力(vision)に対応していません")
 
 
 class MockProvider(AiProvider):
     """デモモード/APIキー未設定時のフォールバック。決定論的な擬似応答を返す。"""
     name = "mock"
 
-    async def complete(self, prompt: str, history: list[dict] | None = None) -> str:
+    async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
         return f"[mock-ai] 「{prompt[:50]}」について回答します。これはデモ応答です。"
 
     async def embed(self, text: str) -> list[float]:
@@ -41,7 +48,9 @@ class OpenAIProvider(AiProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    async def complete(self, prompt: str, history: list[dict] | None = None) -> str:
+    async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
+        # OpenAI chat completions APIはopencodeの{"websearch": true}形式のtools指定と
+        # 互換性が無いため、ここではtoolsを無視する(素のchat completionのみ対応)。
         messages = (history or []) + [{"role": "user", "content": prompt}]
         async with httpx.AsyncClient(timeout=30) as client:
             try:
@@ -75,7 +84,8 @@ class GeminiProvider(AiProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    async def complete(self, prompt: str, history: list[dict] | None = None) -> str:
+    async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
+        # Gemini generateContent APIも同様にopencode独自のtools形式とは非互換のため無視する。
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"gemini-1.5-flash:generateContent?key={self.api_key}"
@@ -111,10 +121,15 @@ class OpenCodeProvider(AiProvider):
     """
     name = "opencode"
 
-    def __init__(self, endpoint: str, provider_id: str, model_id: str):
+    def __init__(self, endpoint: str, provider_id: str, model_id: str, vision_model_id: str | None = None):
+        # 既定モデル(model_id)はテキスト専用のことが多いため vision_model_id を別枠で持つ。
+        # 未指定(None)の場合は complete_vision() 自体を非サポート扱いにする(誤って
+        # テキスト専用モデルに画像を送って静かに無視されるより、明示的に弾く方が安全)。
         self.endpoint = endpoint.rstrip("/")
         self.provider_id = provider_id
         self.model_id = model_id
+        self.vision_model_id = vision_model_id
+        self.supports_vision = bool(vision_model_id)
 
     def _build_prompt(self, prompt: str, history: list[dict] | None) -> str:
         if not history:
@@ -123,8 +138,52 @@ class OpenCodeProvider(AiProvider):
         lines.append(f"user: {prompt}")
         return "これまでの会話:\n" + "\n".join(lines)
 
-    async def complete(self, prompt: str, history: list[dict] | None = None) -> str:
+    async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
+        """tools: {"websearch": true} のように明示指定すると、モデルの自発的判断任せに
+        せずopencode側にツール利用を強制できる(未指定時は全ツール利用可のデフォルト挙動)。"""
         full_prompt = self._build_prompt(prompt, history)
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                session_resp = await client.post(f"{self.endpoint}/session", json={})
+                session_resp.raise_for_status()
+                session_id = session_resp.json()["id"]
+
+                body: dict = {
+                    "model": {"providerID": self.provider_id, "modelID": self.model_id},
+                    "parts": [{"type": "text", "text": full_prompt}],
+                }
+                if tools:
+                    body["tools"] = tools
+
+                msg_resp = await client.post(
+                    f"{self.endpoint}/session/{session_id}/message",
+                    json=body,
+                )
+                msg_resp.raise_for_status()
+                msg_json = msg_resp.json()
+                # HTTPは200でも、上流(opencode Zen)のモデル側エラー(無料枠終了401等)は
+                # info.error に埋め込まれて返ってくる仕様(2026-08-21実地確認)。ここを
+                # 見ないと「エラーなのに空文字列成功扱い」でサイレント失敗する。
+                error = (msg_json.get("info") or {}).get("error")
+                if error:
+                    message = (error.get("data") or {}).get("message") or error.get("name") or str(error)
+                    return f"[opencode-error-fallback] {message}"
+                parts = msg_json.get("parts", [])
+                text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
+                return text or "[opencode-empty-response]"
+        except Exception as exc:
+            return f"[opencode-error-fallback] {exc}"
+
+    async def complete_vision(self, prompt: str, image_bytes: bytes, mime: str) -> str:
+        """画像を FilePart(type=file, url=data URL) として添付し、vision対応モデルに
+        問い合わせる(`GET /doc` の FilePartInput スキーマで url が data URL 可であることを
+        確認済み)。model_id ではなく vision_model_id を明示指定する(既定モデルは
+        capabilities.input.image=false のことが多く、画像を送っても無視されるため)。"""
+        if not self.vision_model_id:
+            raise NotImplementedError(
+                "OPENCODE_VISION_MODEL_ID が未設定のため画像入力に対応できません"
+            )
+        data_url = f"data:{mime};base64,{base64.b64encode(image_bytes).decode()}"
         try:
             async with httpx.AsyncClient(timeout=120) as client:
                 session_resp = await client.post(f"{self.endpoint}/session", json={})
@@ -134,8 +193,11 @@ class OpenCodeProvider(AiProvider):
                 msg_resp = await client.post(
                     f"{self.endpoint}/session/{session_id}/message",
                     json={
-                        "model": {"providerID": self.provider_id, "modelID": self.model_id},
-                        "parts": [{"type": "text", "text": full_prompt}],
+                        "model": {"providerID": self.provider_id, "modelID": self.vision_model_id},
+                        "parts": [
+                            {"type": "file", "mime": mime, "url": data_url},
+                            {"type": "text", "text": prompt},
+                        ],
                     },
                 )
                 msg_resp.raise_for_status()
@@ -162,5 +224,6 @@ def build_ai_provider(settings: Settings) -> AiProvider:
             settings.opencode_endpoint,
             settings.opencode_provider_id,
             settings.opencode_model_id,
+            settings.opencode_vision_model_id,
         )
     return MockProvider()

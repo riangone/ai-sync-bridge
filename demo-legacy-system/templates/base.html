@@ -3,31 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <title>{{ title }} - 基幹業務システム(Legacy ERP)</title>
-<link rel="stylesheet" href="/static/css/site.css">
+{% set bp = base_path(request) %}
+<link rel="stylesheet" href="{{ bp }}/static/css/site.css">
 </head>
 <body>
 <div id="header">基幹業務システム LEGACY-ERP v3.2</div>
 <div id="nav">
-    <a href="/">ホーム</a>
-    <a href="/Customer/List">顧客管理</a>
-    <a href="/Order/List">受注管理</a>
-    <a href="/Estimate/List">見積管理</a>
-    <a href="/Invoice/List">請求管理</a>
-    <a href="/PurchaseOrder/List">発注管理</a>
-    <a href="/Supplier/List">仕入先管理</a>
-    <a href="/Employee/List">従業員管理</a>
-    <a href="/Product/Inquiry">商品在庫照会</a>
-    <a href="/InventoryTransaction/List">在庫トランザクション</a>
-    <a href="/GoodsReceipt/List">入荷管理</a>
-    <a href="/Property/List">物件管理</a>
-    <a href="/ArAp/List">売掛買掛</a>
-    <a href="/Profit/List">利益管理</a>
+    <a href="{{ bp }}/">ホーム</a>
+    <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
+    <a href="{{ bp }}/Customer/List">顧客管理</a>
+    <a href="{{ bp }}/Order/List">受注管理</a>
+    <a href="{{ bp }}/Estimate/List">見積管理</a>
+    <a href="{{ bp }}/Invoice/List">請求管理</a>
+    <a href="{{ bp }}/PurchaseOrder/List">発注管理</a>
+    <a href="{{ bp }}/Supplier/List">仕入先管理</a>
+    <a href="{{ bp }}/Employee/List">従業員管理</a>
+    <a href="{{ bp }}/Product/Inquiry">商品在庫照会</a>
+    <a href="{{ bp }}/InventoryTransaction/List">在庫トランザクション</a>
+    <a href="{{ bp }}/GoodsReceipt/List">入荷管理</a>
+    <a href="{{ bp }}/Property/List">物件管理</a>
+    <a href="{{ bp }}/ArAp/List">売掛買掛</a>
+    <a href="{{ bp }}/Profit/List">利益管理</a>
 </div>
 <div id="content">
 {% block content %}{% endblock %}
 </div>
 <div id="footer">Copyright (C) Legacy Systems Inc. All Rights Reserved. (AIサポートなし・改変不可を想定したデモ画面)</div>
-<script src="/static/js/site.js"></script>
+<script src="{{ bp }}/static/js/site.js"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -35,6 +35,7 @@
     renderChart: window.AISB.domBase.renderChart,
     renderStatusDistributionChart: window.AISB.domBase.renderStatusDistributionChart,
     LEGACY_ENTITIES: window.AISB.configBase.LEGACY_ENTITIES,
+    INSTANCE: window.AISB.configBase.INSTANCE,
     detectLegacyContext: () => window.AISB.domBase.detectLegacyContext(window.AISB.configBase.LEGACY_ENTITIES),
     runInsight: client.runInsight,
     postJson: client.postJson,

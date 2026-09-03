@@ -62,8 +62,8 @@ class AdminService:
             "vector_backend": self.settings.vector_backend,
             "customer_count": len(self.store.list_customers()),
             "order_count": len(self.store.list_orders()),
-            "workflow_rule_count": len(self.workflow_engine.list_rules()),
-            "workflow_event_count": len(self.workflow_engine.history),
+            "workflow_count": len(self.workflow_engine.list_workflows()),
+            "workflow_execution_count": len(self.workflow_engine.execution_history),
             "unread_notification_count": self.notifications.unread_count(),
             "generated_at": datetime.utcnow(),
         }
@@ -75,8 +75,8 @@ class AdminService:
         if not self.settings.demo_mode:
             raise NotImplementedError("demo_mode=false では提供しない管理操作です")
         self.store.reset()
-        # 顧客/受注のIDが振り直されるため、重複発火防止セットも合わせてリセットしないと
-        # 新しいエンティティが古いIDと衝突して「再発火しない」バグになる。
+        # ワークフロー定義自体はエンティティIDを参照しないため保持したまま、
+        # 実行履歴だけを初期状態に戻す(NotificationCenterの既読状態と同種の設計)。
         self.workflow_engine.reset()
         self.audit_log.record(actor, "reset_demo_data", "デモデータ(顧客/受注/会話履歴)を初期状態にリセットしました")
         self.notifications.push(

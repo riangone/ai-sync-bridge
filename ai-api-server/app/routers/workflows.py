@@ -1,85 +1,132 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.deps import get_admin_service, get_ai_provider, get_demo_store, get_notification_center, get_workflow_engine
-from app.models.schemas import InsightResponse, WorkflowEvent, WorkflowRule, WorkflowRuleCreate, WorkflowRunResult
+from app.deps import (
+    get_admin_service,
+    get_ai_provider,
+    get_workflow_engine,
+    get_workflow_step_runner,
+)
+from app.models.schemas import (
+    InsightResponse,
+    WorkflowDefinition,
+    WorkflowDefinitionCreate,
+    WorkflowDefinitionUpdate,
+    WorkflowExecuteRequest,
+    WorkflowExecutionResult,
+    WorkflowToggleResult,
+    WorkflowTriggerEvalRequest,
+    WorkflowTriggerEvalResult,
+)
 from app.services import insight_service
 from app.services.admin_service import AdminService
 from app.services.ai_client import AiProvider
-from app.services.demo_data import DemoDataStore
-from app.services.notification_service import NotificationCenter
 from app.services.workflow_service import WorkflowEngine
+from app.services.workflow_step_runner import WorkflowStepRunner
 
+# README 5.2/6.2 の "/api/workflow" 単数形ではなく、コードベース全体の既存規約
+# (/api/customers, /api/inventory, /api/purchase-order, ...) に合わせて
+# "/api/workflows" 複数形プレフィックスを維持する(#8のポート番号方針と同じ判断:
+# パス単数/複数の表記差は機能そのものではないため、既存コードベースの規約を優先する)。
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
-# action -> 通知レベルの対応(承認系は警告扱いで管理画面/通知パネルで目立たせる)
-_LEVEL_BY_ACTION = {"flag_approval": "warning", "notify": "info", "flag_followup": "info"}
+
+@router.get("", response_model=list[WorkflowDefinition])
+def list_workflows(engine: WorkflowEngine = Depends(get_workflow_engine)):
+    return engine.list_workflows()
 
 
-@router.get("/rules", response_model=list[WorkflowRule])
-def list_rules(engine: WorkflowEngine = Depends(get_workflow_engine)):
-    return engine.list_rules()
-
-
-@router.post("/rules", response_model=WorkflowRule, status_code=201)
-def create_rule(
-    payload: WorkflowRuleCreate,
+@router.post("", response_model=WorkflowDefinition, status_code=201)
+def create_workflow(
+    payload: WorkflowDefinitionCreate,
     engine: WorkflowEngine = Depends(get_workflow_engine),
     admin: AdminService = Depends(get_admin_service),
 ):
-    rule = engine.add_rule(payload.model_dump())
-    admin.audit_log.record("admin", "create_workflow_rule", f"ルール追加: {rule['name']}")
-    return rule
+    wf = engine.add_workflow(payload.model_dump())
+    admin.audit_log.record("admin", "create_workflow", f"ワークフロー作成: {wf['name']}")
+    return wf
 
 
-@router.delete("/rules/{rule_id}", status_code=204)
-def delete_rule(
-    rule_id: int,
+@router.get("/{workflow_id}", response_model=WorkflowDefinition)
+def get_workflow(workflow_id: str, engine: WorkflowEngine = Depends(get_workflow_engine)):
+    wf = engine.get_workflow(workflow_id)
+    if wf is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return wf
+
+
+@router.put("/{workflow_id}", response_model=WorkflowDefinition)
+def update_workflow(
+    workflow_id: str,
+    payload: WorkflowDefinitionUpdate,
     engine: WorkflowEngine = Depends(get_workflow_engine),
     admin: AdminService = Depends(get_admin_service),
 ):
-    if not engine.delete_rule(rule_id):
-        raise HTTPException(status_code=404, detail="Rule not found")
-    admin.audit_log.record("admin", "delete_workflow_rule", f"ルール削除: id={rule_id}")
+    wf = engine.update_workflow(workflow_id, payload.model_dump(exclude_unset=True))
+    if wf is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    admin.audit_log.record("admin", "update_workflow", f"ワークフロー更新: {wf['name']}")
+    return wf
 
 
-@router.post("/run", response_model=WorkflowRunResult)
-def run_workflows(
+@router.delete("/{workflow_id}", status_code=204)
+def delete_workflow(
+    workflow_id: str,
     engine: WorkflowEngine = Depends(get_workflow_engine),
-    store: DemoDataStore = Depends(get_demo_store),
-    notifications: NotificationCenter = Depends(get_notification_center),
+    admin: AdminService = Depends(get_admin_service),
 ):
-    new_events = engine.evaluate(store)
-    # 発火イベントは通知センターにも流し込み、Chrome拡張の通知パネル/未読バッジに反映する
-    # (ワークフローと通知を別モジュールに分けたのは、通知センターが将来
-    #  他の発生源(OCR失敗・予測分析アラート等)からも使い回せるようにするため)。
-    for event in new_events:
-        notifications.push(
-            source="workflow",
-            level=_LEVEL_BY_ACTION.get(event["action"], "info"),
-            title=event["rule_name"],
-            message=event["message"],
-            ref_type=event["entity"],
-            ref_id=event["entity_id"],
-        )
-    return {
-        "evaluated_customers": len(store.list_customers()),
-        "evaluated_orders": len(store.list_orders()),
-        "new_events": new_events,
-    }
+    if not engine.delete_workflow(workflow_id):
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    admin.audit_log.record("admin", "delete_workflow", f"ワークフロー削除: id={workflow_id}")
 
 
-@router.get("/history", response_model=list[WorkflowEvent])
+@router.patch("/{workflow_id}/toggle", response_model=WorkflowToggleResult)
+def toggle_workflow(
+    workflow_id: str,
+    engine: WorkflowEngine = Depends(get_workflow_engine),
+    admin: AdminService = Depends(get_admin_service),
+):
+    wf = engine.toggle_workflow(workflow_id)
+    if wf is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    admin.audit_log.record("admin", "toggle_workflow", f"ワークフロー有効/無効切替: {wf['name']} -> {wf['enabled']}")
+    return {"id": wf["id"], "enabled": wf["enabled"]}
+
+
+@router.post("/{workflow_id}/execute", response_model=WorkflowExecutionResult)
+async def execute_workflow(
+    workflow_id: str,
+    payload: WorkflowExecuteRequest = WorkflowExecuteRequest(),
+    engine: WorkflowEngine = Depends(get_workflow_engine),
+    runner: WorkflowStepRunner = Depends(get_workflow_step_runner),
+):
+    try:
+        return await engine.execute(workflow_id, payload.context, runner)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+
+@router.post("/evaluate-triggers", response_model=WorkflowTriggerEvalResult)
+def evaluate_triggers(
+    payload: WorkflowTriggerEvalRequest,
+    engine: WorkflowEngine = Depends(get_workflow_engine),
+):
+    matched = engine.evaluate_triggers(payload.current_screen_type, payload.changed_table)
+    return {"matched_workflows": matched}
+
+
+@router.get("/history/list", response_model=list[WorkflowExecutionResult])
 def get_history(limit: int = 50, engine: WorkflowEngine = Depends(get_workflow_engine)):
-    return engine.get_history(limit)
+    return engine.get_execution_history(limit)
 
 
-# ルール評価自体はAI非依存(条件式ベース)のまま。発火傾向の解釈だけをオプトインでAIに委譲する。
+# ワークフロー実行そのものはAI非依存(ステップ設定に基づく決定的な実行)のまま。
+# 実行傾向の解釈だけをオプトインでAIに委譲する(既存の与信/在庫レポートと同一パターン)。
 @router.get("/history/insight", response_model=InsightResponse)
 async def history_insight(
     limit: int = 50,
     engine: WorkflowEngine = Depends(get_workflow_engine),
     ai: AiProvider = Depends(get_ai_provider),
 ):
-    history = engine.get_history(limit)
+    history = engine.get_execution_history(limit)
     comment = await insight_service.interpret_workflow_history(ai, history)
     return InsightResponse(comment=comment, provider=ai.name)

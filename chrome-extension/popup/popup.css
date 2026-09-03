@@ -7,7 +7,7 @@ body {
 h1 {
   font-size: 14px;
   margin: 0 0 10px;
-  color: #1c3f61;
+  color: #17497e;
 }
 #status {
   display: flex;
@@ -23,8 +23,8 @@ h1 {
   display: inline-block;
 }
 .dot-unknown { background: #ccc; }
-.dot-ok { background: #2e7d32; }
-.dot-error { background: #c62828; }
+.dot-ok { background: #0ca30c; }
+.dot-error { background: #d03b3b; }
 .row {
   display: flex;
   justify-content: space-between;

@@ -28,7 +28,7 @@ window.AISB.panels.admin = function renderAdminPanel(el, ctx) {
           <div class="aisb-card">
             モード: ${s.demo_mode ? "デモ" : "本番"} / AI: ${s.ai_provider} / 検索: ${s.vector_backend}<br>
             顧客数: ${s.customer_count} / 受注数: ${s.order_count}<br>
-            ワークフロー: ルール${s.workflow_rule_count}件 / 発火${s.workflow_event_count}件<br>
+            ワークフロー: 定義${s.workflow_count}件 / 実行${s.workflow_execution_count}件<br>
             未読通知: ${s.unread_notification_count}件
           </div>`;
       })

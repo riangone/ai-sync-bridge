@@ -1,75 +1,99 @@
-// modules/panel-workflows.js — ワークフロー(自動化ルール)パネル + AI解釈コメント
+// modules/panel-workflows.js — ワークフロー(マルチステップ自動化)パネル + AI解釈コメント
 window.AISB = window.AISB || {};
 window.AISB.panels = window.AISB.panels || {};
 
 window.AISB.panels.workflows = function renderWorkflowsPanel(el, ctx) {
   el.innerHTML = `
-    <div class="aisb-section-title">自動化ルール</div>
-    <div id="aisb-wf-rules">読込中...</div>
-    <div class="aisb-btn-row">
-      <button id="aisb-wf-run">ルールを評価する</button>
-    </div>
-    <div class="aisb-section-title">発火履歴</div>
+    <div class="aisb-section-title">ワークフロー定義</div>
+    <div id="aisb-wf-list">読込中...</div>
+    <div class="aisb-section-title">実行履歴</div>
     <div id="aisb-wf-history">読込中...</div>
     <div class="aisb-btn-row">
       <button id="aisb-wf-insight-btn" class="aisb-btn-secondary">AIで傾向を解釈する</button>
     </div>
     <div id="aisb-wf-insight"></div>
   `;
-  const rulesEl = el.querySelector("#aisb-wf-rules");
+  const listEl = el.querySelector("#aisb-wf-list");
   const historyEl = el.querySelector("#aisb-wf-history");
+  const triggerLabel = { schedule: "定期実行", screen_navigation: "画面遷移時", data_update: "データ更新時", manual: "手動" };
+
   el.querySelector("#aisb-wf-insight-btn").addEventListener("click", (e) =>
     ctx.runInsight(`${ctx.API_BASE}/api/workflows/history/insight`, e.target, el.querySelector("#aisb-wf-insight"))
   );
 
-  function loadRules() {
-    fetch(`${ctx.API_BASE}/api/workflows/rules`)
+  function loadWorkflows() {
+    fetch(`${ctx.API_BASE}/api/workflows`)
       .then((r) => r.json())
-      .then((rules) => {
-        rulesEl.innerHTML =
-          rules
+      .then((workflows) => {
+        listEl.innerHTML =
+          workflows
             .map(
-              (r) => `<div class="aisb-card">
-            <b>${r.name}</b><br>
-            条件: ${r.entity}.${r.field} ${r.operator} ${r.value} → ${r.action}
+              (wf) => `<div class="aisb-card" data-id="${wf.id}">
+            <b>${wf.name}</b>${wf.enabled ? "" : ' <span class="aisb-badge">無効</span>'}<br>
+            ${wf.description || ""}<br>
+            トリガー: ${triggerLabel[wf.trigger.type] || wf.trigger.type} / ステップ数: ${wf.steps.length}
+            <div class="aisb-btn-row">
+              <button class="aisb-wf-exec-btn">実行</button>
+              <button class="aisb-wf-toggle-btn aisb-btn-secondary">${wf.enabled ? "無効化" : "有効化"}</button>
+            </div>
+            <div class="aisb-wf-exec-result"></div>
           </div>`
             )
-            .join("") || "<p>ルールがありません</p>";
+            .join("") || "<p>ワークフローがありません</p>";
+
+        listEl.querySelectorAll(".aisb-wf-exec-btn").forEach((btn) => {
+          btn.addEventListener("click", (ev) => {
+            const card = ev.target.closest(".aisb-card");
+            const id = card.dataset.id;
+            const resultEl = card.querySelector(".aisb-wf-exec-result");
+            resultEl.textContent = "実行中...";
+            fetch(`${ctx.API_BASE}/api/workflows/${id}/execute`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ context: {} }),
+            })
+              .then((r) => r.json())
+              .then((run) => {
+                resultEl.innerHTML = `<span class="aisb-badge">結果: ${run.status}(${
+                  run.steps.filter((s) => s.status === "success").length
+                }/${run.steps.length}ステップ成功)</span>`;
+                loadHistory();
+              })
+              .catch((e) => (resultEl.textContent = `エラー: ${e}`));
+          });
+        });
+
+        listEl.querySelectorAll(".aisb-wf-toggle-btn").forEach((btn) => {
+          btn.addEventListener("click", (ev) => {
+            const id = ev.target.closest(".aisb-card").dataset.id;
+            fetch(`${ctx.API_BASE}/api/workflows/${id}/toggle`, { method: "PATCH" })
+              .then(() => loadWorkflows())
+              .catch((e) => alert(`エラー: ${e}`));
+          });
+        });
       })
-      .catch((e) => (rulesEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (listEl.innerHTML = `<p>エラー: ${e}</p>`));
   }
 
   function loadHistory() {
-    fetch(`${ctx.API_BASE}/api/workflows/history`)
+    fetch(`${ctx.API_BASE}/api/workflows/history/list`)
       .then((r) => r.json())
-      .then((events) => {
+      .then((executions) => {
         historyEl.innerHTML =
-          events
+          executions
             .map(
-              (ev) => `<div class="aisb-event-card">
-            <b>${ev.rule_name}</b>: ${ev.message}
-            <span class="aisb-event-time">${new Date(ev.triggered_at).toLocaleString()}</span>
+              (ex) => `<div class="aisb-event-card">
+            <b>${ex.workflow_name}</b>: ${ex.status}(${ex.steps.filter((s) => s.status === "success").length}/${
+                ex.steps.length
+              }ステップ成功)
+            <span class="aisb-event-time">${new Date(ex.finished_at).toLocaleString()}</span>
           </div>`
             )
-            .join("") || "<p>発火履歴はまだありません</p>";
+            .join("") || "<p>実行履歴はまだありません</p>";
       })
       .catch((e) => (historyEl.innerHTML = `<p>エラー: ${e}</p>`));
   }
 
-  el.querySelector("#aisb-wf-run").addEventListener("click", async () => {
-    historyEl.textContent = "評価中...";
-    try {
-      const res = await fetch(`${ctx.API_BASE}/api/workflows/run`, { method: "POST" });
-      const data = await res.json();
-      loadHistory();
-      if (data.new_events.length === 0) {
-        historyEl.insertAdjacentHTML("afterbegin", `<div class="aisb-badge">新規発火なし(全て評価済み)</div>`);
-      }
-    } catch (e) {
-      historyEl.textContent = `エラー: ${e}`;
-    }
-  });
-
-  loadRules();
+  loadWorkflows();
   loadHistory();
 };

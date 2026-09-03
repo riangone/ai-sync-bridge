@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
+{% set bp = base_path(request) %}
 <h2>{{ heading }}</h2>
-<form method="post" action="/{{ entity_path }}/Entry{% if is_edit %}/{{ record_id }}{% endif %}" id="entry-form">
+<form method="post" action="{{ bp }}/{{ entity_path }}/Entry{% if is_edit %}/{{ record_id }}{% endif %}" id="entry-form">
 <table class="form-table">
     <tr>
         <th>{{ partner_label }}{% if partner_options is not none %}<span class="required">*</span>{% endif %}</th>
@@ -60,7 +61,7 @@
 
 <div class="form-actions">
     <input type="submit" class="button" value="{{ is_edit and '更新' or '登録' }}">
-    <a class="button-link" href="/{{ entity_path }}/List">戻る</a>
+    <a class="button-link" href="{{ bp }}/{{ entity_path }}/List">戻る</a>
 </div>
 </form>
 

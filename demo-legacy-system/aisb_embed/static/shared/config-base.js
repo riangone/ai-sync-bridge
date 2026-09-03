@@ -42,6 +42,18 @@ window.AISB.configBase = (function () {
       { id: "analytics", label: "予測分析", enabled: true },
       { id: "workflows", label: "ワークフロー", enabled: false },
       { id: "notifications", label: "通知", enabled: false },
+      // Phase2/4追加分。chrome-extension/shared/config-base.js と同じ基準・同じ内容
+      // (新パネル追加時は3箇所とも更新すること)。2026-08-20: 同期時に暫定falseを
+      // 引き継いでいたのを是正、AI異常検知/AI提案/AIリスク診断を持つ機能を有効化。
+      { id: "inventory", label: "在庫管理", enabled: true },
+      { id: "purchase", label: "発注管理", enabled: true },
+      { id: "profit", label: "利益・粗利", enabled: true },
+      { id: "arap", label: "売掛買掛", enabled: true },
+      { id: "alerts", label: "アラート", enabled: true },
+      { id: "recommend", label: "類似検索", enabled: true },
+      { id: "websearch", label: "企業・物件検索", enabled: true },
+      { id: "assistant", label: "AIアシスタント", enabled: true },
+      { id: "convinput", label: "自然言語入力", enabled: true },
       { id: "admin", label: "管理", enabled: false },
     ],
   };
@@ -53,6 +65,12 @@ window.AISB.configBase = (function () {
     "http://localhost:5010": "http://localhost:5011",
     "https://aisync.0101.click": "https://aisync-api.0101.click",
   };
+
+  // このコピーが属する業態("erp"|"dealer")。パネルJS(panel-web-search.js等)が
+  // 共通コードのまま業態ごとに表示/機能を出し分けるための唯一の分岐点。
+  // ai-api-server側のsettings.instance(AISB_INSTANCE環境変数)と対応関係にあるが、
+  // こちらは埋め込み先のレガシー画面によって静的に決まるためハードコードでよい。
+  const INSTANCE = "erp";
 
   // レガシーERP 6.3章 全13業務エンティティ。chrome-extension版と同一定義。
   const LEGACY_ENTITIES = [
@@ -82,9 +100,12 @@ window.AISB.configBase = (function () {
     const profile = { ...DEFAULT_PROFILE, ...(stored || {}), panels: DEFAULT_PROFILE.panels };
     const sidebarOpen = loadJSON(STORAGE_KEY_OPEN, true);
     const API_BASE = ORIGIN_API_MAP[location.origin] || profile.apiBaseUrl;
-    const LEGACY_ORIGIN = location.origin;
+    // サブパス公開時にmiddleware.pyが埋め込むwindow.AISB_BASE_PATHを補う
+    // (demo-legacy-system-dealer側と同一パターン。現状ERP版はサブパス公開して
+    // いないためこの値は常に""=従来通りlocation.originのみと同じ結果になる)。
+    const LEGACY_ORIGIN = location.origin + (window.AISB_BASE_PATH || "");
     return { profile, sidebarOpen, API_BASE, LEGACY_ORIGIN };
   }
 
-  return { DEFAULT_PROFILE, ORIGIN_API_MAP, LEGACY_ENTITIES, loadContext, loadJSON, saveJSON, STORAGE_KEY_PROFILE, STORAGE_KEY_OPEN };
+  return { DEFAULT_PROFILE, ORIGIN_API_MAP, LEGACY_ENTITIES, INSTANCE, loadContext, loadJSON, saveJSON, STORAGE_KEY_PROFILE, STORAGE_KEY_OPEN };
 })();

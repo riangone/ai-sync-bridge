@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI-Sync Bridge デモ選択</title>
+<style>
+  :root {
+    --blue: #2a78d6;
+    --blue-dark: #17497e;
+    --ink: #1b2430;
+    --sub: #5b6675;
+    --bg: #eef1f6;
+    --card: #ffffff;
+    --line: #d9dfe8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+    color: #fff;
+    padding: 56px 20px 64px;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: .06em;
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 999px;
+    padding: 4px 14px;
+    margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: clamp(22px, 4vw, 32px);
+    margin: 0 0 12px;
+    line-height: 1.4;
+  }
+  .hero p {
+    max-width: 640px;
+    margin: 0 auto;
+    font-size: 14px;
+    line-height: 1.9;
+    color: rgba(255,255,255,.92);
+  }
+  .wrap {
+    max-width: 980px;
+    margin: -32px auto 0;
+    padding: 0 20px 56px;
+  }
+  .arch-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+    background: linear-gradient(120deg, #2a78d6, #17497e);
+    color: #fff;
+    border-radius: 14px;
+    padding: 16px 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 28px rgba(23,73,126,.28);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .arch-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(23,73,126,.36);
+  }
+  .arch-banner-icon {
+    font-size: 26px;
+    flex: none;
+  }
+  .arch-banner-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .arch-banner-text b {
+    font-size: 15px;
+  }
+  .arch-banner-text small {
+    font-size: 12px;
+    color: rgba(255,255,255,.85);
+  }
+  .arch-banner-arrow {
+    flex: none;
+    font-size: 13px;
+    font-weight: bold;
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.4);
+    border-radius: 999px;
+    padding: 7px 14px;
+    white-space: nowrap;
+  }
+  @media (max-width: 520px) {
+    .arch-banner { flex-wrap: wrap; }
+    .arch-banner-arrow { margin-left: 40px; }
+  }
+  .concept {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 8px 24px rgba(23,73,126,.08);
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--sub);
+    margin-bottom: 32px;
+  }
+  .concept b { color: var(--ink); }
+  .concept-cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 14px;
+  }
+  .concept-col {
+    background: #f5f8fc;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+  }
+  .concept-col b { display: block; color: var(--blue-dark); margin-bottom: 4px; font-size: 12px; }
+  .section-title {
+    text-align: center;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--sub);
+    letter-spacing: .04em;
+    margin: 0 0 18px;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 6px 18px rgba(23,73,126,.06);
+    display: flex;
+    flex-direction: column;
+  }
+  .card-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--blue-dark);
+    background: #e4edfa;
+    border-radius: 4px;
+    padding: 2px 8px;
+    width: fit-content;
+    margin-bottom: 10px;
+  }
+  .card h2 {
+    font-size: 18px;
+    margin: 0 0 6px;
+  }
+  .card .card-sub {
+    font-size: 12.5px;
+    color: var(--sub);
+    margin: 0 0 14px;
+  }
+  .card ul {
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.85;
+    margin: 0 0 18px;
+    padding-left: 18px;
+    flex: 1;
+  }
+  .card ul li b { color: var(--blue-dark); }
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-block;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 10px 16px;
+    border-radius: 7px;
+    text-align: center;
+  }
+  .btn-primary {
+    background: var(--blue);
+    color: #fff;
+    flex: 1;
+  }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-secondary {
+    background: #fff;
+    color: var(--blue-dark);
+    border: 1px solid var(--line);
+  }
+  .btn-secondary:hover { border-color: var(--blue); }
+  .note {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--sub);
+    line-height: 1.8;
+  }
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: 1fr; }
+    .concept-cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="hero">
+    <span class="hero-badge">🤖 AI SIDE PANEL DEMO</span>
+    <h1>レガシー基幹システムはそのまま。<br>AIサイドパネルだけを後付けする。</h1>
+    <p>
+      既存のWeb画面を改変せず、🤖ボタンから自然文検索・入力支援・要約を追加する
+      「AI-Sync Bridge」。2つの業務ドメインへの適用例です。
+    </p>
+  </div>
+
+  <div class="wrap">
+
+    <a class="arch-banner" href="/architecture.html">
+      <span class="arch-banner-icon">🧭</span>
+      <span class="arch-banner-text">
+        <b>システムアーキテクチャ資料</b>
+        <small>AIサイドパネルの仕組みを8枚のスライドで図解</small>
+      </span>
+      <span class="arch-banner-arrow">見る →</span>
+    </a>
+
+    <div class="concept">
+      <b>このデモについて</b> —
+      Chrome拡張（または埋め込みスクリプト）がレガシー画面にAIサイドパネルを注入し、
+      別プロセスのAI APIサーバーが機能を提供します。レガシー側は無改造です。
+      <div class="concept-cols">
+        <div class="concept-col"><b>探す・聞く</b>自然文検索・類似検索・AIチャット</div>
+        <div class="concept-col"><b>入力を楽にする</b>自然言語入力・OCR取込</div>
+        <div class="concept-col"><b>見落とさない</b>予測分析・アラート・与信/滞留債権レポート</div>
+      </div>
+    </div>
+
+    <p class="section-title">デモ環境を選択してください</p>
+
+    <div class="cards">
+
+      <div class="card">
+        <span class="card-tag">LEGACY ERP</span>
+        <h2>製造業向け基幹システム</h2>
+        <p class="card-sub">顧客・受注・在庫・仕入・売掛買掛を扱う、BtoB向け一般ERP業務のデモです。</p>
+        <ul>
+          <li><b>業務データ:</b> 顧客/受注/商品在庫/仕入先/見積/請求/発注/物件 など13エンティティ</li>
+          <li><b>AI検索の例:</b> 「与信限度額が100万円を超える顧客を、限度額の高い順に5件」</li>
+          <li><b>専用機能:</b> 会社検索・物件検索(外部情報から登録用データを自動生成)</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/erp/">ERPデモを開く</a>
+          <a class="btn btn-secondary" href="/erp/ai-panel">AI機能一覧</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">LEGACY DMS</span>
+        <h2>自動車ディーラー向け基幹システム</h2>
+        <p class="card-sub">車両在庫・契約・整備/車検・仕入を扱う、BtoC向け自動車販売業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
+        <ul>
+          <li><b>業務データ:</b> 顧客/受注契約/車両在庫/仕入先/整備・車検(ServiceOrder) など13エンティティ</li>
+          <li><b>AI検索の例:</b> 「延滞している請求の金額を顧客区分(法人/個人)別に合計」</li>
+          <li><b>専用機能:</b> 仕入先検索(オークション会場・下取り仲介業者の情報を調べ登録用データを自動生成)</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/dealer/">DMSデモを開く</a>
+          <a class="btn btn-secondary" href="/dealer/ai-panel">AI機能一覧</a>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="note">
+      いずれもデータは自動生成されたデモ用サンプルであり、実在の企業・個人とは関係ありません。<br>
+      各デモ内の画面右下🤖ボタンから、AIサイドパネルの全機能をいつでも試せます。
+    </p>
+
+  </div>
+
+</body>
+</html>

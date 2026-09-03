@@ -29,8 +29,19 @@ BASE_DIR = Path(__file__).parent
 
 app = FastAPI(title="Legacy ERP System (Demo)")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+# サブパス経由公開(例: https://host/dealer/... 経由でCaddyがstrip_prefixする構成)対応。
+# Caddy側がX-Forwarded-Prefixを付与した場合のみ、テンプレート内の絶対パスリンクに
+# プレフィックスを補う。ヘッダーが無ければ従来通り""(=完全無改変の挙動)。
+templates.env.globals["base_path"] = lambda request: request.headers.get("x-forwarded-prefix", "")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 aisb_embed.mount(app)
+
+
+def redirect_to(request: Request, path: str, status_code: int = 303) -> RedirectResponse:
+    """POST後リダイレクト用。X-Forwarded-Prefix配下でも遷移先を正しく維持する。
+    GET側テンプレートの base_path(request) と同じロジック（ヘッダー未設定時は""=無改変）。"""
+    prefix = request.headers.get("x-forwarded-prefix", "")
+    return RedirectResponse(f"{prefix}{path}", status_code=status_code)
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +330,11 @@ def home(request: Request):
     return templates.TemplateResponse(request, "index.html", {"title": "メインメニュー", "summary": summary})
 
 
+@app.get("/ai-panel")
+def ai_panel_intro(request: Request):
+    return templates.TemplateResponse(request, "ai_intro.html", {"title": "AIサイドパネルのご案内"})
+
+
 # ---------------------------------------------------------------------------
 # Customer（顧客管理）
 # ---------------------------------------------------------------------------
@@ -344,7 +360,7 @@ def customer_entry_new(request: Request):
 def customer_entry_edit(request: Request, cid: str):
     c = db.customers.get(cid)
     if not c:
-        return RedirectResponse("/Customer/List", status_code=303)
+        return redirect_to(request, "/Customer/List")
     return render_entry(request, title="顧客編集", heading="顧客編集", entity_path="Customer",
                          fields=CUSTOMER_FIELDS, values=c, is_edit=True, record_id=cid)
 
@@ -356,7 +372,7 @@ async def customer_create(request: Request):
     cid = db.next_id("Customer")
     values.update({"Id": cid, "CreditUsed": 0, "CreatedAt": db._rand_date(0, 0)})
     db.customers[cid] = values
-    return RedirectResponse("/Customer/List", status_code=303)
+    return redirect_to(request, "/Customer/List")
 
 
 @app.post("/Customer/Entry/{cid}")
@@ -367,14 +383,14 @@ async def customer_update(request: Request, cid: str):
     existing.update(values)
     existing["Id"] = cid
     db.customers[cid] = existing
-    return RedirectResponse("/Customer/List", status_code=303)
+    return redirect_to(request, "/Customer/List")
 
 
 @app.get("/Customer/Detail/{cid}")
 def customer_detail(request: Request, cid: str):
     c = db.customers.get(cid)
     if not c:
-        return RedirectResponse("/Customer/List", status_code=303)
+        return redirect_to(request, "/Customer/List")
     return render_detail(request, title="顧客詳細", heading="顧客詳細", entity_path="Customer",
                           fields=CUSTOMER_FIELDS, values=c, record_id=cid, money_fields={"CreditLimit"})
 
@@ -443,7 +459,7 @@ def order_entry_new(request: Request):
 def order_entry_edit(request: Request, oid: str):
     o = db.orders.get(oid)
     if not o:
-        return RedirectResponse("/Order/List", status_code=303)
+        return redirect_to(request, "/Order/List")
     values = dict(o)
     values["customerId"] = o["CustomerId"]
     values["orderDate"] = o["OrderDate"]
@@ -472,7 +488,7 @@ async def order_create(request: Request):
         "CreatedAt": form.get("orderDate", ""),
     }
     db.order_items[oid] = items
-    return RedirectResponse("/Order/List", status_code=303)
+    return redirect_to(request, "/Order/List")
 
 
 @app.post("/Order/Entry/{oid}")
@@ -480,7 +496,7 @@ async def order_update(request: Request, oid: str):
     form = await request.form()
     o = db.orders.get(oid)
     if not o:
-        return RedirectResponse("/Order/List", status_code=303)
+        return redirect_to(request, "/Order/List")
     cust = db.customers.get(form.get("customerId"))
     items = parse_item_rows(form)
     total = sum(it["Amount"] for it in items)
@@ -491,15 +507,16 @@ async def order_update(request: Request, oid: str):
         "DeliveryDate": form.get("deliveryDate", o["DeliveryDate"]),
         "TotalAmount": total, "Notes": form.get("notes", o["Notes"]),
     })
+    db.orders[oid] = o  # SQLite永続化(dict.update()のインプレース変更はwrite-throughされないため再代入)
     db.order_items[oid] = items
-    return RedirectResponse("/Order/List", status_code=303)
+    return redirect_to(request, "/Order/List")
 
 
 @app.get("/Order/Detail/{oid}")
 def order_detail(request: Request, oid: str):
     o = db.orders.get(oid)
     if not o:
-        return RedirectResponse("/Order/List", status_code=303)
+        return redirect_to(request, "/Order/List")
     fields = [
         field("CustomerName", "顧客名"), field("OrderDate", "受注日"), field("DeliveryDate", "納期"),
         field("TotalAmount", "合計金額", "number"), field("Status", "ステータス"), field("Notes", "備考"),
@@ -534,7 +551,7 @@ def estimate_entry_new(request: Request):
 def estimate_entry_edit(request: Request, eid: str):
     e = db.estimates.get(eid)
     if not e:
-        return RedirectResponse("/Estimate/List", status_code=303)
+        return redirect_to(request, "/Estimate/List")
     values = dict(e)
     values["customerId"] = e["CustomerId"]
     values["estimateDate"] = e["EstimateDate"]
@@ -563,7 +580,7 @@ async def estimate_create(request: Request):
         "CreatedAt": form.get("estimateDate", ""),
     }
     db.estimate_items[eid] = items
-    return RedirectResponse("/Estimate/List", status_code=303)
+    return redirect_to(request, "/Estimate/List")
 
 
 @app.post("/Estimate/Entry/{eid}")
@@ -571,7 +588,7 @@ async def estimate_update(request: Request, eid: str):
     form = await request.form()
     e = db.estimates.get(eid)
     if not e:
-        return RedirectResponse("/Estimate/List", status_code=303)
+        return redirect_to(request, "/Estimate/List")
     cust = db.customers.get(form.get("customerId"))
     items = parse_item_rows(form)
     total = sum(it["Amount"] for it in items)
@@ -582,15 +599,16 @@ async def estimate_update(request: Request, eid: str):
         "ValidUntil": form.get("validUntil", e["ValidUntil"]),
         "TotalAmount": total, "Notes": form.get("notes", e["Notes"]),
     })
+    db.estimates[eid] = e  # SQLite永続化(dict.update()のインプレース変更はwrite-throughされないため再代入)
     db.estimate_items[eid] = items
-    return RedirectResponse("/Estimate/List", status_code=303)
+    return redirect_to(request, "/Estimate/List")
 
 
 @app.get("/Estimate/Detail/{eid}")
 def estimate_detail(request: Request, eid: str):
     e = db.estimates.get(eid)
     if not e:
-        return RedirectResponse("/Estimate/List", status_code=303)
+        return redirect_to(request, "/Estimate/List")
     fields = [
         field("CustomerName", "顧客名"), field("EstimateDate", "見積日"), field("ValidUntil", "有効期限"),
         field("TotalAmount", "合計金額", "number"), field("Status", "ステータス"), field("Notes", "備考"),
@@ -625,7 +643,7 @@ def po_entry_new(request: Request):
 def po_entry_edit(request: Request, pid: str):
     po = db.purchase_orders.get(pid)
     if not po:
-        return RedirectResponse("/PurchaseOrder/List", status_code=303)
+        return redirect_to(request, "/PurchaseOrder/List")
     values = dict(po)
     values["supplierId"] = po["SupplierId"]
     values["orderDate"] = po["OrderDate"]
@@ -654,7 +672,7 @@ async def po_create(request: Request):
         "CreatedAt": form.get("orderDate", ""),
     }
     db.purchase_order_items[pid] = items
-    return RedirectResponse("/PurchaseOrder/List", status_code=303)
+    return redirect_to(request, "/PurchaseOrder/List")
 
 
 @app.post("/PurchaseOrder/Entry/{pid}")
@@ -662,7 +680,7 @@ async def po_update(request: Request, pid: str):
     form = await request.form()
     po = db.purchase_orders.get(pid)
     if not po:
-        return RedirectResponse("/PurchaseOrder/List", status_code=303)
+        return redirect_to(request, "/PurchaseOrder/List")
     sup = db.suppliers.get(form.get("supplierId"))
     items = parse_item_rows(form)
     total = sum(it["Amount"] for it in items)
@@ -673,15 +691,16 @@ async def po_update(request: Request, pid: str):
         "DeliveryDate": form.get("deliveryDate", po["DeliveryDate"]),
         "TotalAmount": total, "Notes": form.get("notes", po["Notes"]),
     })
+    db.purchase_orders[pid] = po  # SQLite永続化(dict.update()のインプレース変更はwrite-throughされないため再代入)
     db.purchase_order_items[pid] = items
-    return RedirectResponse("/PurchaseOrder/List", status_code=303)
+    return redirect_to(request, "/PurchaseOrder/List")
 
 
 @app.get("/PurchaseOrder/Detail/{pid}")
 def po_detail(request: Request, pid: str):
     po = db.purchase_orders.get(pid)
     if not po:
-        return RedirectResponse("/PurchaseOrder/List", status_code=303)
+        return redirect_to(request, "/PurchaseOrder/List")
     fields = [
         field("SupplierName", "仕入先"), field("OrderDate", "発注日"), field("DeliveryDate", "納期"),
         field("TotalAmount", "合計金額", "number"), field("Status", "ステータス"), field("Notes", "備考"),
@@ -721,7 +740,7 @@ def invoice_entry_new(request: Request):
 def invoice_entry_edit(request: Request, iid: str):
     inv = db.invoices.get(iid)
     if not inv:
-        return RedirectResponse("/Invoice/List", status_code=303)
+        return redirect_to(request, "/Invoice/List")
     return render_entry(request, title="請求編集", heading="請求編集", entity_path="Invoice",
                          fields=invoice_fields_with_options(), values=inv, is_edit=True, record_id=iid)
 
@@ -738,7 +757,7 @@ async def invoice_create(request: Request):
         "OrderId": form.get("OrderId", ""), "Notes": form.get("Notes", ""),
         "CreatedAt": form.get("InvoiceDate", ""),
     }
-    return RedirectResponse("/Invoice/List", status_code=303)
+    return redirect_to(request, "/Invoice/List")
 
 
 @app.post("/Invoice/Entry/{iid}")
@@ -746,7 +765,7 @@ async def invoice_update(request: Request, iid: str):
     form = await request.form()
     inv = db.invoices.get(iid)
     if not inv:
-        return RedirectResponse("/Invoice/List", status_code=303)
+        return redirect_to(request, "/Invoice/List")
     cust = db.customers.get(form.get("CustomerId"))
     inv.update({
         "CustomerId": cust["Id"] if cust else inv["CustomerId"],
@@ -757,14 +776,15 @@ async def invoice_update(request: Request, iid: str):
         "OrderId": form.get("OrderId", inv["OrderId"]),
         "Notes": form.get("Notes", inv["Notes"]),
     })
-    return RedirectResponse("/Invoice/List", status_code=303)
+    db.invoices[iid] = inv  # SQLite永続化(dict.update()のインプレース変更はwrite-throughされないため再代入)
+    return redirect_to(request, "/Invoice/List")
 
 
 @app.get("/Invoice/Detail/{iid}")
 def invoice_detail(request: Request, iid: str):
     inv = db.invoices.get(iid)
     if not inv:
-        return RedirectResponse("/Invoice/List", status_code=303)
+        return redirect_to(request, "/Invoice/List")
     fields = [
         field("CustomerName", "顧客名"), field("InvoiceDate", "請求日"), field("DueDate", "支払期日"),
         field("TotalAmount", "金額", "number"), field("OrderId", "関連受注"),
@@ -794,7 +814,7 @@ def supplier_entry_new(request: Request):
 def supplier_entry_edit(request: Request, sid: str):
     s = db.suppliers.get(sid)
     if not s:
-        return RedirectResponse("/Supplier/List", status_code=303)
+        return redirect_to(request, "/Supplier/List")
     return render_entry(request, title="仕入先編集", heading="仕入先編集", entity_path="Supplier",
                          fields=SUPPLIER_FIELDS, values=s, is_edit=True, record_id=sid)
 
@@ -806,7 +826,7 @@ async def supplier_create(request: Request):
     sid = db.next_id("Supplier")
     values.update({"Id": sid, "CreatedAt": db._rand_date(0, 0)})
     db.suppliers[sid] = values
-    return RedirectResponse("/Supplier/List", status_code=303)
+    return redirect_to(request, "/Supplier/List")
 
 
 @app.post("/Supplier/Entry/{sid}")
@@ -817,14 +837,14 @@ async def supplier_update(request: Request, sid: str):
     existing.update(values)
     existing["Id"] = sid
     db.suppliers[sid] = existing
-    return RedirectResponse("/Supplier/List", status_code=303)
+    return redirect_to(request, "/Supplier/List")
 
 
 @app.get("/Supplier/Detail/{sid}")
 def supplier_detail(request: Request, sid: str):
     s = db.suppliers.get(sid)
     if not s:
-        return RedirectResponse("/Supplier/List", status_code=303)
+        return redirect_to(request, "/Supplier/List")
     return render_detail(request, title="仕入先詳細", heading="仕入先詳細", entity_path="Supplier",
                           fields=SUPPLIER_FIELDS, values=s, record_id=sid, money_fields={"CreditAmount"})
 
@@ -849,7 +869,7 @@ def employee_entry_new(request: Request):
 def employee_entry_edit(request: Request, eid: str):
     e = db.employees.get(eid)
     if not e:
-        return RedirectResponse("/Employee/List", status_code=303)
+        return redirect_to(request, "/Employee/List")
     return render_entry(request, title="従業員編集", heading="従業員編集", entity_path="Employee",
                          fields=EMPLOYEE_FIELDS, values=e, is_edit=True, record_id=eid)
 
@@ -861,7 +881,7 @@ async def employee_create(request: Request):
     eid = db.next_id("Employee")
     values.update({"Id": eid, "CreatedAt": db._rand_date(0, 0)})
     db.employees[eid] = values
-    return RedirectResponse("/Employee/List", status_code=303)
+    return redirect_to(request, "/Employee/List")
 
 
 @app.post("/Employee/Entry/{eid}")
@@ -872,14 +892,14 @@ async def employee_update(request: Request, eid: str):
     existing.update(values)
     existing["Id"] = eid
     db.employees[eid] = existing
-    return RedirectResponse("/Employee/List", status_code=303)
+    return redirect_to(request, "/Employee/List")
 
 
 @app.get("/Employee/Detail/{eid}")
 def employee_detail(request: Request, eid: str):
     e = db.employees.get(eid)
     if not e:
-        return RedirectResponse("/Employee/List", status_code=303)
+        return redirect_to(request, "/Employee/List")
     return render_detail(request, title="従業員詳細", heading="従業員詳細", entity_path="Employee",
                           fields=EMPLOYEE_FIELDS, values=e, record_id=eid)
 
@@ -913,7 +933,7 @@ def property_register(request: Request):
 def property_entry_edit(request: Request, pid: str):
     p = db.properties.get(pid)
     if not p:
-        return RedirectResponse("/Property/List", status_code=303)
+        return redirect_to(request, "/Property/List")
     return _property_entry_response(request, "物件編集", "物件編集", p, True, pid)
 
 
@@ -924,7 +944,7 @@ async def property_create(request: Request):
     pid = db.next_id("Property")
     values.update({"Id": pid, "OccupancyRate": 0, "ParkingSpaces": 0, "CreatedAt": db._rand_date(0, 0)})
     db.properties[pid] = values
-    return RedirectResponse("/Property/List", status_code=303)
+    return redirect_to(request, "/Property/List")
 
 
 @app.post("/Property/Register")
@@ -940,14 +960,14 @@ async def property_update(request: Request, pid: str):
     existing.update(values)
     existing["Id"] = pid
     db.properties[pid] = existing
-    return RedirectResponse("/Property/List", status_code=303)
+    return redirect_to(request, "/Property/List")
 
 
 @app.get("/Property/Detail/{pid}")
 def property_detail(request: Request, pid: str):
     p = db.properties.get(pid)
     if not p:
-        return RedirectResponse("/Property/List", status_code=303)
+        return redirect_to(request, "/Property/List")
     return render_detail(request, title="物件詳細", heading="物件詳細", entity_path="Property",
                           fields=PROPERTY_FIELDS, values=p, record_id=pid, money_fields={"Price"})
 
@@ -1016,7 +1036,8 @@ async def goodsreceipt_create(request: Request):
     }
     if prod:
         prod["Stock"] += int(form.get("Quantity") or 0)
-    return RedirectResponse("/GoodsReceipt/List", status_code=303)
+        db.products[prod["Id"]] = prod  # SQLite永続化(インプレース変更はwrite-throughされないため再代入)
+    return redirect_to(request, "/GoodsReceipt/List")
 
 
 # ---------------------------------------------------------------------------

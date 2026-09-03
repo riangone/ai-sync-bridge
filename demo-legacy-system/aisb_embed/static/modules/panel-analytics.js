@@ -38,8 +38,8 @@ window.AISB.panels.analytics = function renderAnalyticsPanel(el, ctx) {
       const max = Math.max(...points.map((p) => p.actual ?? p.predicted ?? 0), 1);
       chartEl.innerHTML =
         `<div class="aisb-legend">
-           <span><span class="aisb-legend-dot" style="background:#3a6ea5"></span>実績</span>
-           <span><span class="aisb-legend-dot" style="background:#9db8d6"></span>予測(${data.method})</span>
+           <span><span class="aisb-legend-dot" style="background:#2a78d6"></span>実績</span>
+           <span><span class="aisb-legend-dot" style="background:#9ec5f4"></span>予測(${data.method})</span>
          </div>
          <div class="aisb-chart">` +
         points

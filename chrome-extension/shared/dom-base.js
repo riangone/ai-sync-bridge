@@ -15,6 +15,51 @@ window.AISB.domBase = (function () {
 /* Shadow DOM 内スタイル。ホストページに一切影響を与えない */
 :host, #aisb-root {
   all: initial;
+  /* ---- カラートークン (2026-08-20 配色刷新) ----
+     基準はカテゴリカル配色(色覚多様性を考慮したhue順)。タブは19枚あるが、
+     色は「唯一の識別子」ではなくラベルテキストを補助する第二の手がかりとして使う
+     (色だけに依存しない = 常にラベル文字が併記される)ため、8スロットの理論上限を
+     超えて7系統(赤はステータス専用として温存し使わない)に機能グルーピングして
+     割り当てている。 */
+  --aisb-ink: #16181d;
+  --aisb-ink-soft: #4b5058;
+  --aisb-muted: #82888f;
+  --aisb-page: #f3f5f9;
+  --aisb-surface: #ffffff;
+  --aisb-border: #dfe3ea;
+  --aisb-border-soft: #eceff3;
+
+  --aisb-blue: #2a78d6;
+  --aisb-blue-deep: #17497e;
+  --aisb-blue-tint: #eaf2fd;
+
+  --aisb-orange: #eb6834;
+  --aisb-orange-deep: #a8461d;
+  --aisb-orange-tint: #fdeee6;
+
+  --aisb-aqua: #1baf7a;
+  --aisb-aqua-deep: #0d7a52;
+  --aisb-aqua-tint: #e4f7f0;
+
+  --aisb-yellow: #eda100;
+  --aisb-yellow-deep: #8a5c00;
+  --aisb-yellow-tint: #fdf1de;
+
+  --aisb-magenta: #e87ba4;
+  --aisb-magenta-deep: #a13d68;
+  --aisb-magenta-tint: #fbe9f0;
+
+  --aisb-green: #1a8a1a;
+  --aisb-green-deep: #0a5c0a;
+  --aisb-green-tint: #e6f7e6;
+
+  --aisb-violet: #6a4fc9;
+  --aisb-violet-deep: #4a3aa7;
+  --aisb-violet-tint: #f0edfc;
+
+  --aisb-good: #0ca30c;
+  --aisb-warning: #b8790a;
+  --aisb-critical: #d03b3b;
 }
 #aisb-root * {
   box-sizing: border-box;
@@ -25,10 +70,10 @@ window.AISB.domBase = (function () {
   top: 50%;
   right: 0;
   transform: translateY(-50%);
-  background: #3a6ea5;
+  background: linear-gradient(135deg, var(--aisb-blue), var(--aisb-violet-deep));
   color: #fff;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50% 0 0 50%;
   display: flex;
   align-items: center;
@@ -36,7 +81,7 @@ window.AISB.domBase = (function () {
   cursor: pointer;
   font-size: 18px;
   z-index: 2147483647;
-  box-shadow: -2px 0 6px rgba(0,0,0,0.3);
+  box-shadow: -2px 0 8px rgba(20,30,50,0.35);
 }
 #aisb-panel {
   position: fixed;
@@ -44,8 +89,10 @@ window.AISB.domBase = (function () {
   right: 0;
   width: var(--aisb-width, 380px);
   height: 100vh;
-  background: #fff;
-  box-shadow: -4px 0 16px rgba(0,0,0,0.25);
+  background: var(--aisb-surface);
+  box-shadow: -6px 0 20px rgba(15,23,42,0.22);
+  border-radius: 10px 0 0 10px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   z-index: 2147483646;
@@ -55,7 +102,7 @@ window.AISB.domBase = (function () {
   transform: translateX(100%);
 }
 #aisb-header {
-  background: #1c3f61;
+  background: linear-gradient(135deg, #142c4d 0%, #1c3f61 45%, #3a2f7a 100%);
   color: #fff;
   padding: 10px 14px;
   display: flex;
@@ -72,53 +119,158 @@ window.AISB.domBase = (function () {
 }
 #aisb-tabs {
   display: flex;
-  border-bottom: 1px solid #ddd;
-  background: #f7f7f9;
+  flex-wrap: wrap;
+  gap: 3px;
+  border-bottom: 1px solid var(--aisb-border);
+  background: var(--aisb-page);
+  padding: 6px 6px 0;
 }
 .aisb-tab {
-  flex: 1;
-  padding: 8px 4px;
+  --tab-c: var(--aisb-blue);
+  --tab-c-deep: var(--aisb-blue-deep);
+  --tab-c-tint: var(--aisb-blue-tint);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px 6px;
   border: none;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   cursor: pointer;
-  font-size: 12px;
-  color: #555;
-  border-bottom: 2px solid transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--aisb-ink-soft);
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.aisb-tab::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--tab-c);
+  margin-right: 5px;
+}
+.aisb-tab:hover {
+  background: var(--aisb-surface);
+  color: var(--aisb-ink);
 }
 .aisb-tab.active {
-  color: #1c3f61;
-  border-bottom-color: #3a6ea5;
-  font-weight: 600;
+  background: var(--tab-c-tint);
+  color: var(--tab-c-deep);
+  border-bottom-color: var(--tab-c);
+  font-weight: 700;
 }
+
+/* ---- タブの機能グルーピング配色 (7系統、赤はステータス専用のため不使用) ---- */
+.aisb-tab[data-panel="chat"],
+.aisb-tab[data-panel="assistant"],
+.aisb-tab[data-panel="convinput"] {
+  --tab-c: var(--aisb-blue);
+  --tab-c-deep: var(--aisb-blue-deep);
+  --tab-c-tint: var(--aisb-blue-tint);
+}
+.aisb-tab[data-panel="nlsql"],
+.aisb-tab[data-panel="search"],
+.aisb-tab[data-panel="analytics"],
+.aisb-tab[data-panel="recommend"] {
+  --tab-c: var(--aisb-aqua);
+  --tab-c-deep: var(--aisb-aqua-deep);
+  --tab-c-tint: var(--aisb-aqua-tint);
+}
+.aisb-tab[data-panel="inventory"],
+.aisb-tab[data-panel="purchase"] {
+  --tab-c: var(--aisb-orange);
+  --tab-c-deep: var(--aisb-orange-deep);
+  --tab-c-tint: var(--aisb-orange-tint);
+}
+.aisb-tab[data-panel="profit"],
+.aisb-tab[data-panel="arap"] {
+  --tab-c: var(--aisb-green);
+  --tab-c-deep: var(--aisb-green-deep);
+  --tab-c-tint: var(--aisb-green-tint);
+}
+.aisb-tab[data-panel="alerts"],
+.aisb-tab[data-panel="workflows"],
+.aisb-tab[data-panel="notifications"] {
+  --tab-c: var(--aisb-yellow);
+  --tab-c-deep: var(--aisb-yellow-deep);
+  --tab-c-tint: var(--aisb-yellow-tint);
+}
+.aisb-tab[data-panel="ocr"],
+.aisb-tab[data-panel="websearch"] {
+  --tab-c: var(--aisb-magenta);
+  --tab-c-deep: var(--aisb-magenta-deep);
+  --tab-c-tint: var(--aisb-magenta-tint);
+}
+.aisb-tab[data-panel="legacy"],
+.aisb-tab[data-panel="customers"],
+.aisb-tab[data-panel="admin"] {
+  --tab-c: var(--aisb-violet);
+  --tab-c-deep: var(--aisb-violet-deep);
+  --tab-c-tint: var(--aisb-violet-tint);
+}
+
 #aisb-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 14px;
   font-size: 13px;
-  color: #222;
+  color: var(--aisb-ink);
+  background: var(--aisb-page);
+  line-height: 1.55;
 }
 .aisb-card {
-  background: #f5f7fa;
-  border: 1px solid #e0e4e8;
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
+  background: var(--aisb-surface);
+  border: 1px solid var(--aisb-border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin-bottom: 9px;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
+  box-shadow: 0 1px 2px rgba(16,24,40,0.05);
 }
 .aisb-badge {
   display: inline-block;
-  background: #e8f0fe;
-  color: #1c3f61;
+  background: var(--aisb-blue-tint);
+  color: var(--aisb-blue-deep);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 11px;
+  font-weight: 600;
   margin-bottom: 8px;
 }
+.aisb-ws-source {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 5px 9px;
+  margin: 0 0 8px 0;
+}
+.aisb-ws-source-real {
+  background: var(--aisb-green-tint);
+  color: var(--aisb-green-deep);
+}
+.aisb-ws-source-mock {
+  background: var(--aisb-yellow-tint);
+  color: var(--aisb-yellow-deep);
+}
 .aisb-insight-card {
-  background: #fbf6ec;
-  border: 1px solid #e6d5a8;
-  border-left: 3px solid #c9971e;
+  background: var(--aisb-violet-tint);
+  border: 1px solid #d6cdf2;
+  border-left: 4px solid var(--aisb-violet);
+  white-space: pre-wrap;
+}
+/* ルールベースの集計コメント(summary)用。本物のAI解釈(aisb-insight-card、紫)とは
+   意図的に見た目を分け、「これはAIの判断ではない」ことを一目で区別できるようにする。
+   (aisb_embed/static/sidebar.css の移植版。編集したら content/sidebar.css にも反映すること) */
+.aisb-summary-card {
+  background: #f1f2f4;
+  border: 1px solid #d9dce1;
+  border-left: 4px solid #8a929e;
   white-space: pre-wrap;
 }
 #aisb-chat-log {
@@ -128,20 +280,21 @@ window.AISB.domBase = (function () {
 }
 .aisb-msg {
   margin-bottom: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 7px 11px;
+  border-radius: 10px;
   max-width: 90%;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .aisb-msg-user {
-  background: #3a6ea5;
+  background: var(--aisb-blue);
   color: #fff;
   margin-left: auto;
 }
 .aisb-msg-assistant {
-  background: #eef1f4;
-  color: #222;
+  background: var(--aisb-surface);
+  border: 1px solid var(--aisb-border);
+  color: var(--aisb-ink);
 }
 #aisb-chat-input-row, #aisb-search-row {
   display: flex;
@@ -150,22 +303,27 @@ window.AISB.domBase = (function () {
 #aisb-chat-input, #aisb-search-input {
   flex: 1;
   padding: 6px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--aisb-border);
   border-radius: 4px;
   font-size: 12px;
+  background: var(--aisb-surface);
 }
 #aisb-chat-send, #aisb-search-run, #aisb-ocr-run {
-  background: #3a6ea5;
+  background: var(--aisb-blue);
   color: #fff;
   border: none;
   border-radius: 4px;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 600;
+}
+#aisb-chat-send:hover, #aisb-search-run:hover, #aisb-ocr-run:hover {
+  background: var(--aisb-blue-deep);
 }
 #aisb-ocr-result {
-  background: #f5f7fa;
-  border: 1px solid #e0e4e8;
+  background: var(--aisb-surface);
+  border: 1px solid var(--aisb-border);
   border-radius: 6px;
   padding: 8px;
   margin-top: 8px;
@@ -182,7 +340,7 @@ window.AISB.domBase = (function () {
   gap: 4px;
   height: 120px;
   padding: 8px 4px 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--aisb-border);
   margin-bottom: 6px;
 }
 .aisb-bar-col {
@@ -197,14 +355,14 @@ window.AISB.domBase = (function () {
 .aisb-bar {
   width: 100%;
   border-radius: 3px 3px 0 0;
-  background: #3a6ea5;
+  background: var(--aisb-blue);
 }
 .aisb-bar.aisb-bar-forecast {
-  background: repeating-linear-gradient(45deg, #9db8d6, #9db8d6 4px, #c3d4e8 4px, #c3d4e8 8px);
+  background: repeating-linear-gradient(45deg, #9ec5f4, #9ec5f4 4px, #cde2fb 4px, #cde2fb 8px);
 }
 .aisb-bar-label {
   font-size: 9px;
-  color: #666;
+  color: var(--aisb-muted);
   writing-mode: vertical-rl;
   text-orientation: mixed;
 }
@@ -212,7 +370,7 @@ window.AISB.domBase = (function () {
   display: flex;
   gap: 12px;
   font-size: 11px;
-  color: #555;
+  color: var(--aisb-ink-soft);
   margin-bottom: 10px;
 }
 .aisb-legend-dot {
@@ -224,48 +382,57 @@ window.AISB.domBase = (function () {
   vertical-align: middle;
 }
 
-/* ---- 再受注リスク / ワークフロー ---- */
-.aisb-risk-overdue { border-left: 4px solid #c0392b; }
-.aisb-risk-due_soon { border-left: 4px solid #d68910; }
-.aisb-risk-on_track { border-left: 4px solid #2e8b57; }
+/* ---- 再受注リスク / ワークフロー (ステータス配色は固定・カテゴリ配色と混同しない) ---- */
+.aisb-risk-overdue { border-left: 4px solid var(--aisb-critical); }
+.aisb-risk-due_soon { border-left: 4px solid var(--aisb-warning); }
+.aisb-risk-on_track { border-left: 4px solid var(--aisb-good); }
 .aisb-risk-tag {
   display: inline-block;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 1px 6px;
   border-radius: 3px;
   margin-left: 6px;
 }
-.aisb-risk-overdue .aisb-risk-tag { background: #fdecea; color: #c0392b; }
-.aisb-risk-due_soon .aisb-risk-tag { background: #fdf2e0; color: #d68910; }
-.aisb-risk-on_track .aisb-risk-tag { background: #e8f5ec; color: #2e8b57; }
+.aisb-risk-overdue .aisb-risk-tag { background: #fdecea; color: var(--aisb-critical); }
+.aisb-risk-due_soon .aisb-risk-tag { background: var(--aisb-yellow-tint); color: var(--aisb-warning); }
+.aisb-risk-on_track .aisb-risk-tag { background: var(--aisb-green-tint); color: var(--aisb-good); }
 
 .aisb-section-title {
   font-size: 12px;
-  font-weight: 600;
-  color: #1c3f61;
+  font-weight: 700;
+  color: var(--aisb-ink);
   margin: 10px 0 6px;
 }
 .aisb-btn-row {
   display: flex;
   gap: 6px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 .aisb-btn-row button {
-  background: #3a6ea5;
+  background: var(--aisb-blue);
   color: #fff;
   border: none;
   border-radius: 4px;
   padding: 6px 10px;
   cursor: pointer;
   font-size: 11px;
+  font-weight: 600;
+}
+.aisb-btn-row button:hover {
+  background: var(--aisb-blue-deep);
 }
 .aisb-btn-row button.aisb-btn-secondary {
-  background: #eef1f4;
-  color: #1c3f61;
+  background: var(--aisb-surface);
+  color: var(--aisb-blue-deep);
+  border: 1px solid var(--aisb-border);
+}
+.aisb-btn-row button.aisb-btn-secondary:hover {
+  background: var(--aisb-blue-tint);
 }
 .aisb-event-card {
-  background: #fff8e6;
+  background: var(--aisb-yellow-tint);
   border: 1px solid #f0dca0;
   border-radius: 6px;
   padding: 6px 8px;
@@ -273,7 +440,7 @@ window.AISB.domBase = (function () {
   font-size: 11px;
 }
 .aisb-event-time {
-  color: #999;
+  color: var(--aisb-muted);
   font-size: 10px;
   display: block;
   margin-top: 2px;
@@ -281,18 +448,21 @@ window.AISB.domBase = (function () {
 
 /* ---- 通知 / 管理 (Phase4) ---- */
 .aisb-notif-unread {
-  box-shadow: inset 3px 0 0 #3a6ea5;
-  background: #eef4fb;
+  box-shadow: inset 3px 0 0 var(--aisb-blue);
+  background: var(--aisb-blue-tint);
 }
 .aisb-notif-read-btn {
   margin-top: 6px;
-  background: #3a6ea5;
+  background: var(--aisb-blue);
   color: #fff;
   border: none;
   border-radius: 4px;
   padding: 3px 8px;
   cursor: pointer;
   font-size: 10px;
+}
+.aisb-notif-read-btn:hover {
+  background: var(--aisb-blue-deep);
 }
 
 /* ---- 業務データ(レガシーERP全13エンティティ) パネル ---- */
@@ -303,29 +473,34 @@ window.AISB.domBase = (function () {
 }
 .aisb-inline-row select {
   padding: 6px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--aisb-border);
   border-radius: 4px;
   font-size: 12px;
-  background: #fff;
+  background: var(--aisb-surface);
 }
-.aisb-inline-row input[type="text"] {
+.aisb-inline-row input[type="text"],
+.aisb-inline-row input[type="number"] {
   flex: 1;
   padding: 6px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--aisb-border);
   border-radius: 4px;
   font-size: 12px;
 }
 .aisb-inline-row button {
-  background: #3a6ea5;
+  background: var(--aisb-blue);
   color: #fff;
   border: none;
   border-radius: 4px;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 600;
+}
+.aisb-inline-row button:hover {
+  background: var(--aisb-blue-deep);
 }
 .aisb-context-banner {
-  background: #eef4fb;
+  background: var(--aisb-blue-tint);
   border: 1px solid #b9d3ec;
   border-radius: 6px;
   padding: 8px 10px;
@@ -335,7 +510,7 @@ window.AISB.domBase = (function () {
 }
 .aisb-context-banner .aisb-summarize-btn {
   margin-top: 6px;
-  background: #1c3f61;
+  background: var(--aisb-blue-deep);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -349,29 +524,34 @@ window.AISB.domBase = (function () {
   font-size: 11px;
 }
 .aisb-table th, .aisb-table td {
-  border-bottom: 1px solid #e0e4e8;
-  padding: 4px 6px;
+  border-bottom: 1px solid var(--aisb-border-soft);
+  padding: 5px 6px;
   text-align: left;
   vertical-align: top;
 }
 .aisb-table th {
-  color: #555;
-  font-weight: 600;
-  background: #f5f7fa;
+  color: var(--aisb-ink-soft);
+  font-weight: 700;
+  background: var(--aisb-page);
+  border-bottom: 2px solid var(--aisb-border);
   position: sticky;
   top: 0;
 }
+.aisb-table tr:nth-child(even) td {
+  background: #fafbfd;
+}
 .aisb-table tr:hover td {
-  background: #f5f9ff;
+  background: var(--aisb-blue-tint);
 }
 .aisb-link-btn {
   background: transparent;
   border: none;
-  color: #3a6ea5;
+  color: var(--aisb-blue-deep);
   cursor: pointer;
   font-size: 11px;
   padding: 0;
   text-decoration: underline;
+  font-weight: 600;
 }
 
 /* ---- リサイズハンドル / 最小化・最大化 (サイドバーUI改善) ---- */
@@ -387,7 +567,7 @@ window.AISB.domBase = (function () {
 }
 #aisb-resize-handle:hover,
 #aisb-resize-handle.aisb-resizing {
-  background: rgba(58, 110, 165, 0.35);
+  background: rgba(42, 120, 214, 0.35);
 }
 #aisb-header-btns {
   display: flex;
@@ -401,7 +581,7 @@ window.AISB.domBase = (function () {
   border-radius: 3px;
 }
 #aisb-header-btns button:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
 }
 .aisb-maximized #aisb-panel {
   width: min(920px, 92vw) !important;
@@ -432,29 +612,30 @@ window.AISB.domBase = (function () {
   margin-bottom: 8px;
 }
 .aisb-chip {
-  background: #eef4fb;
-  color: #1c3f61;
-  border: 1px solid #b9d3ec;
+  background: var(--aisb-aqua-tint);
+  color: var(--aisb-aqua-deep);
+  border: 1px solid #a7e3cd;
   border-radius: 999px;
   padding: 4px 10px;
   cursor: pointer;
   font-size: 11px;
+  font-weight: 600;
   line-height: 1.4;
   max-width: 100%;
   white-space: normal;
   text-align: left;
 }
 .aisb-chip:hover {
-  background: #dce9f8;
+  background: #cdeee0;
 }
 .aisb-chip:active {
-  background: #cfe0f3;
+  background: #b7e5d3;
 }
 #aisb-nlsql-q {
   width: 100%;
   min-height: 56px;
   padding: 6px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--aisb-border);
   border-radius: 4px;
   font-size: 12px;
   font-family: inherit;
@@ -462,28 +643,49 @@ window.AISB.domBase = (function () {
   margin-bottom: 6px;
 }
 .aisb-filter-summary {
-  background: #f5f7fa;
-  border: 1px solid #e0e4e8;
+  background: var(--aisb-page);
+  border: 1px solid var(--aisb-border);
   border-radius: 6px;
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 11px;
-  color: #444;
+  color: var(--aisb-ink-soft);
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   white-space: pre-wrap;
   word-break: break-all;
 }
 .aisb-hint {
   font-size: 11px;
-  color: #777;
+  color: var(--aisb-muted);
   line-height: 1.5;
   margin-bottom: 6px;
 }
+/* AIが実際に生成・実行したSQLは存在しない(実SQLエンジン不在、AIは構造化フィルタ/
+   specのみ生成)ため、検証済み条件から機械的に組み立てた疑似SQL(表示専用、実行
+   しない)を、実行結果と見分けやすいよう .aisb-filter-summary とは別のコード風
+   (ダーク背景)スタイルで見せる。 */
+.aisb-sql-preview {
+  background: #182335;
+  color: #d7e3f5;
+  border: 1px solid #2c3c56;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+.aisb-sql-preview code {
+  font-family: inherit;
+  background: none;
+}
 .aisb-warning-card {
-  background: #fdf2e0;
+  background: var(--aisb-yellow-tint);
   border: 1px solid #f0dca0;
-  border-left: 3px solid #d68910;
-  color: #7a5410;
+  border-left: 3px solid var(--aisb-warning);
+  color: #6b4a08;
   font-size: 11px;
 }
 
@@ -505,7 +707,7 @@ window.AISB.domBase = (function () {
   width: 92px;
   flex: 0 0 auto;
   font-size: 10px;
-  color: #444;
+  color: var(--aisb-ink-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -513,22 +715,22 @@ window.AISB.domBase = (function () {
 .aisb-hbar-track {
   flex: 1;
   height: 10px;
-  background: #eef1f4;
+  background: var(--aisb-border-soft);
   border-radius: 5px;
   overflow: hidden;
 }
 .aisb-hbar-fill {
   height: 100%;
-  background: #3a6ea5;
+  background: var(--aisb-blue);
   border-radius: 5px;
 }
-.aisb-hbar-track.aisb-hbar-warn .aisb-hbar-fill { background: #d68910; }
-.aisb-hbar-track.aisb-hbar-over .aisb-hbar-fill { background: #c0392b; }
+.aisb-hbar-track.aisb-hbar-warn .aisb-hbar-fill { background: var(--aisb-warning); }
+.aisb-hbar-track.aisb-hbar-over .aisb-hbar-fill { background: var(--aisb-critical); }
 .aisb-hbar-value {
   width: 118px;
   flex: 0 0 auto;
   font-size: 10px;
-  color: #444;
+  color: var(--aisb-ink-soft);
   text-align: right;
   white-space: nowrap;
 }
@@ -540,35 +742,35 @@ window.AISB.domBase = (function () {
   display: block;
 }
 .aisb-trend-axis {
-  stroke: #ddd;
+  stroke: var(--aisb-border);
   stroke-width: 1;
 }
 .aisb-trend-area {
-  fill: rgba(58, 110, 165, 0.1);
+  fill: rgba(42, 120, 214, 0.12);
   stroke: none;
 }
 .aisb-trend-line {
   fill: none;
-  stroke: #3a6ea5;
+  stroke: var(--aisb-blue);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 .aisb-trend-dot {
-  fill: #3a6ea5;
+  fill: var(--aisb-blue);
   stroke: #fff;
   stroke-width: 2;
 }
 .aisb-trend-endlabel {
   font-size: 9px;
-  fill: #1c3f61;
-  font-weight: 600;
+  fill: var(--aisb-blue-deep);
+  font-weight: 700;
 }
 .aisb-trend-xlabels {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
-  color: #888;
+  color: var(--aisb-muted);
   margin: 2px 0 6px;
 }
 
@@ -578,7 +780,7 @@ window.AISB.domBase = (function () {
   height: 16px;
   border-radius: 8px;
   overflow: hidden;
-  background: #eef1f4;
+  background: var(--aisb-border-soft);
   margin-bottom: 6px;
 }
 .aisb-dist-seg {
@@ -593,7 +795,7 @@ window.AISB.domBase = (function () {
   flex-wrap: wrap;
   gap: 10px;
   font-size: 11px;
-  color: #444;
+  color: var(--aisb-ink-soft);
   margin-bottom: 10px;
 }
 .aisb-dist-legend-item {
@@ -607,7 +809,7 @@ window.AISB.domBase = (function () {
   display: flex;
   gap: 4px;
   margin-bottom: 10px;
-  border-bottom: 1px solid #e0e4e8;
+  border-bottom: 1px solid var(--aisb-border);
 }
 .aisb-subtab {
   flex: 1;
@@ -616,13 +818,13 @@ window.AISB.domBase = (function () {
   background: transparent;
   cursor: pointer;
   font-size: 11px;
-  color: #555;
+  color: var(--aisb-ink-soft);
   border-bottom: 2px solid transparent;
 }
 .aisb-subtab.active {
-  color: #1c3f61;
-  border-bottom-color: #3a6ea5;
-  font-weight: 600;
+  color: var(--aisb-blue-deep);
+  border-bottom-color: var(--aisb-blue);
+  font-weight: 700;
 }
 .aisb-subpanel {
   display: none;
@@ -674,8 +876,8 @@ window.AISB.domBase = (function () {
       const actuals = chart.series[1].values;
       const legend =
         `<div class="aisb-legend">` +
-        `<span><span class="aisb-legend-dot" style="background:#c7d8ec"></span>${escapeHtml(chart.series[0].label)}</span>` +
-        `<span><span class="aisb-legend-dot" style="background:#3a6ea5"></span>${escapeHtml(chart.series[1].label)}</span>` +
+        `<span><span class="aisb-legend-dot" style="background:#9ec5f4"></span>${escapeHtml(chart.series[0].label)}</span>` +
+        `<span><span class="aisb-legend-dot" style="background:#2a78d6"></span>${escapeHtml(chart.series[1].label)}</span>` +
         `</div>`;
       const rows = categories
         .map((cat, i) => {
@@ -761,7 +963,7 @@ window.AISB.domBase = (function () {
   // 棒グラフとは別ジョブ(part-to-whole)の表現として追加した(ai-api-server側の
   // distribution.slices は既存の .aisb-risk-* 配色と揃えた status(good/warning/critical)
   // を持つ)。色はテキストではなく凡例のドット(スウォッチ)側にのみ使う。
-  const STATUS_COLOR = { good: "#2e8b57", warning: "#d68910", critical: "#c0392b" };
+  const STATUS_COLOR = { good: "#0ca30c", warning: "#b8790a", critical: "#d03b3b" };
   function renderStatusDistributionChart(distribution) {
     const slices = (distribution && distribution.slices) || [];
     const total = slices.reduce((s, x) => s + (Number(x.count) || 0), 0);
@@ -770,13 +972,13 @@ window.AISB.domBase = (function () {
       .filter((s) => s.count > 0)
       .map((s) => {
         const pct = (s.count / total) * 100;
-        const color = STATUS_COLOR[s.status] || "#8a94a6";
+        const color = STATUS_COLOR[s.status] || "#82888f";
         return `<div class="aisb-dist-seg" style="width:${pct.toFixed(2)}%;background:${color}" title="${escapeHtml(s.label)}: ${s.count}件(${Math.round(pct)}%)"></div>`;
       })
       .join("");
     const legend = slices
       .map((s) => {
-        const color = STATUS_COLOR[s.status] || "#8a94a6";
+        const color = STATUS_COLOR[s.status] || "#82888f";
         const pct = Math.round((s.count / total) * 100);
         return `<span class="aisb-dist-legend-item"><span class="aisb-legend-dot" style="background:${color}"></span>${escapeHtml(s.label)} ${s.count}件(${pct}%)</span>`;
       })

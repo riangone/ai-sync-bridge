@@ -201,6 +201,11 @@ class CrossAnalysisService:
 
     # -----------------------------------------------------------------
     # 3. 滞留債権(焦げ付き)分析: Invoice(延滞) × Customer
+    #    内訳集計の軸はinstanceで異なる: erpのCustomerはIndustry(業種)列を持つが、
+    #    dealerのCustomerにはIndustry列自体が存在せず(CustomerType=法人/個人のみ)、
+    #    Industryで集計すると全件「未設定」1本にまとまる無意味な内訳になる。
+    #    web_search_service.py/panel-nlsql.jsのGENERATE_PRESETS_BY_INSTANCEと同じ
+    #    「instanceで実在する属性に出し分ける」方針をここにも適用する。
     # -----------------------------------------------------------------
     async def bad_debt(self) -> dict:
         invoices, _ = await legacy_client.fetch_rows(self.settings, "Invoice")
@@ -208,6 +213,9 @@ class CrossAnalysisService:
         warnings = []
         customer_by_id = {c.get("Id"): c for c in customers}
         today = datetime.utcnow().date()
+        is_dealer = self.settings.instance == "dealer"
+        breakdown_field = "CustomerType" if is_dealer else "Industry"
+        breakdown_label = "顧客区分(法人/個人)" if is_dealer else "業種"
 
         rows = []
         for inv in invoices:
@@ -221,7 +229,7 @@ class CrossAnalysisService:
                 "CustomerName": inv.get("CustomerName"), "TotalAmount": _to_float(inv.get("TotalAmount")),
                 "InvoiceDate": inv.get("InvoiceDate"), "DueDate": inv.get("DueDate"),
                 "DaysOverdue": days_overdue, "CustomerCreditLimit": _to_float(cust.get("CreditLimit")),
-                "CustomerIndustry": cust.get("Industry"),
+                "CustomerBreakdown": cust.get(breakdown_field),
             })
         if not rows:
             warnings.append("延滞状態の請求はありません")
@@ -234,6 +242,14 @@ class CrossAnalysisService:
             entry["Count"] += 1
         aggregated = sorted(by_customer.values(), key=lambda e: e["Total"], reverse=True)[:_TOP_N_CHART]
 
+        by_breakdown: dict[str, dict] = {}
+        for r in rows:
+            key = r["CustomerBreakdown"] or "未設定"
+            entry = by_breakdown.setdefault(key, {"Breakdown": key, "Total": 0.0, "Count": 0})
+            entry["Total"] += r["TotalAmount"]
+            entry["Count"] += 1
+        breakdown_chart_data = sorted(by_breakdown.values(), key=lambda e: e["Total"], reverse=True)[:_TOP_N_CHART]
+
         chart = {
             "type": "ranked-bar", "unit": "円",
             "categories": [a["CustomerName"] for a in aggregated],
@@ -243,6 +259,16 @@ class CrossAnalysisService:
             "overdue_invoice_count": len(rows),
             "overdue_total_amount": round(sum(r["TotalAmount"] for r in rows), 2),
             "affected_customer_count": len(by_customer),
+            "by_breakdown_label": breakdown_label,
+            "by_breakdown": [
+                {"Breakdown": e["Breakdown"], "Total": round(e["Total"], 2), "Count": e["Count"]}
+                for e in sorted(by_breakdown.values(), key=lambda e: e["Total"], reverse=True)
+            ],
+            "breakdown_chart": {
+                "type": "ranked-bar", "unit": "円",
+                "categories": [e["Breakdown"] for e in breakdown_chart_data],
+                "series": [{"label": "延滞金額(合計)", "values": [round(e["Total"], 2) for e in breakdown_chart_data]}],
+            },
         }
         # 延滞日数の経過度合いで3区分(日数不明分はカウントに含めない)。
         aging = [r["DaysOverdue"] for r in rows if r["DaysOverdue"] is not None]

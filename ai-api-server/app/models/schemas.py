@@ -1,5 +1,6 @@
 """Pydantic スキーマ定義（言語非依存仕様の Models 層）"""
 from datetime import datetime
+from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -73,6 +74,22 @@ class OcrResult(BaseModel):
     extracted_text: str
     fields: dict[str, str]
     confidence: float
+    source: str = "mock"
+
+
+class OcrRegisterRequest(BaseModel):
+    fields: dict  # OcrResult.fields をそのまま渡す想定
+    entity: str  # "Customer" | "Supplier" | "Employee" | "Property"(erpのみ)
+
+
+class OcrRegisterResponse(BaseModel):
+    success: bool
+    normalized: dict  # レガシーフォームのフィールド名(Name/Tel/...)に正規化済み
+    entry_entity: str
+
+
+class OcrEntitiesResponse(BaseModel):
+    entities: list[str]  # この業態(instance)でOCR自動入力先として選べるエンティティ名一覧
 
 
 # ---------- Search ----------
@@ -263,45 +280,85 @@ class DynamicAnalysisResponse(BaseModel):
     provider: str
 
 
-# ---------- Workflow Engine ----------
-class WorkflowRule(BaseModel):
-    id: int
+# ---------- Workflow Engine (マルチステップ・パイプライン, README 5.4.10) ----------
+class WorkflowTrigger(BaseModel):
+    type: str  # schedule | screen_navigation | data_update | manual
+    config: dict = {}
+
+
+class WorkflowStep(BaseModel):
+    order: int
     name: str
-    entity: str  # customer | order
-    field: str
-    operator: str  # >, <, >=, <=, ==, !=, contains
-    value: str
-    action: str  # flag_approval | notify | flag_followup
-    message_template: str
-    enabled: bool = True
+    action_type: str  # ocr|search|report|auto_input|push|recommend|chat|wait|condition
+    config: dict = {}
+    next_on_success: str | int | None = None  # "next" | "end" | 数値(オーダー番号へジャンプ)
+    next_on_failure: str | int | None = None
 
 
-class WorkflowRuleCreate(BaseModel):
+class WorkflowDefinitionCreate(BaseModel):
     name: str
-    entity: str
-    field: str
-    operator: str
-    value: str
-    action: str
-    message_template: str
+    description: str | None = None
     enabled: bool = True
+    trigger: WorkflowTrigger
+    steps: list[WorkflowStep]
 
 
-class WorkflowEvent(BaseModel):
+class WorkflowDefinitionUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    enabled: bool | None = None
+    trigger: WorkflowTrigger | None = None
+    steps: list[WorkflowStep] | None = None
+
+
+class WorkflowDefinition(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    enabled: bool
+    trigger: WorkflowTrigger
+    steps: list[WorkflowStep]
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkflowToggleResult(BaseModel):
+    id: str
+    enabled: bool
+
+
+class WorkflowTriggerEvalRequest(BaseModel):
+    current_screen_type: str | None = None
+    changed_table: str | None = None
+
+
+class WorkflowTriggerEvalResult(BaseModel):
+    matched_workflows: list[WorkflowDefinition]
+
+
+class WorkflowExecuteRequest(BaseModel):
+    context: dict = {}
+
+
+class WorkflowStepResult(BaseModel):
+    order: int
+    name: str
+    action_type: str
+    status: str  # success | failed
+    output: Any = None
+    error: str | None = None
+
+
+class WorkflowExecutionResult(BaseModel):
     id: int
-    rule_id: int
-    rule_name: str
-    entity: str
-    entity_id: int
-    action: str
-    message: str
-    triggered_at: datetime
-
-
-class WorkflowRunResult(BaseModel):
-    evaluated_customers: int
-    evaluated_orders: int
-    new_events: list[WorkflowEvent]
+    workflow_id: str
+    workflow_name: str
+    trigger_type: str
+    status: str  # completed | failed
+    started_at: datetime
+    finished_at: datetime
+    steps: list[WorkflowStepResult]
+    context: dict
 
 
 # ---------- Notifications ----------
@@ -330,6 +387,149 @@ class NotificationMarkResult(BaseModel):
     marked: int
 
 
+# ---------- Inventory / Product (Phase4: README 9章「InventoryController」) ----------
+class ProductBase(BaseModel):
+    name: str
+    sku: str
+    stock: int
+    reorder_point: int  # これを下回ると異常検知(anomalies)で検出される
+    unit_cost: float
+    supplier: str
+
+
+class ProductCreate(ProductBase):
+    pass
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    sku: str | None = None
+    stock: int | None = None
+    reorder_point: int | None = None
+    unit_cost: float | None = None
+    supplier: str | None = None
+
+
+class Product(ProductBase):
+    id: int
+
+
+class InventoryAnomaly(BaseModel):
+    product_id: int
+    product_name: str
+    stock: int
+    reorder_point: int
+    shortage: int  # reorder_point - stock (正の値のみ異常)
+    severity: str  # warning | critical (stock==0はcritical)
+
+
+class InventoryAnomalyResponse(BaseModel):
+    generated_at: datetime
+    anomalies: list[InventoryAnomaly]
+
+
+# ---------- Purchase Order (Phase4: README 9章「PurchaseOrderController」) ----------
+class PurchaseOrderBase(BaseModel):
+    product_id: int
+    supplier: str
+    qty: int
+    status: str = "ordered"  # ordered | received | cancelled
+    ordered_at: str
+    expected_date: str | None = None
+    received_qty: int = 0
+
+
+class PurchaseOrderCreate(BaseModel):
+    product_id: int
+    supplier: str
+    qty: int
+    expected_date: str | None = None
+
+
+class PurchaseOrder(PurchaseOrderBase):
+    id: int
+
+
+class PurchaseOrderProposal(BaseModel):
+    product_id: int
+    product_name: str
+    current_stock: int
+    reorder_point: int
+    suggested_qty: int
+    supplier: str
+    reason: str  # 提案根拠(在庫僅少/reorder_point割れ 等の説明文)
+
+
+class PurchaseOrderProposalResponse(BaseModel):
+    generated_at: datetime
+    proposals: list[PurchaseOrderProposal]
+
+
+class GoodsReceiptRequest(BaseModel):
+    purchase_order_id: int
+    received_qty: int
+
+
+class SupplierEvaluation(BaseModel):
+    supplier: str
+    order_count: int
+    total_qty: int
+    on_time_rate: float  # received済みPOのうちexpected_date以内に揃った割合
+    rating: str  # good | normal | caution
+
+
+class SupplierEvaluationResponse(BaseModel):
+    generated_at: datetime
+    evaluations: list[SupplierEvaluation]
+
+
+# ---------- Profit Report (Phase4: README 9章「ProfitReportController」) ----------
+class ProfitDataPoint(BaseModel):
+    product_name: str
+    revenue: float
+    profit: float
+
+
+class ProductProfitDetail(BaseModel):
+    product_name: str
+    qty: int
+    revenue: float
+    cost: float
+    profit: float
+    margin_rate: float  # profit / revenue (revenue==0 の場合は0)
+    cost_known: bool  # False = 商品マスタに原価未登録(costは0扱い、参考値)
+
+
+class ProfitReportResponse(BaseModel):
+    generated_at: datetime
+    period: str | None = None  # "YYYY-MM" 絞り込み条件(未指定なら全期間)
+    profit_data: list[ProfitDataPoint]
+    product_details: list[ProductProfitDetail]
+    total_profit: float
+    summary: str  # ルールベース集計コメント(AIではない。AI解釈が欲しい場合は /insight を叩く)
+
+
+# ---------- AR/AP Aging (Phase4: README 9章「ArApController」) ----------
+class AgingEntry(BaseModel):
+    entity_type: str  # receivable(売掛) | payable(買掛)
+    entity_name: str  # 顧客名 or 仕入先名
+    current: float  # 未到来(期日前)
+    bucket_1_30: float
+    bucket_31_60: float
+    bucket_61_90: float
+    bucket_90_plus: float
+    total: float
+    risk: str  # low | medium | high
+
+
+class ArApAgingResponse(BaseModel):
+    generated_at: datetime
+    aging_report: list[AgingEntry]
+    total_receivable: float
+    total_payable: float
+    summary: str  # ルールベース集計コメント(AIではない。AI解釈が欲しい場合は /insight を叩く)
+
+
 # ---------- Admin ----------
 class AdminStats(BaseModel):
     demo_mode: bool
@@ -337,8 +537,8 @@ class AdminStats(BaseModel):
     vector_backend: str
     customer_count: int
     order_count: int
-    workflow_rule_count: int
-    workflow_event_count: int
+    workflow_count: int
+    workflow_execution_count: int
     unread_notification_count: int
     generated_at: datetime
 
@@ -349,3 +549,199 @@ class AuditLogEntry(BaseModel):
     action: str
     detail: str
     at: datetime
+
+
+# ---------- Push Notification (Phase4: README 9章「PushController + AlertCheckService」) ----------
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    p256dh: str | None = None
+    auth: str | None = None
+    device_name: str | None = None
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str
+
+
+class PushSubscription(BaseModel):
+    id: int
+    endpoint: str
+    p256dh: str | None = None
+    auth: str | None = None
+    device_name: str | None = None
+    created_at: datetime
+
+
+class PushSubscribeResult(BaseModel):
+    success: bool
+
+
+class PushAlert(BaseModel):
+    source: str  # inventory | ar_ap
+    severity: str  # high | medium | info (README 5.1: high=赤, medium=黄, info=青)
+    title: str
+    message: str
+    ref_type: str | None = None
+    ref_id: int | None = None
+
+
+class PushCheckResponse(BaseModel):
+    generated_at: datetime
+    alerts: list[PushAlert]
+    total_alerts: int
+    high_count: int
+    medium_count: int
+    summary: str | None = None  # ルールベース集計コメント(AIではない。AI解釈が欲しい場合は /insight を叩く)
+
+
+# ---------- Analysis History (Phase4: README 9章「AnalysisHistoryService」) ----------
+class AnalysisHistoryCreate(BaseModel):
+    type: str
+    query: str
+    result: dict
+
+
+class AnalysisHistoryEntry(BaseModel):
+    id: int
+    type: str
+    query: str
+    result: dict
+    created_at: datetime
+
+
+# ---------- Web Search: Company / Property (Phase2: README 5.3節「外部データ検索系」) ----------
+class CompanySearchRequest(BaseModel):
+    keyword: str
+
+
+class CompanySearchResult(BaseModel):
+    name: str
+    name_kana: str | None = None
+    representative: str | None = None
+    address: str | None = None
+    tel: str | None = None
+    website: str | None = None
+    industry: str | None = None
+    capital: int | None = None
+    employees: int | None = None
+
+
+class CompanySearchResponse(BaseModel):
+    keyword: str
+    results: list[CompanySearchResult]
+    source: str | None = None  # "opencode-websearch"(実検索) | "mock"(擬似データ)
+
+
+class CompanyRegisterRequest(BaseModel):
+    company_data: dict
+
+
+class CompanyRegisterResponse(BaseModel):
+    success: bool
+    normalized: dict  # レガシーフォームのフィールド名(Name/NameKana/...)に正規化済み
+    # 自動入力先エンティティ(erp="Customer", dealer="Supplier")。
+    # フロント側で instance からの再導出をせずに済むよう、サーバー側の判断をそのまま渡す。
+    entry_entity: str = "Customer"
+
+
+class PropertySearchRequest(BaseModel):
+    keyword: str
+
+
+class PropertySearchResult(BaseModel):
+    name: str
+    name_kana: str | None = None
+    address: str | None = None
+    access: str | None = None
+    land_area: float | None = None
+    building_area: float | None = None
+    structure: str | None = None
+    floors: int | None = None
+    built_date: str | None = None
+    price: int | None = None
+    monthly_rent: int | None = None
+
+
+class PropertySearchResponse(BaseModel):
+    keyword: str
+    results: list[PropertySearchResult]
+    source: str | None = None  # "opencode-websearch"(実検索) | "mock"(擬似データ)
+
+
+class PropertyRegisterRequest(BaseModel):
+    property_data: dict
+
+
+class PropertyRegisterResponse(BaseModel):
+    success: bool
+    normalized: dict
+
+
+# ---------- Recommend (Phase2: README 5.3節「レコメンド系」) ----------
+class RecommendRequest(BaseModel):
+    table_name: str  # customers | orders | products
+    id: int
+    max_results: int = 5
+    include_explanation: bool = False  # ルールベースの一致理由文を付与するか(AIではない)
+
+
+class RecommendResult(BaseModel):
+    id: int
+    text: str
+    score: float
+    explanation: str | None = None
+
+
+class RecommendResponse(BaseModel):
+    table_name: str
+    source_id: int
+    results: list[RecommendResult]
+
+
+# ---------- Local AI Assist (Phase3: README 5.4.2「ビジネスアシスタント」) ----------
+class AssistRequest(BaseModel):
+    message: str
+    screen_context: dict | None = None
+    conversation_id: str | None = None
+
+
+class AssistResponse(BaseModel):
+    response: str
+    conversation_id: str
+    suggested_actions: list[str]
+    provider: str
+
+
+# ---------- Conversational Input (Phase3: README 5.4.7「自然言語→フォームデータ変換」) ----------
+class ConversationalInputRequest(BaseModel):
+    message: str
+    target_screen: str
+    screen_context: dict | None = None
+    conversation_id: str | None = None
+
+
+class InputMapping(BaseModel):
+    field: str
+    value: str
+    confidence: str  # high(AIが直接抽出) | medium(エンティティ解決で補完)
+
+
+class ConversationalInputResponse(BaseModel):
+    response: str
+    conversation_id: str
+    input_mappings: list[InputMapping]
+    intent: str
+    missing_fields: list[str]
+    confidence: float
+
+
+# 2026-09-01: OCR(OcrRegisterRequest/Response)と同じ「登録用データを作る」導線用。
+class ConversationalInputRegisterRequest(BaseModel):
+    fields: dict  # input_mappingsを{field: value}に組み直したものをそのまま渡す想定
+    target_screen: str  # "order-input" | "customer-register" | "estimate-mgmt" | "invoice-mgmt" | "supplier-mgmt"
+
+
+class ConversationalInputRegisterResponse(BaseModel):
+    success: bool
+    normalized: dict  # レガシーフォームのフィールド名(Name/Tel/customerId/...)に正規化済み
+    entry_entity: str

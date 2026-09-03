@@ -27,6 +27,20 @@ window.AISB.configBase = (function () {
       { id: "analytics", label: "予測分析", enabled: true },
       { id: "workflows", label: "ワークフロー", enabled: false },
       { id: "notifications", label: "通知", enabled: false },
+      // Phase2/4追加分(Task#1-4/#7)。同期時にlegacy/customers/notifications等の暫定false
+      // をそのまま引き継いでいたが、実際はAI異常検知(inventory)・AI発注提案(purchase)・
+      // AIリスク診断(arap/alerts)・AI検索+正規化(websearch)を持つ機能であり、
+      // analytics/recommendと同じ基準で有効化(2026-08-20)。profitは既存analyticsと同待遇
+      // (レポート系はUI一覧に含める方針で統一)。
+      { id: "inventory", label: "在庫管理", enabled: true },
+      { id: "purchase", label: "発注管理", enabled: true },
+      { id: "profit", label: "利益・粗利", enabled: true },
+      { id: "arap", label: "売掛買掛", enabled: true },
+      { id: "alerts", label: "アラート", enabled: true },
+      { id: "recommend", label: "類似検索", enabled: true },
+      { id: "websearch", label: "企業・物件検索", enabled: true },
+      { id: "assistant", label: "AIアシスタント", enabled: true },
+      { id: "convinput", label: "自然言語入力", enabled: true },
       { id: "admin", label: "管理", enabled: false },
     ],
   };
@@ -40,6 +54,23 @@ window.AISB.configBase = (function () {
     "http://localhost:5010": "http://localhost:5011",
     "https://aisync.0101.click": "https://aisync-api.0101.click",
   };
+
+  // このコピーが対象とする業態("erp"|"dealer")。埋め込み版(aisb_embed/shared/config-base.js)
+  // ではアプリごとに物理コピーが分かれるため単純ハードコードだが、拡張版は同一コードが
+  // manifest.json content_scripts.matches に列挙したオリジンへ注入される仕組みなので、
+  // ORIGIN_API_MAPと同じ考え方でorigin別に解決する(panel-nlsql.js/panel-web-search.js/
+  // panel-conv-input.js が ctx.INSTANCE で業態別に中身を出し分ける、その唯一の分岐点)。
+  // 現時点の manifest.json matches / host_permissions はERP側オリジン
+  // (localhost:5010 / aisync.0101.click)のみで、dealer側オリジンは未登録のため、
+  // このマップは実質常に空振りし INSTANCE は "erp" に解決される。dealer側のレガシー画面
+  // にもこの拡張を注入したくなった場合は、ここへのエントリ追加に加えて manifest.json の
+  // matches / host_permissions も更新すること(そちらは新規オリジンへのアクセス許可を
+  // 増やす変更になるため、この分岐追加だけでは効果を持たない)。
+  const ORIGIN_INSTANCE_MAP = {
+    "http://localhost:5020": "dealer",
+    "https://aisync-dealer.0101.click": "dealer",
+  };
+  const INSTANCE = ORIGIN_INSTANCE_MAP[location.origin] || "erp";
 
   // レガシーERP 6.3章 全13業務エンティティ。id はレガシー側ルーティング
   // (/{entity}/List, /{entity}/Detail/{id}) およびJSON API (/api/{entity}/list,
@@ -88,5 +119,5 @@ window.AISB.configBase = (function () {
     return { profile, sidebarOpen, API_BASE, LEGACY_ORIGIN };
   }
 
-  return { DEFAULT_PROFILE, ORIGIN_API_MAP, LEGACY_ENTITIES, loadContext };
+  return { DEFAULT_PROFILE, ORIGIN_API_MAP, LEGACY_ENTITIES, INSTANCE, loadContext };
 })();

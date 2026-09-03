@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>車両在庫照会</h2>
+<table class="grid">
+    <thead>
+    <tr>
+        <th>ID</th><th>車両名</th><th>ボディタイプ</th><th>年式</th><th>走行距離</th>
+        <th>色</th><th>状態</th><th>価格</th><th>在庫数</th><th>発注目安</th><th>要補充</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for v in vehicles %}
+    <tr class="{{ 'stock-warning' if v.Stock <= v.SafetyStock else '' }}">
+        <td>{{ v.Id }}</td>
+        <td>{{ v.Name }}</td>
+        <td>{{ v.Category }}</td>
+        <td>{{ v.Year }}</td>
+        <td>{{ "{:,}".format(v.Mileage) }}km</td>
+        <td>{{ v.Color }}</td>
+        <td>{{ v.ConditionType }}</td>
+        <td>&yen;{{ "{:,}".format(v.UnitPrice) }}</td>
+        <td>{{ v.Stock }}</td>
+        <td>{{ v.SafetyStock }}</td>
+        <td>{{ "要補充" if v.Stock <= v.SafetyStock else "適正" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

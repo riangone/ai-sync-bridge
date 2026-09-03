@@ -8,7 +8,7 @@ aisb_embed 自身の管理用エンドポイント。
 """
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -37,11 +37,15 @@ def toggle(body: ToggleBody):
 
 
 @router.get("/admin", response_class=HTMLResponse)
-def admin_page():
+def admin_page(request: Request):
+    # Caddyのサブパス公開(strip_prefix)経由でアクセスされた場合、素の"/aisb-embed/toggle"
+    # へfetchすると別システム(同一ドメイン配下の別プロセス)を誤って叩いてしまうため、
+    # 常にX-Forwarded-Prefixを踏まえた絶対パスで自分自身を叩く。
+    prefix = request.headers.get("x-forwarded-prefix", "")
     locked = config.env_override() is not None
     enabled = config.is_enabled()
     lock_notice = (
-        f"<p style='color:#c0392b'>環境変数 AISB_EMBED_ENABLED="
+        f"<p style='color:#d03b3b'>環境変数 AISB_EMBED_ENABLED="
         f"{os.environ.get('AISB_EMBED_ENABLED')!r} が設定されているため、"
         f"下のボタンでの切り替えは保存はされますが実際の有効/無効には反映されません"
         f"(env変数を外すかサーバー起動時の設定を変更してください)。</p>"
@@ -55,11 +59,11 @@ def admin_page():
 <title>AI-Sync Bridge 埋め込み管理</title>
 <style>
   body {{ font-family: -apple-system, "Segoe UI", "Hiragino Sans", sans-serif; max-width: 520px; margin: 60px auto; color: #222; }}
-  h1 {{ font-size: 18px; color: #1c3f61; }}
+  h1 {{ font-size: 18px; color: #17497e; }}
   .state {{ display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: 600; }}
-  .state.on {{ background: #e8f5ec; color: #2e8b57; }}
-  .state.off {{ background: #fdecea; color: #c0392b; }}
-  button {{ background: #3a6ea5; color: #fff; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 13px; margin-top: 12px; }}
+  .state.on {{ background: #e6f7e6; color: #0ca30c; }}
+  .state.off {{ background: #fdecea; color: #d03b3b; }}
+  button {{ background: #2a78d6; color: #fff; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 13px; margin-top: 12px; }}
   button.off {{ background: #888; }}
   p.desc {{ color: #555; font-size: 13px; line-height: 1.6; }}
 </style>
@@ -78,7 +82,7 @@ def admin_page():
   <script>
     document.getElementById("toggle-btn").addEventListener("click", async () => {{
       const nowEnabled = document.getElementById("state").classList.contains("on");
-      const res = await fetch("/aisb-embed/toggle", {{
+      const res = await fetch("{prefix}/aisb-embed/toggle", {{
         method: "POST",
         headers: {{ "Content-Type": "application/json" }},
         body: JSON.stringify({{ enabled: !nowEnabled }}),

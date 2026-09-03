@@ -111,6 +111,21 @@ class DynamicAnalysisService:
             for (primary, secondary), fk in JOIN_GRAPH.items()
         ]
 
+        # プロンプト内の記法例は、以前は "Customer.Industry" を固定で例示していたが、
+        # Industry列はerp専用(dealerのCustomerには存在しない)であり、instanceによって
+        # AIに存在しない項目を書式例として刷り込んでしまっていた。実際に取得した
+        # schema_rowsから常に実在するフィールド名を動的に選び、instance非依存にする。
+        example_ref = "Customer.Name"
+        for (_primary, secondary), _fk in JOIN_GRAPH.items():
+            candidate_rows = schema_rows.get(secondary) or []
+            if not candidate_rows:
+                continue
+            fields = sorted(candidate_rows[0].keys())
+            field = "Name" if "Name" in fields else next((f for f in fields if f != "Id"), None)
+            if field:
+                example_ref = f"{secondary}.{field}"
+                break
+
         return (
             "あなたは基幹システムのデータ分析アシスタントです。以下のエンティティ一覧"
             "(各項目名・低カーディナリティ項目の実際の値の例)から、ユーザーの質問に"
@@ -137,7 +152,7 @@ class DynamicAnalysisService:
             "}\n"
             "重要な制約:\n"
             "1. secondary_entityの項目を filters/group_by/metric_field で参照する場合は"
-            ' 必ず "副エンティティ名.項目名" の形式(例: "Customer.Industry")で書くこと。'
+            f' 必ず "副エンティティ名.項目名" の形式(例: "{example_ref}")で書くこと。'
             "primary_entityの項目はそのままの項目名で書くこと。\n"
             "2. secondary_entityを指定する場合、必ず上記の許可された組み合わせから"
             "選ぶこと(順序も守ること。主エンティティ側を primary_entity にすること)。\n"

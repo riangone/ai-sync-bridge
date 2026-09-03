@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }} - 自動車ディーラー基幹システム(Legacy DMS)</title>
+{% set bp = base_path(request) %}
+<link rel="stylesheet" href="{{ bp }}/static/css/site.css">
+</head>
+<body>
+<div id="header">自動車ディーラー基幹システム LEGACY-DMS v2.1</div>
+<div id="nav">
+    <a href="{{ bp }}/">ホーム</a>
+    <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
+    <a href="{{ bp }}/Customer/List">顧客管理</a>
+    <a href="{{ bp }}/Order/List">受注/契約管理</a>
+    <a href="{{ bp }}/Estimate/List">見積管理</a>
+    <a href="{{ bp }}/Invoice/List">請求管理</a>
+    <a href="{{ bp }}/PurchaseOrder/List">仕入管理</a>
+    <a href="{{ bp }}/Supplier/List">仕入先管理</a>
+    <a href="{{ bp }}/Employee/List">従業員管理</a>
+    <a href="{{ bp }}/Vehicle/Inquiry">車両在庫照会</a>
+    <a href="{{ bp }}/InventoryTransaction/List">車両入出庫履歴</a>
+    <a href="{{ bp }}/GoodsReceipt/List">入庫管理</a>
+    <a href="{{ bp }}/ServiceOrder/List">整備/車検管理</a>
+    <a href="{{ bp }}/ArAp/List">売掛買掛</a>
+    <a href="{{ bp }}/Profit/List">利益管理</a>
+</div>
+<div id="content">
+{% block content %}{% endblock %}
+</div>
+<div id="footer">Copyright (C) Legacy Systems Inc. All Rights Reserved. (AIサポートなし・改変不可を想定したデモ画面)</div>
+<script src="{{ bp }}/static/js/site.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
