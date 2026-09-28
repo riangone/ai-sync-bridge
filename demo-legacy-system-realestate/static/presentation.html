@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ai-sync-bridge — AI拡張機能の紹介</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --surface:#ffffff; --surface-2:#eef1f8;
+    --ink:#1c2333; --ink-dim:#5f6b82;
+    --accent:#3860e0; --accent-soft:rgba(56,96,224,.09);
+    --accent2:#0e9c74; --accent2-soft:rgba(14,156,116,.10);
+    --warn:#b3720a; --warn-soft:rgba(179,114,10,.09);
+    --danger:#c23048;
+    --line:#e3e7f0;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(20,30,60,.04), 0 10px 28px rgba(20,30,60,.06);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth; scroll-snap-type:y mandatory;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI","Hiragino Sans","Yu Gothic",system-ui,-apple-system,sans-serif;
+  }
+  section.slide{
+    min-height:100vh; scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; flex-direction:column; justify-content:center;
+    padding:72px 9vw 56px;
+    border-bottom:1px solid var(--line);
+    position:relative;
+  }
+  .kicker{
+    font-size:13px; letter-spacing:.16em; color:var(--accent);
+    text-transform:uppercase; font-weight:700; margin-bottom:12px;
+  }
+  h1{font-size:44px; margin:0 0 14px; line-height:1.3; letter-spacing:-.01em;}
+  h2{font-size:30px; margin:0 0 26px; line-height:1.35; letter-spacing:-.01em;}
+  .subtitle{font-size:17px; color:var(--ink-dim); margin:0; line-height:1.75; max-width:640px;}
+  .grid{display:grid; gap:18px;}
+  .grid.cols-2{grid-template-columns:1fr 1fr;}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 24px; box-shadow:var(--shadow);
+  }
+  .card h3{margin:0 0 8px; font-size:16.5px; display:flex; align-items:center; gap:8px;}
+  .card p{margin:0; font-size:13.5px; color:var(--ink-dim); line-height:1.7;}
+  .tag{
+    display:inline-block; font-size:11px; font-weight:700; letter-spacing:.03em;
+    padding:3px 10px; border-radius:999px; margin-bottom:10px;
+  }
+  .tag.ai{background:var(--accent-soft); color:var(--accent);}
+  .tag.safe{background:var(--accent2-soft); color:var(--accent2);}
+  .tag.ui{background:var(--warn-soft); color:var(--warn);}
+  .flow{display:flex; align-items:stretch; gap:0; margin-top:4px;}
+  .flow .step{
+    flex:1; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; display:flex; flex-direction:column; gap:8px; box-shadow:var(--shadow);
+  }
+  .flow .step .n{
+    width:26px; height:26px; border-radius:50%; background:var(--accent);
+    color:#fff; font-weight:700; font-size:12.5px; display:flex; align-items:center; justify-content:center;
+  }
+  .flow .step h4{margin:0; font-size:14.5px;}
+  .flow .step p{margin:0; font-size:12.5px; color:var(--ink-dim); line-height:1.6;}
+  .flow .arrow{
+    flex:0 0 40px; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-dim); font-size:20px;
+  }
+  .badge-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:22px;}
+  .badge{
+    font-size:12px; background:var(--surface); border:1px solid var(--line);
+    padding:6px 12px; border-radius:999px; color:var(--ink-dim); box-shadow:var(--shadow);
+  }
+  .callout{
+    border-radius:var(--radius); padding:20px 24px; border:1px solid #e8d29c; background:var(--warn-soft);
+    display:flex; gap:14px; align-items:flex-start; margin-top:20px;
+  }
+  .callout .ico{font-size:22px;}
+  .callout b{color:#8a5c08;}
+  .callout.safe{border-color:#bfe6d7; background:var(--accent2-soft);}
+  .callout.safe b{color:#0b7c5c;}
+  .mono{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    background:#101728; border:1px solid #223; border-radius:12px;
+    padding:14px 18px; font-size:12.5px; color:#8fe6c4; line-height:1.75; overflow:auto;
+    margin-top:16px;
+  }
+  .mono .k{color:#7fb0ff;}
+  .mono .s{color:#f0c98a;}
+  table.demo{width:100%; border-collapse:collapse; font-size:13px; margin-top:18px;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);}
+  table.demo th, table.demo td{text-align:left; padding:11px 16px; border-bottom:1px solid var(--line);}
+  table.demo tr:last-child td{border-bottom:none;}
+  table.demo th{color:var(--ink-dim); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; background:var(--surface-2);}
+  ol.steps-num{counter-reset:s; list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px;}
+  ol.steps-num li{counter-increment:s; position:relative; padding-left:42px; font-size:14.5px; line-height:1.7; color:var(--ink);}
+  ol.steps-num li::before{
+    content:counter(s); position:absolute; left:0; top:0;
+    width:26px; height:26px; border-radius:8px; background:var(--surface); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; color:var(--accent2);
+    box-shadow:var(--shadow);
+  }
+  .link-box{
+    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:14px 18px; margin-top:18px; box-shadow:var(--shadow); max-width:560px;
+  }
+  .link-box a{color:var(--accent); font-weight:700; font-size:14.5px; text-decoration:none; word-break:break-all;}
+  .link-box a:hover{text-decoration:underline;}
+  .cover h1{font-size:52px;}
+  .cover .subtitle{font-size:18px;}
+  .logo{display:inline-flex; align-items:center; gap:12px; margin-bottom:26px;}
+  .logo .mark{
+    width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:17px;
+  }
+  .scrolldown{
+    position:absolute; bottom:26px; left:9vw; font-size:12.5px; color:var(--ink-dim);
+    display:flex; align-items:center; gap:8px;
+  }
+  .scrolldown .chevron{animation:bob 1.6s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(5px);}}
+  #dots{
+    position:fixed; right:22px; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:10px; z-index:50;
+  }
+  #dots a{
+    width:9px; height:9px; border-radius:50%; background:var(--line); border:none;
+    display:block; cursor:pointer; transition:background .2s ease, transform .2s ease;
+  }
+  #dots a.active{background:var(--accent); transform:scale(1.25);}
+  footer.pageinfo{
+    position:absolute; bottom:24px; right:9vw; font-size:12px; color:var(--ink-dim);
+  }
+  @media (max-width:900px){
+    section.slide{padding:52px 6vw 44px;}
+    .grid.cols-2,.grid.cols-3{grid-template-columns:1fr;}
+    .flow{flex-direction:column;}
+    .flow .arrow{transform:rotate(90deg);}
+    h1{font-size:32px;} .cover h1{font-size:36px;}
+    #dots{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<nav id="dots"></nav>
+
+<!-- 1. Cover -->
+<section class="slide cover" id="s1">
+  <div class="logo"><div class="mark">AI</div><div class="kicker" style="margin:0;">ai-sync-bridge</div></div>
+  <h1>既存の業務システムに、<br>後付けでAIを繋ぐ拡張機能</h1>
+  <p class="subtitle">レガシーな基幹システム（顧客・受注・請求・在庫…）を<b>一切改修せずに</b>、
+  Chrome拡張のサイドパネルで自然文検索・AIレポート自動生成・チャットを追加します。</p>
+  <div class="badge-row">
+    <span class="badge">🎯 最終提供形態：Chrome拡張</span>
+    <span class="badge">🛡️ AIは構造化パラメータのみ生成（安全設計）</span>
+  </div>
+  <div class="scrolldown">スクロールして見る <span class="chevron">↓</span></div>
+</section>
+
+<!-- 2. Feature overview -->
+<section class="slide" id="s2">
+  <div class="kicker">機能特点</div>
+  <h2>サイドパネル1つに詰め込まれた6つのAI機能</h2>
+  <div class="grid cols-3">
+    <div class="card"><span class="tag ai">chat</span><h3>💬 AIチャット</h3><p>業務データの文脈を踏まえた自由対話。質問・相談の入口。</p></div>
+    <div class="card"><span class="tag ai">nlsql</span><h3>🔎 AI検索</h3><p>自然文を条件に変換し単一エンティティを検索。疑似SQLも表示。</p></div>
+    <div class="card"><span class="tag ai">report</span><h3>📊 AIレポート自動生成</h3><p>2エンティティ結合＋集計（sum/count/avg等）まで自然文から自動生成。</p></div>
+    <div class="card"><span class="tag ai">ocr</span><h3>🧾 OCR取込</h3><p>紙の書類・画像から構造化データを取り込む。</p></div>
+    <div class="card"><span class="tag ai">search</span><h3>🧭 セマンティック検索</h3><p>キーワード一致でなく意味ベースでの類似検索。</p></div>
+    <div class="card"><span class="tag ai">analytics</span><h3>📈 予測分析</h3><p>与信・在庫・滞留債権などの傾向を予測的に分析。</p></div>
+  </div>
+</section>
+
+<!-- 3. Usage flow -->
+<section class="slide" id="s3">
+  <div class="kicker">使い方の基本</div>
+  <h2>自然文 →（AI）→ 構造化条件 →（コード）→ 結果</h2>
+  <div class="flow">
+    <div class="step"><div class="n">1</div><h4>質問を入力</h4><p>「延滞している請求を顧客の業種別に合計」のように日本語でそのまま聞く。</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">2</div><h4>AIが条件を組み立て</h4><p>対象データ・フィルタ・集計方法をJSONで生成。</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">3</div><h4>ホワイトリスト検証</h4><p>コード側でフィールド名・結合キーの妥当性を検証。</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">4</div><h4>実行＆表示</h4><p>集計を実行し、チャート・明細・AI解釈まで自動表示。</p></div>
+  </div>
+  <table class="demo">
+    <thead><tr><th>質問例</th><th>内部処理</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td>業種別の与信限度額合計を高い順に</td><td>単一エンティティ集計</td><td>チャート＋明細で即表示</td></tr>
+      <tr><td>延滞している請求を顧客の業種別に合計</td><td>Invoice × Customer 結合</td><td>結合キーはコード側の固定辞書で自動決定</td></tr>
+      <tr><td>月別の受注件数の推移</td><td>集計軸が日付と機械判定</td><td>自動的に折れ線チャートへ切替</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4. Transparency & result presentation -->
+<section class="slide" id="s4">
+  <div class="kicker">見せ方の工夫</div>
+  <h2>「何が実行されたか」を隠さず、見やすく見せる</h2>
+  <div class="grid cols-2">
+    <div class="card"><span class="tag ui">条件＋疑似SQL</span><h3>透明表示</h3><p>AIが選んだ対象・結合・フィルタ・集計方法をそのまま表示し、実行された条件から疑似SQL文字列も組み立てて見せる（表示専用、実行には不使用）。</p></div>
+    <div class="card"><span class="tag ui">チャート自動選択</span><h3>棒／折れ線／積み上げ横棒</h3><p>時系列は折れ線に、内訳（正常/警戒/超過など）は積み上げ横棒に、それ以外は棒グラフに自動で切り替わる。</p></div>
+    <div class="card"><span class="tag ui">AI解釈</span><h3>結果と同時に自動表示</h3><p>従来必要だった「解釈するボタン」を押さなくても、結果表示と同時にAIの解釈コメントが出る。再生成も可能。</p></div>
+    <div class="card"><span class="tag ui">サブタブ</span><h3>整理されたレイアウト</h3><p>「定型レポート／AIレポート生成／自然文検索」を縦積みでなくサブタブ切替にし、1画面ずつ見やすく。</p></div>
+  </div>
+</section>
+
+<!-- 5. Safety design -->
+<section class="slide" id="s5">
+  <div class="kicker">安全設計</div>
+  <h2>AIには「実行可能なコード」を一切生成させない</h2>
+  <div class="grid cols-2">
+    <div class="card"><span class="tag safe">構造化のみ</span><h3>AIの役割はパラメータ選びだけ</h3><p>AIが返すのはJSON（対象・条件・集計方法）のみ。生SQLも <code>eval</code> も使わず、返り値はホワイトリスト検証を経てからPythonロジックが実行する。</p></div>
+    <div class="card"><span class="tag safe">結合キー固定</span><h3>JOIN_GRAPHホワイトリスト</h3><p>AIが選べるのは「どのデータ同士か」という名前だけ。実際の結合キーはコード側の固定辞書から決定し、誤結合は原理的に発生しない。</p></div>
+  </div>
+</section>
+
+<!-- 6. Try it & access -->
+<section class="slide" id="s6">
+  <div class="kicker">今すぐ試す</div>
+  <h2>検証環境（demo-legacy-system）ですぐ動かせる</h2>
+  <ol class="steps-num">
+    <li>右サイドパネルの「AI検索」タブを開き、サブタブから「AIレポート生成」を選ぶ。</li>
+    <li>質問例チップをクリック、または「延滞している請求を顧客の業種別に合計」のように自由入力。</li>
+    <li>生成された条件・疑似SQL・チャート・明細・AI解釈がその場に表示される。</li>
+  </ol>
+  <div class="link-box">🔗 <a href="http://localhost:5010/" target="_blank" rel="noopener">http://localhost:5010/</a></div>
+  <div class="callout safe">
+    <div class="ico">🧩</div>
+    <div><b>本命はChrome拡張：</b>同じサイドパネルUIはChrome拡張としてもインストール可能で、実際の既存システムのページにそのままサイドパネルを注入する。対象システム側のコード変更は不要。この検証環境はあくまで開発中の確認用スタンドイン。</div>
+  </div>
+  <footer class="pageinfo">ai-sync-bridge</footer>
+</section>
+
+<script>
+const ids = ["s1","s2","s3","s4","s5","s6"];
+const dotsNav = document.getElementById("dots");
+ids.forEach((id) => {
+  const a = document.createElement("a");
+  a.href = "#" + id;
+  a.dataset.target = id;
+  dotsNav.appendChild(a);
+});
+const dotEls = dotsNav.querySelectorAll("a");
+const sections = ids.map(id => document.getElementById(id));
+
+function setActive(id){
+  dotEls.forEach(d => d.classList.toggle("active", d.dataset.target === id));
+}
+
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) setActive(entry.target.id);
+  });
+}, { threshold: 0.6 });
+sections.forEach(s => io.observe(s));
+
+let currentIdx = 0;
+function goTo(i){
+  currentIdx = Math.max(0, Math.min(sections.length - 1, i));
+  sections[currentIdx].scrollIntoView({ behavior: "smooth" });
+}
+window.addEventListener("keydown", (e) => {
+  if (["ArrowDown","PageDown"," "].includes(e.key)) { goTo(currentIdx + 1); e.preventDefault(); }
+  if (["ArrowUp","PageUp"].includes(e.key)) { goTo(currentIdx - 1); e.preventDefault(); }
+});
+
+setActive("s1");
+</script>
+</body>
+</html>

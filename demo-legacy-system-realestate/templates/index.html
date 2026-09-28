@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>メインメニュー</h2>
+
+<div class="ai-guide">
+    <div class="ai-guide-head">
+        <span class="ai-guide-icon">🤖</span>
+        <div>
+            <h3>AIサイドパネルのご案内</h3>
+            <p class="ai-guide-sub">画面右下の🤖ボタンから、AIがこのレガシー画面の操作をサポートします</p>
+        </div>
+    </div>
+    <div class="ai-guide-cols">
+        <div class="ai-guide-col">
+            <h4>できること（メリット）</h4>
+            <ul>
+                <li>自然文で聞くだけで物件検索・入力が完了し、画面遷移の手間を削減</li>
+                <li>契約状況・売掛買掛・利益などをその場でAIが要約して即確認</li>
+                <li>予測分析やアラートで、見落としがちな変化を先に察知</li>
+            </ul>
+        </div>
+        <div class="ai-guide-col">
+            <h4>使い方（3ステップ）</h4>
+            <ol>
+                <li>右下の <strong>🤖</strong> ボタンをクリックしてパネルを開く</li>
+                <li>上部タブから「AIチャット」「AI検索」など目的の機能を選択</li>
+                <li>知りたいことをそのまま日本語で入力・送信するだけ</li>
+            </ol>
+        </div>
+    </div>
+    <a class="ai-guide-more" href="{{ bp }}/ai-panel">→ 全機能・詳しい使い方を見る</a>
+</div>
+
+<div class="summary-boxes">
+    <div class="summary-box"><div class="num">{{ summary.customers }}</div><div class="label">顧客数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.orders }}</div><div class="label">契約件数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.properties }}</div><div class="label">取扱物件数</div></div>
+    <div class="summary-box"><div class="num">&yen;{{ "{:,}".format(summary.sales_total) }}</div><div class="label">契約合計金額</div></div>
+</div>
+
+<div class="menu-grid">
+    <a class="menu-button" href="{{ bp }}/Customer/List">顧客管理</a>
+    <a class="menu-button" href="{{ bp }}/Property/List">物件管理</a>
+    <a class="menu-button" href="{{ bp }}/Order/List">契約管理</a>
+    <a class="menu-button" href="{{ bp }}/Estimate/List">査定管理</a>
+    <a class="menu-button" href="{{ bp }}/Viewing/List">内見予約管理</a>
+    <a class="menu-button" href="{{ bp }}/Invoice/List">請求管理</a>
+    <a class="menu-button" href="{{ bp }}/PurchaseOrder/List">工事発注管理</a>
+    <a class="menu-button" href="{{ bp }}/Supplier/List">協力会社管理</a>
+    <a class="menu-button" href="{{ bp }}/Employee/List">担当エージェント管理</a>
+    <a class="menu-button" href="{{ bp }}/InventoryTransaction/List">物件ステータス履歴</a>
+    <a class="menu-button" href="{{ bp }}/GoodsReceipt/List">工事完了報告</a>
+    <a class="menu-button" href="{{ bp }}/ArAp/List">売掛買掛</a>
+    <a class="menu-button" href="{{ bp }}/Profit/List">利益管理</a>
+</div>
+{% endblock %}

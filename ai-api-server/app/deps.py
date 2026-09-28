@@ -45,6 +45,7 @@ from app.services.workflow_step_runner import WorkflowStepRunner
 from app.services.nlsql_service import NLSQLService
 from app.services.cross_analysis_service import CrossAnalysisService
 from app.services.dynamic_analysis_service import DynamicAnalysisService
+from app.services.realestate_advisory_service import RealestateAdvisoryService
 
 
 @lru_cache
@@ -178,6 +179,19 @@ def get_cross_analysis_service() -> CrossAnalysisService:
 
 def get_dynamic_analysis_service() -> DynamicAnalysisService:
     return DynamicAnalysisService(get_settings(), get_ai_provider())
+
+
+def get_realestate_advisory_service() -> RealestateAdvisoryService:
+    """査定AI/仲介手数料上限チェック/内見重複検知は Property/Viewing エンティティに
+    依存し、そもそも erp/dealer には該当エンティティが存在しない。
+    get_property_search_service の instance=="dealer" 除外と同じ考え方で、
+    instance != "realestate" ではサービスを組み立てず404にする。"""
+    if get_settings().instance != "realestate":
+        raise HTTPException(
+            status_code=404,
+            detail="この業態には不動産仲介向けアドバイザリー機能(査定/内見重複検知/仲介手数料チェック)はありません",
+        )
+    return RealestateAdvisoryService(get_settings())
 
 
 def get_workflow_step_runner() -> WorkflowStepRunner:

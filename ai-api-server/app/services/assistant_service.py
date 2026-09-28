@@ -50,6 +50,12 @@ _ENTITY_LABELS_BY_INSTANCE = {
         "InventoryTransaction": "車両入出庫", "GoodsReceipt": "入庫",
         "ServiceOrder": "整備/車検", "ArAp": "売掛買掛", "Profit": "利益",
     },
+    "realestate": {
+        "Customer": "顧客", "Order": "契約", "Property": "物件", "Supplier": "協力会社",
+        "Employee": "担当エージェント", "Estimate": "査定", "Invoice": "請求",
+        "PurchaseOrder": "工事発注", "InventoryTransaction": "物件ステータス履歴",
+        "GoodsReceipt": "工事完了報告", "Viewing": "内見予約", "ArAp": "売掛買掛", "Profit": "利益",
+    },
 }
 
 _FEATURES_BY_INSTANCE = {
@@ -65,6 +71,13 @@ _FEATURES_BY_INSTANCE = {
         "利益/粗利レポート・AR/APエイジング分析", "類似レコード推薦",
         "ワークフロー自動化(在庫アラート/OCR自動入力/与信超過チェック等)",
         "整備/車検の履歴照会・管理",
+    ],
+    "realestate": [
+        "顧客/物件/契約・査定/協力会社の検索・登録", "OCRによる帳票読み取り・自動入力(物件概要書等)",
+        "ベクトル検索・横断検索・自然言語検索", "成約予測・売上トレンド・ローン与信リスク分析",
+        "仲介手数料/粗利レポート・AR/APエイジング分析", "類似物件推薦",
+        "ワークフロー自動化(物件ステータスアラート/OCR自動入力/与信超過チェック等)",
+        "内見予約の履歴照会・管理",
     ],
 }
 

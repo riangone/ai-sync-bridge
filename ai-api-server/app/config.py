@@ -32,7 +32,23 @@ class Settings(BaseModel):
     # (north-mini-code-free/ling-3.0-flash-free/deepseek-v4-flash-free は401、
     # laguna-s-2.1-free/big-pickle/nemotron-3-ultra-free は疎通OK)。websearchツール込みの
     # 実検索でも動作確認済みの laguna-s-2.1-free に変更。
-    opencode_model_id: str = os.getenv("OPENCODE_MODEL_ID", "laguna-s-2.1-free")
+    # 2026-09-08: laguna-s-2.1-free も上流で401("not supported")に廃止済みと実地確認
+    # (north-mini-code-free/ling-3.0-flash-free/laguna-s-2.1-free/deepseek-v4-flash-free
+    # の4つ全滅、nemotron-3-ultra-free は502で不安定)。現時点で安定して疎通するのは
+    # big-pickle と mimo-v2.5-free の2つのみ(各2回連続成功を確認)。テキスト専用の
+    # big-pickle に変更。無料枠モデルは今後も予告なく廃止されるため、動作しなくなったら
+    # 同様に /config/providers の全モデルを実地プローブし直すこと(status="active"表示は
+    # 信用できない)。
+    opencode_model_id: str = os.getenv("OPENCODE_MODEL_ID", "big-pickle")
+    # 2026-09-18: 「AI呼び出しが不調」と報告あり調査。今回はモデル廃止(401)ではなく、
+    # ローカルの opencode CLI バイナリが古い(1.15.3)ままだったことが原因と実地確認。
+    # 無料枠(Zen)側が「OpenCode 1.18.0 以降が必要」という426 UpgradeRequiredエラーを返し、
+    # big-pickle/mimo-v2.5-free含む全モデルが失敗していた(モデル自体は生きていた)。
+    # `sudo npm i -g opencode-ai@latest`(→1.18.31)でCLIを更新し、稼働中の`opencode serve`
+    # プロセス(古いバイナリをメモリに保持したまま)を再起動して復旧。3インスタンス
+    # (5011/5021/5031)の /api/chat 実呼び出しでも復旧確認済み。
+    # 教訓: このエラー系は「モデルの生死(401)」だけでなく「ローカルCLIのバージョン(426)」
+    # も疑うこと。まず `opencode --version` とエラー本文(UpgradeRequired等)を確認する。
     # 既定モデル(deepseek-v4-flash-free)は capabilities.input.image=false でvision非対応
     # (2026-08-21 GET /config/providers で実地確認)。画像入力が要る用途(OCR等)は別途
     # image=true のモデルを明示指定する。無料枠で確認できたのは mimo-v2.5-free のみ
@@ -48,11 +64,11 @@ class Settings(BaseModel):
     legacy_base_url: str = os.getenv("AISB_LEGACY_BASE_URL", "http://localhost:5010")
 
     # このプロセスがどの業種ドメイン(=どのレガシーシステム)向けの ai-api-server
-    # インスタンスかを表す。ai-api-server はERP版/ディーラー版で全く同一のコードを
-    # プロセスだけ分けて動かす構成のため("同一コードから業種非依存で追従できる"ことの
-    # 実証)、これを外部から明示しないと (1) 両インスタンスが同じSQLiteファイルに
-    # 書き込んで壊し合う、(2) ディーラー側なのにERP風ダミーデータ(山田商事等)が
-    # 出続ける、という2つの相互干渉が起きる。値は "erp" | "dealer"。
+    # インスタンスかを表す。ai-api-server はERP版/ディーラー版/不動産仲介版で全く同一の
+    # コードをプロセスだけ分けて動かす構成のため("同一コードから業種非依存で追従できる"
+    # ことの実証)、これを外部から明示しないと (1) 各インスタンスが同じSQLiteファイルに
+    # 書き込んで壊し合う、(2) 業態と食い違うダミーデータ(山田商事等)が出続ける、という
+    # 2つの相互干渉が起きる。値は "erp" | "dealer" | "realestate"。
     instance: str = os.getenv("AISB_INSTANCE", "erp")
 
     # DemoDataStore(demo_mode時の会話履歴/受注等)の永続化先。未指定時は instance ごとに

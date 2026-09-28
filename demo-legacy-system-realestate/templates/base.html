@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }} - 不動産仲介基幹システム(Legacy RE)</title>
+{% set bp = base_path(request) %}
+<link rel="stylesheet" href="{{ bp }}/static/css/site.css">
+</head>
+<body>
+<div id="header">不動産仲介基幹システム LEGACY-RE v1.0</div>
+<div id="nav">
+    <a href="{{ bp }}/">ホーム</a>
+    <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
+    <a href="{{ bp }}/Customer/List">顧客管理</a>
+    <a href="{{ bp }}/Property/List">物件管理</a>
+    <a href="{{ bp }}/Order/List">契約管理</a>
+    <a href="{{ bp }}/Estimate/List">査定管理</a>
+    <a href="{{ bp }}/Viewing/List">内見予約管理</a>
+    <a href="{{ bp }}/Invoice/List">請求管理</a>
+    <a href="{{ bp }}/PurchaseOrder/List">工事発注管理</a>
+    <a href="{{ bp }}/Supplier/List">協力会社管理</a>
+    <a href="{{ bp }}/Employee/List">担当エージェント管理</a>
+    <a href="{{ bp }}/InventoryTransaction/List">物件ステータス履歴</a>
+    <a href="{{ bp }}/GoodsReceipt/List">工事完了報告</a>
+    <a href="{{ bp }}/ArAp/List">売掛買掛</a>
+    <a href="{{ bp }}/Profit/List">利益管理</a>
+</div>
+<div id="content">
+{% block content %}{% endblock %}
+</div>
+<div id="footer">Copyright (C) Legacy Systems Inc. All Rights Reserved. (AIサポートなし・改変不可を想定したデモ画面)</div>
+<script src="{{ bp }}/static/js/site.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

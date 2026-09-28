@@ -745,3 +745,69 @@ class ConversationalInputRegisterResponse(BaseModel):
     success: bool
     normalized: dict  # レガシーフォームのフィールド名(Name/Tel/customerId/...)に正規化済み
     entry_entity: str
+
+
+# ---------- Realestate Advisory (instance=="realestate" 専用。README差分実装:
+# 査定AI/内見重複検知/宅建業法手数料上限チェック。他2 demo にはProperty/Viewing
+# エンティティ自体が存在しないため、instance!="realestate" では 404 になる) ----------
+class ValuationRequest(BaseModel):
+    property_type: str | None = None  # マンション/戸建て/土地/一棟収益 (db.PROPERTY_TYPES)
+    building_area: float | None = None  # ㎡
+    land_area: float | None = None  # ㎡
+    address_keyword: str | None = None  # 住所の部分一致で類似物件を絞り込む(例: "渋谷")
+
+
+class ValuationComparable(BaseModel):
+    id: str | None = None
+    name: str | None = None
+    address: str | None = None
+    price: float
+    unit_price: float  # 円/㎡
+    status: str | None = None
+
+
+class ValuationResponse(BaseModel):
+    generated_at: datetime
+    comparable_count: int
+    unit_price_low: float
+    unit_price_median: float
+    unit_price_high: float
+    suggested_price_low: float
+    suggested_price_high: float
+    comparables: list[ValuationComparable]
+    summary: str  # ルールベース集計コメント(AIではない。AI解釈が欲しい場合は /insight を叩く)
+    warnings: list[str] = []
+
+
+class CommissionCheckRequest(BaseModel):
+    contract_amount: float  # 契約金額(税抜, 円)
+    requested_amount: float | None = None  # 請求予定の仲介手数料(税込)。省略時は法定上限そのものを検査
+
+
+class CommissionCheckResponse(BaseModel):
+    contract_amount: float
+    legal_cap_excl_tax: float
+    legal_cap_incl_tax: float
+    requested_amount: float
+    over_legal_cap: bool
+    diff: float  # requested_amount - legal_cap_incl_tax (プラスなら超過)
+    summary: str
+
+
+class ViewingConflict(BaseModel):
+    type: str  # property_double_booking | agent_overload
+    severity: str  # high | medium
+    date: str
+    viewing_ids: list[Any]
+    property_id: Any | None = None
+    property_name: str | None = None
+    employee_id: Any | None = None
+    message: str
+
+
+class ViewingConflictResponse(BaseModel):
+    generated_at: datetime
+    conflicts: list[ViewingConflict]
+    total_conflicts: int
+    high_count: int
+    summary: str

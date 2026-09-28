@@ -79,8 +79,11 @@ class DemoDataStore:
         (demo-legacy-system-dealer側)と食い違って見える。instanceで切り替えることで
         両インスタンスの見た目上の一貫性を揃える。
         """
-        if get_settings().instance == "dealer":
+        instance = get_settings().instance
+        if instance == "dealer":
             self._seed_dealer()
+        elif instance == "realestate":
+            self._seed_realestate()
         else:
             self._seed_erp()
 
@@ -224,6 +227,77 @@ class DemoDataStore:
             {"supplier": "USS東京オークション", "amount": 5000000, "issued_at": "2026-08-05", "due_date": "2026-09-04"},
             {"supplier": "日産ディーラー卸", "amount": 3500000, "issued_at": "2026-04-01", "due_date": "2026-05-01"},
             {"supplier": "USS東京オークション", "amount": 2600000, "issued_at": "2026-02-01", "due_date": "2026-03-03",
+             "paid": True, "paid_at": "2026-02-28"},
+        ]
+        for pay in seed_payables:
+            self.create_payable(pay)
+
+    def _seed_realestate(self) -> None:
+        """不動産仲介版(AISB_INSTANCE=realestate)向けシード。demo-legacy-system-realestate
+        (port 5030)と用語・登場人物を揃えている(顧客=買主/売主、商品=売却物件在庫、
+        仕入先=協力会社/売主元)。件数・日付構成は_seed_erp()/_seed_dealer()と意図的に
+        揃えており、予測分析(on_track/due_soon/overdue)やAR/APエイジングのデモ挙動は同一。
+        """
+        seed_customers = [
+            {"name": "高橋健一", "email": "takahashi@example.com", "phone": "03-1234-5678", "company": "", "notes": "VIP顧客(投資用マンション複数所有)", "status": "取引中"},
+            {"name": "中村不動産開発", "email": "info@nakamura-re.example.com", "phone": "03-2345-6789", "company": "中村不動産開発", "notes": "法人(一棟まとめ買い)", "status": "取引中"},
+            {"name": "小林正夫", "email": "kobayashi@example.com", "phone": "03-3456-7890", "company": "", "notes": "", "status": "休止"},
+        ]
+        for c in seed_customers:
+            self.create_customer(c)
+
+        seed_orders = [
+            {"customer_id": 3, "item": "物件相談(仲介予備調査)", "qty": 1, "amount": 50000, "date": "2025-11-01"},
+            {"customer_id": 3, "item": "物件相談(仲介予備調査)", "qty": 1, "amount": 80000, "date": "2026-01-05"},
+            {"customer_id": 1, "item": "中古マンション 渋谷ハイツ301", "qty": 1, "amount": 32000000, "date": "2026-02-10"},
+            {"customer_id": 1, "item": "投資用マンション 目黒ステーションフラッツ502", "qty": 1, "amount": 41000000, "date": "2026-03-12"},
+            {"customer_id": 1, "item": "リフォーム関連手数料", "qty": 1, "amount": 1200000, "date": "2026-04-15"},
+            {"customer_id": 2, "item": "新築一戸建て 世田谷ヒルズ7号棟", "qty": 2, "amount": 68000000, "date": "2026-04-01"},
+            {"customer_id": 1, "item": "投資用マンション 中野レジデンス803", "qty": 1, "amount": 45000000, "date": "2026-05-18"},
+            {"customer_id": 2, "item": "新築一戸建て 世田谷ヒルズ7号棟", "qty": 2, "amount": 70000000, "date": "2026-05-05"},
+            {"customer_id": 1, "item": "管理委託契約", "qty": 1, "amount": 1500000, "date": "2026-06-20"},
+            {"customer_id": 2, "item": "新築一戸建て 世田谷ヒルズ9号棟", "qty": 2, "amount": 72000000, "date": "2026-06-25"},
+            {"customer_id": 1, "item": "定期資産点検", "qty": 1, "amount": 300000, "date": "2026-07-20"},
+        ]
+        for o in seed_orders:
+            self.create_order(o)
+
+        # 在庫AI分析/異常検知(reorder_point割れ)のデモ用シード。人気エリアの物件在庫を
+        # 意図的に品薄(stock < reorder_point)にしている。
+        seed_products = [
+            {"name": "中古マンション(渋谷エリア)", "sku": "PROP-SHIBUYA", "stock": 4, "reorder_point": 10, "unit_cost": 28000000, "supplier": "中村不動産開発"},
+            {"name": "投資用マンション(目黒エリア)", "sku": "PROP-MEGURO", "stock": 2, "reorder_point": 8, "unit_cost": 32000000, "supplier": "レジデンシャル仲介ネットワーク"},
+            {"name": "新築一戸建て(世田谷エリア)", "sku": "PROP-SETAGAYA", "stock": 25, "reorder_point": 6, "unit_cost": 55000000, "supplier": "レジデンシャル仲介ネットワーク"},
+            {"name": "新築一戸建て(練馬エリア)", "sku": "PROP-NERIMA", "stock": 12, "reorder_point": 5, "unit_cost": 48000000, "supplier": "北多摩リフォーム協同組合"},
+            {"name": "リフォーム資材セット", "sku": "REFORM-KIT", "stock": 3, "reorder_point": 15, "unit_cost": 450000, "supplier": "北多摩リフォーム協同組合"},
+        ]
+        for p in seed_products:
+            self.create_product(p)
+
+        seed_pos = [
+            {"product_id": 1, "supplier": "中村不動産開発", "qty": 10, "status": "received", "ordered_at": "2026-06-01", "expected_date": "2026-06-15", "received_qty": 10, "received_at": "2026-06-14"},
+            {"product_id": 2, "supplier": "レジデンシャル仲介ネットワーク", "qty": 6, "status": "ordered", "ordered_at": "2026-08-01", "expected_date": "2026-08-20", "received_qty": 0},
+        ]
+        for po in seed_pos:
+            self.create_purchase_order(po)
+
+        seed_invoices = [
+            {"customer_id": 1, "amount": 32000000, "issued_at": "2026-07-25", "due_date": "2026-08-24"},
+            {"customer_id": 1, "amount": 41000000, "issued_at": "2026-06-10", "due_date": "2026-07-10"},
+            {"customer_id": 2, "amount": 68000000, "issued_at": "2026-05-01", "due_date": "2026-05-31"},
+            {"customer_id": 2, "amount": 70000000, "issued_at": "2026-03-01", "due_date": "2026-03-31"},
+            {"customer_id": 3, "amount": 50000, "issued_at": "2026-07-01", "due_date": "2026-07-31"},
+            {"customer_id": 3, "amount": 80000, "issued_at": "2026-01-05", "due_date": "2026-02-04",
+             "paid": True, "paid_at": "2026-02-01"},
+        ]
+        for inv in seed_invoices:
+            self.create_invoice(inv)
+
+        seed_payables = [
+            {"supplier": "中村不動産開発", "amount": 18000000, "issued_at": "2026-06-15", "due_date": "2026-07-15"},
+            {"supplier": "レジデンシャル仲介ネットワーク", "amount": 13200000, "issued_at": "2026-08-05", "due_date": "2026-09-04"},
+            {"supplier": "北多摩リフォーム協同組合", "amount": 2700000, "issued_at": "2026-04-01", "due_date": "2026-05-01"},
+            {"supplier": "レジデンシャル仲介ネットワーク", "amount": 9000000, "issued_at": "2026-02-01", "due_date": "2026-03-03",
              "paid": True, "paid_at": "2026-02-28"},
         ]
         for pay in seed_payables:

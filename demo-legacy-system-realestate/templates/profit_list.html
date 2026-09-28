@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>利益管理</h2>
+<table class="grid">
+    <thead>
+    <tr><th>物件</th><th>売上</th><th>原価</th><th>粗利</th><th>粗利率</th></tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+        <td>{{ row.ProductName }}</td>
+        <td>&yen;{{ "{:,}".format(row.Sales) }}</td>
+        <td>&yen;{{ "{:,}".format(row.Cost) }}</td>
+        <td>&yen;{{ "{:,}".format(row.Gross) }}</td>
+        <td>{{ row.GrossRate }}%</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">データがありません</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

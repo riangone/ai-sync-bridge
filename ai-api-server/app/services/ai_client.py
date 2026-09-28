@@ -9,6 +9,24 @@ import httpx
 from app.config import Settings
 
 
+class AIProviderError(Exception):
+    """AIプロバイダ呼び出しの失敗(タイムアウト・HTTPエラー・上流モデル側エラー等)を表す専用例外。
+
+    旧実装は失敗時に "[xxx-error-fallback] ..." という文字列を正常応答と同じ型(str)で
+    returnしていたため、呼び出し側(chat/assistant/insight/nlsql/web_search の各service)が
+    この文字列プレフィックスを個別に認識しない限り、エラー内容がそのまま「AIの回答」として
+    ユーザーに表示されてしまっていた(サイレント破損)。例外に変えることで、キャッチし忘れた
+    呼び出し側は握りつぶさずに例外を伝播させる(fail loud)。呼び出し側は業務要件に応じて
+    (a) キャッチして構造化エラー/縮退応答を返すか、(b) キャッチせずFastAPIの例外処理層
+    (app.main の exception_handler)に委ねて502として返すかを選べる。
+    """
+
+    def __init__(self, provider: str, original: Exception | str):
+        self.provider = provider
+        self.original = original
+        super().__init__(f"[{provider}] AIプロバイダ呼び出しに失敗しました: {original}")
+
+
 class AiProvider(ABC):
     name: str
     supports_vision: bool = False
@@ -61,8 +79,8 @@ class OpenAIProvider(AiProvider):
                 )
                 resp.raise_for_status()
                 return resp.json()["choices"][0]["message"]["content"]
-            except Exception as exc:  # フォールバック
-                return f"[openai-error-fallback] {exc}"
+            except Exception as exc:
+                raise AIProviderError(self.name, exc) from exc
 
     async def embed(self, text: str) -> list[float]:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -97,7 +115,7 @@ class GeminiProvider(AiProvider):
                 data = resp.json()
                 return data["candidates"][0]["content"]["parts"][0]["text"]
             except Exception as exc:
-                return f"[gemini-error-fallback] {exc}"
+                raise AIProviderError(self.name, exc) from exc
 
     async def embed(self, text: str) -> list[float]:
         return await MockProvider().embed(text)
@@ -167,12 +185,14 @@ class OpenCodeProvider(AiProvider):
                 error = (msg_json.get("info") or {}).get("error")
                 if error:
                     message = (error.get("data") or {}).get("message") or error.get("name") or str(error)
-                    return f"[opencode-error-fallback] {message}"
+                    raise AIProviderError(self.name, message)
                 parts = msg_json.get("parts", [])
                 text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
                 return text or "[opencode-empty-response]"
+        except AIProviderError:
+            raise
         except Exception as exc:
-            return f"[opencode-error-fallback] {exc}"
+            raise AIProviderError(self.name, exc) from exc
 
     async def complete_vision(self, prompt: str, image_bytes: bytes, mime: str) -> str:
         """画像を FilePart(type=file, url=data URL) として添付し、vision対応モデルに
@@ -205,7 +225,7 @@ class OpenCodeProvider(AiProvider):
                 text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
                 return text or "[opencode-empty-response]"
         except Exception as exc:
-            return f"[opencode-error-fallback] {exc}"
+            raise AIProviderError(self.name, exc) from exc
 
     async def embed(self, text: str) -> list[float]:
         # OpenCodeサーバーは埋め込み専用APIを公開していないため、

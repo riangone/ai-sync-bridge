@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>{{ heading }}</h2>
+<form method="post" action="{{ bp }}/{{ entity_path }}/Entry{% if is_edit %}/{{ record_id }}{% endif %}">
+<table class="form-table">
+    {% for f in fields %}
+    <tr>
+        <th>{{ f.label }}{% if f.required %}<span class="required">*</span>{% endif %}</th>
+        <td>
+        {% if f.type == "textarea" %}
+            <textarea class="textbox" name="{{ f.name }}" id="{{ f.name }}" rows="4">{{ values.get(f.name, "") }}</textarea>
+        {% elif f.type == "select" %}
+            <select name="{{ f.name }}" id="{{ f.name }}">
+                {% for opt in f.options %}
+                <option value="{{ opt }}" {% if values.get(f.name) == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+            </select>
+        {% elif f.type == "number" %}
+            <input type="number" class="textbox num" name="{{ f.name }}" id="{{ f.name }}" value="{{ values.get(f.name, "") }}" {% if f.required %}required{% endif %}>
+        {% elif f.type == "date" %}
+            <input type="date" class="textbox" name="{{ f.name }}" id="{{ f.name }}" value="{{ values.get(f.name, "") }}" {% if f.required %}required{% endif %}>
+        {% else %}
+            <input type="text" class="textbox" name="{{ f.name }}" id="{{ f.name }}" value="{{ values.get(f.name, "") }}" {% if f.required %}required{% endif %}>
+        {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+<div class="form-actions">
+    <input type="submit" class="button" value="{{ is_edit and '更新' or '登録' }}">
+    <a class="button-link" href="{{ bp }}/{{ entity_path }}/List">戻る</a>
+</div>
+</form>
+{% endblock %}

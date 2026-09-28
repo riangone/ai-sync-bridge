@@ -39,7 +39,7 @@ import hashlib
 import random
 
 from app.services import ai_json_util
-from app.services.ai_client import AiProvider
+from app.services.ai_client import AiProvider, AIProviderError
 from app.services.normalize_util import normalize as _normalize
 
 
@@ -99,6 +99,24 @@ class CompanySearchService:
             "PaymentTerms": [],
             "Notes": ["notes", "memo"],
         },
+        # 2026-09-08追加: demo-legacy-system-realestate CUSTOMER_FIELDS に対応。realestateの
+        # Customerは買主/売主(個人・法人どちらも含む、例: 投資会社)を表し、dealerのCustomer
+        # (個人向け項目のみ)と違って引き続き register_entity="Customer"(erpと同じ既定分岐)
+        # で成立するが、フィールド構成自体はerpと異なる(Representative/Capital/Industry等の
+        # 法人項目が無く、代わりにCustomerType/DesiredArea/Budgetを持つ)ため個別に定義する。
+        "realestate": {
+            "Name": ["name", "companyName", "company_name"],
+            "NameKana": ["name_kana", "nameKana", "kana"],
+            "CustomerType": ["industry", "customer_type"],
+            "PostalCode": ["postal_code", "postalCode", "zip"],
+            "Address": ["address"],
+            "Tel": ["tel", "phone"],
+            "Email": [],
+            "DesiredArea": [],
+            "Budget": ["capital"],
+            "CreditLimit": ["credit_limit", "creditLimit"],
+            "Notes": ["notes", "memo"],
+        },
     }
     _RESULT_KEYS = (
         "name", "name_kana", "representative", "address", "tel", "website",
@@ -138,13 +156,17 @@ class CompanySearchService:
     async def _ai_search(self, keyword: str) -> dict:
         # tools明示指定(2026-08-21): モデルの自発的判断(プロンプト頼み)に任せず、
         # opencode側にwebsearchツールの利用を強制する。
-        ai_text = await self.ai.complete(
-            self._PROMPT_TEMPLATE.format(keyword=keyword), tools={"websearch": True}
-        )
-        if ai_text.startswith("[opencode-error-fallback]"):
-            # 上流モデルエラー(401等)をここで検知できるようになった(旧実装は
-            # サイレントに0件・source="opencode-websearch"を返していた)。
-            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": ai_text}
+        try:
+            ai_text = await self.ai.complete(
+                self._PROMPT_TEMPLATE.format(keyword=keyword), tools={"websearch": True}
+            )
+        except AIProviderError as exc:
+            # 上流モデルエラー(401等)をここで検知できる(旧実装は文字列プレフィックス
+            # "[opencode-error-fallback]" を毎回自前で判定していたが、ai_client.py 側が
+            # 例外化されたため型で捕捉できるようになった)。検索は元々ベストエフォートな
+            # 補助機能(登録はChrome拡張側の自動入力が担う)なので、ここでは呼び出し元
+            # (company/property検索API)全体を落とさず0件+errorとして返す。
+            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": str(exc)}
         parsed = ai_json_util.extract_json(ai_text)
         raw_results = parsed.get("results")
         results = []
@@ -236,11 +258,12 @@ class PropertySearchService:
         raise NotImplementedError("実Web検索API(EXA検索/Google Custom Search等)を接続してください")
 
     async def _ai_search(self, keyword: str) -> dict:
-        ai_text = await self.ai.complete(
-            self._PROMPT_TEMPLATE.format(keyword=keyword), tools={"websearch": True}
-        )
-        if ai_text.startswith("[opencode-error-fallback]"):
-            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": ai_text}
+        try:
+            ai_text = await self.ai.complete(
+                self._PROMPT_TEMPLATE.format(keyword=keyword), tools={"websearch": True}
+            )
+        except AIProviderError as exc:
+            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": str(exc)}
         parsed = ai_json_util.extract_json(ai_text)
         raw_results = parsed.get("results")
         results = []

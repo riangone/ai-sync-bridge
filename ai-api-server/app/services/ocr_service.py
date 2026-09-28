@@ -44,6 +44,26 @@ _PROMPT = (
     '"fields": {"項目名": "値", ...}, "confidence": 0.0〜1.0の数値(読み取りやすさの自己評価)}'
 )
 
+# 2026-09-08追加: instance=="realestate"専用。物件の間取り図/図面/現況写真は帳票OCR
+# (文字抽出)と異なり、画像そのものから面積・構造・設備といった「写っている物の意味」を
+# 読み取らせる必要がある(ここが erp/dealer の請求書OCRとの本質的な違い——多モーダル
+# visionモデルの解釈力を使う場面であって、単純な文字起こしではない)。
+# fields のキーは PROPERTY_FIELDS のラベル(FIELD_SYNONYMS_BY_INSTANCE["realestate"]["Property"]
+# がそのまま解決できる語)に揃え、register()/normalize()の既存導線をそのまま使い回す。
+_FLOORPLAN_PROMPT = (
+    "あなたは不動産物件の間取り図・図面・現況写真を読み取る専門アシスタントです。\n"
+    "添付された画像から、実際に読み取れる/見て判断できる情報のみを抽出してください。"
+    "推測で断定できない項目は必ず null にしてください。\n"
+    "出力は説明文・Markdown・コードフェンスを一切含めず、次のJSON形式のみを出力してください:\n"
+    '{"extracted_text": "図面内の文字(部屋名・帖数・注記等)を読み取った順にまとめたテキスト", '
+    '"fields": {"物件名": "図面に記載があれば", "種別": "マンション/戸建て/土地/一棟収益のいずれか", '
+    '"建物面積": "数値(㎡)のみ文字列で", "敷地面積": "数値(㎡)のみ文字列で", '
+    '"構造": "木造/鉄骨造/RC造など図面や間取り表記から判断できれば", '
+    '"階数": "数値のみ文字列で(図面に記載があれば)", '
+    '"設備": "図面内に記載の部屋名・間取りタイプ(例: 3LDK)や設備注記をまとめたもの"}, '
+    '"confidence": 0.0〜1.0の数値(読み取りやすさの自己評価)}'
+)
+
 
 class OcrService:
     # 2026-08-31: register() — OCR結果(fields)をレガシー新規登録フォームのフィールド名
@@ -145,6 +165,58 @@ class OcrService:
                 "HireDate": ["入社日", "hire_date"],
             },
         },
+        "realestate": {
+            "Customer": {
+                "Name": ["氏名", "会社名", "名前", "name"],
+                "NameKana": ["カナ", "フリガナ", "name_kana"],
+                "CustomerType": ["顧客区分", "customer_type"],
+                "PostalCode": ["郵便番号", "postal_code"],
+                "Address": ["住所", "所在地", "address"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "Email": ["メール", "メールアドレス", "email"],
+                "DesiredArea": ["希望エリア", "desired_area"],
+                "Budget": ["予算", "budget"],
+                "CreditLimit": ["ローン事前審査枠", "与信限度額", "credit_limit"],
+                "Notes": ["備考", "notes", "memo"],
+            },
+            "Supplier": {
+                "Name": ["協力会社名", "会社名", "取引先", "name"],
+                "Category": ["業務区分", "カテゴリ", "category"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "Address": ["住所", "所在地", "address"],
+                "ContactPerson": ["担当者", "担当者名", "contact_person"],
+                "CreditAmount": ["取引限度額", "与信枠", "credit_amount"],
+                "PaymentTerms": ["支払条件", "payment_terms"],
+                "Notes": ["備考", "notes", "memo"],
+            },
+            "Employee": {
+                "Name": ["氏名", "名前", "name"],
+                "Department": ["部署", "department"],
+                "Position": ["役職", "position"],
+                "LicenseNo": ["宅地建物取引士証番号", "宅建士証番号", "license_no"],
+                "Email": ["メール", "メールアドレス", "email"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "HireDate": ["入社日", "hire_date"],
+            },
+            "Property": {
+                "Name": ["物件名", "name"],
+                "NameKana": ["フリガナ", "カナ", "name_kana"],
+                "PropertyType": ["種別", "物件種別", "property_type"],
+                "TransactionType": ["取引態様", "取引形態", "transaction_type"],
+                "Status": ["ステータス", "status"],
+                "Address": ["住所", "所在地", "address"],
+                "Access": ["交通", "access"],
+                "LandArea": ["敷地面積", "land_area"],
+                "BuildingArea": ["建物面積", "building_area"],
+                "Structure": ["構造", "structure"],
+                "Floors": ["階数", "floors"],
+                "BuiltDate": ["築年月", "built_date"],
+                "LandRight": ["権利形態", "land_right"],
+                "Price": ["価格", "金額", "price"],
+                "MonthlyRent": ["月額賃料", "monthly_rent"],
+                "Facilities": ["設備", "facilities"],
+            },
+        },
     }
 
     def __init__(self, demo_mode: bool = True, ai: AiProvider | None = None, instance: str = "erp"):
@@ -172,13 +244,18 @@ class OcrService:
             "entry_entity": entity,
         }
 
-    async def extract(self, filename: str, content: bytes, mime: str | None = None) -> dict:
+    async def extract(self, filename: str, content: bytes, mime: str | None = None, doc_type: str = "document") -> dict:
+        # doc_type="floorplan": instance=="realestate"専用。間取り図/図面/現況写真を
+        # 帳票OCRとは別の専用プロンプト(_FLOORPLAN_PROMPT)で読み取る。他業態やmimeが
+        # PDFの場合でも(図面をスキャンPDFで受け取るケースはあるため)動線は共通のまま、
+        # プロンプトだけを差し替える。
+        prompt = _FLOORPLAN_PROMPT if (doc_type == "floorplan" and self.instance == "realestate") else _PROMPT
         is_image = bool(mime) and mime.startswith("image/")
         is_pdf = (mime == "application/pdf") or filename.lower().endswith(".pdf")
         vision_ready = self.ai is not None and getattr(self.ai, "supports_vision", False)
 
         if vision_ready and is_image:
-            return await self._ai_extract(filename, content, mime)
+            return await self._ai_extract(filename, content, mime, prompt)
 
         if vision_ready and is_pdf:
             page_images = self._pdf_to_page_images(content)
@@ -192,7 +269,7 @@ class OcrService:
                         "source": "opencode-vision-pdf",
                     }
                 page_results = [
-                    await self._ai_extract(filename, png_bytes, "image/png")
+                    await self._ai_extract(filename, png_bytes, "image/png", prompt)
                     for png_bytes in page_images
                 ]
                 return self._merge_page_results(filename, page_results)
@@ -253,8 +330,8 @@ class OcrService:
             "source": "opencode-vision-pdf",
         }
 
-    async def _ai_extract(self, filename: str, content: bytes, mime: str) -> dict:
-        ai_text = await self.ai.complete_vision(_PROMPT, content, mime)
+    async def _ai_extract(self, filename: str, content: bytes, mime: str, prompt: str = _PROMPT) -> dict:
+        ai_text = await self.ai.complete_vision(prompt, content, mime)
         parsed = ai_json_util.extract_json(ai_text)
         extracted_text = parsed.get("extracted_text") or ""
         fields = parsed.get("fields")

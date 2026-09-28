@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>{{ heading }}</h2>
+<form method="post" action="{{ bp }}/{{ entity_path }}/Entry{% if is_edit %}/{{ record_id }}{% endif %}" id="entry-form">
+<table class="form-table">
+    <tr>
+        <th>{{ partner_label }}{% if partner_options is not none %}<span class="required">*</span>{% endif %}</th>
+        <td>
+            <select name="{{ partner_field }}" id="{{ partner_field }}" required>
+                <option value="">選択してください</option>
+                {% for pid, pname in partner_options %}
+                <option value="{{ pid }}" {% if values.get(partner_field) == pid %}selected{% endif %}>{{ pname }}</option>
+                {% endfor %}
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <th>{{ date1_label }}</th>
+        <td><input type="date" class="textbox" name="{{ date1_name }}" value="{{ values.get(date1_name, "") }}"></td>
+    </tr>
+    <tr>
+        <th>{{ date2_label }}</th>
+        <td><input type="date" class="textbox" name="{{ date2_name }}" value="{{ values.get(date2_name, "") }}"></td>
+    </tr>
+    <tr>
+        <th>備考</th>
+        <td><textarea class="textbox" name="notes" rows="3">{{ values.get("notes", "") }}</textarea></td>
+    </tr>
+</table>
+
+<h3>明細行</h3>
+<table class="grid" id="item-table">
+    <thead>
+    <tr><th>物件/項目</th><th>数量</th><th>単価</th><th>金額</th><th></th></tr>
+    </thead>
+    <tbody id="item-table-body">
+    {% for it in items %}
+    <tr class="item-row">
+        <td>
+            <select name="productId">
+                <option value="">選択してください</option>
+                {% for p in products %}
+                <option value="{{ p.Id }}" data-price="{{ p.UnitPrice }}" {% if it.ProductId == p.Id %}selected{% endif %}>{{ p.Name }}（&yen;{{ "{:,}".format(p.UnitPrice) }}）</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><input type="number" name="quantity" class="textbox num qty-input" value="{{ it.Quantity }}" min="1"></td>
+        <td><input type="text" class="textbox price-input" value="{{ "{:,}".format(it.UnitPrice) }}" readonly></td>
+        <td class="amount-cell">&yen;{{ "{:,}".format(it.Amount) }}</td>
+        <td><button type="button" class="button small" onclick="removeItem(this)">削除</button></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+<button type="button" class="button" onclick="addItem()">行追加</button>
+
+<div class="total-line">
+    合計金額: <span id="{{ total_elem_id }}">&yen;{{ "{:,}".format(values.get("_total", 0)) }}</span>
+</div>
+
+<div class="form-actions">
+    <input type="submit" class="button" value="{{ is_edit and '更新' or '登録' }}">
+    <a class="button-link" href="{{ bp }}/{{ entity_path }}/List">戻る</a>
+</div>
+</form>
+
+<script>
+const PRODUCT_OPTIONS_HTML = `<option value="">選択してください</option>{% for p in products %}<option value="{{ p.Id }}" data-price="{{ p.UnitPrice }}">{{ p.Name }}（&yen;{{ "{:,}".format(p.UnitPrice) }}）</option>{% endfor %}`;
+
+function addItem() {
+    const tbody = document.getElementById("item-table-body");
+    const tr = document.createElement("tr");
+    tr.className = "item-row";
+    tr.innerHTML = `
+        <td><select name="productId">${PRODUCT_OPTIONS_HTML}</select></td>
+        <td><input type="number" name="quantity" class="textbox num qty-input" value="1" min="1"></td>
+        <td><input type="text" class="textbox price-input" value="0" readonly></td>
+        <td class="amount-cell">&yen;0</td>
+        <td><button type="button" class="button small" onclick="removeItem(this)">削除</button></td>
+    `;
+    tbody.appendChild(tr);
+    bindRow(tr);
+}
+
+function removeItem(btn) {
+    btn.closest("tr").remove();
+    recalcTotal();
+}
+
+function bindRow(tr) {
+    const select = tr.querySelector('select[name="productId"]');
+    const qty = tr.querySelector(".qty-input");
+    const priceInput = tr.querySelector(".price-input");
+    const amountCell = tr.querySelector(".amount-cell");
+
+    function update() {
+        const opt = select.options[select.selectedIndex];
+        const price = opt ? parseInt(opt.getAttribute("data-price") || "0", 10) : 0;
+        priceInput.value = price.toLocaleString();
+        const q = parseInt(qty.value || "0", 10);
+        const amount = price * q;
+        amountCell.textContent = "¥" + amount.toLocaleString();
+        recalcTotal();
+    }
+    select.addEventListener("change", update);
+    qty.addEventListener("input", update);
+}
+
+function recalcTotal() {
+    let total = 0;
+    document.querySelectorAll("#item-table-body .amount-cell").forEach((cell) => {
+        total += parseInt(cell.textContent.replace(/[^0-9]/g, "") || "0", 10);
+    });
+    document.getElementById("{{ total_elem_id }}").textContent = "¥" + total.toLocaleString();
+}
+
+document.querySelectorAll("#item-table-body .item-row").forEach(bindRow);
+recalcTotal();
+</script>
+{% endblock %}

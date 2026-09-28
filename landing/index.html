@@ -51,7 +51,7 @@
     color: rgba(255,255,255,.92);
   }
   .wrap {
-    max-width: 980px;
+    max-width: 1180px;
     margin: -32px auto 0;
     padding: 0 20px 56px;
   }
@@ -138,7 +138,7 @@
   }
   .cards {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 22px;
   }
   .card {
@@ -212,6 +212,9 @@
     color: var(--sub);
     line-height: 1.8;
   }
+  @media (max-width: 980px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 720px) {
     .cards { grid-template-columns: 1fr; }
     .concept-cols { grid-template-columns: 1fr; }
@@ -225,7 +228,7 @@
     <h1>レガシー基幹システムはそのまま。<br>AIサイドパネルだけを後付けする。</h1>
     <p>
       既存のWeb画面を改変せず、🤖ボタンから自然文検索・入力支援・要約を追加する
-      「AI-Sync Bridge」。2つの業務ドメインへの適用例です。
+      「AI-Sync Bridge」。3つの業務ドメインへの適用例です。
     </p>
   </div>
 
@@ -282,6 +285,21 @@
         <div class="card-actions">
           <a class="btn btn-primary" href="/dealer/">DMSデモを開く</a>
           <a class="btn btn-secondary" href="/dealer/ai-panel">AI機能一覧</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">LEGACY 仲介システム</span>
+        <h2>不動産仲介向け基幹システム</h2>
+        <p class="card-sub">物件・内見・契約・売却査定を扱う、不動産仲介業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
+        <ul>
+          <li><b>業務データ:</b> 顧客/契約/物件在庫/協力会社/査定/仲介手数料請求/工事発注/内見予約 など13エンティティ</li>
+          <li><b>AI検索の例:</b> 「募集中の物件を、登録が古い順に5件」</li>
+          <li><b>専用機能:</b> 物件検索・会社検索(外部情報から登録用データを自動生成)</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/realestate/">仲介デモを開く</a>
+          <a class="btn btn-secondary" href="/realestate/ai-panel">AI機能一覧</a>
         </div>
       </div>
 

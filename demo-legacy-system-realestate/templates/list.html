@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>{{ heading }}</h2>
+
+{% if show_entry %}
+<div class="toolbar">
+    <a class="button-link" href="{{ bp }}/{{ entity_path }}/Entry">{{ new_label or "新規登録" }}</a>
+    {% if show_search %}<a class="button-link" href="{{ bp }}/{{ entity_path }}/Search">検索</a>{% endif %}
+</div>
+{% endif %}
+
+<table class="grid">
+    <thead>
+    <tr>
+        {% for key, label in columns %}<th>{{ label }}</th>{% endfor %}
+        {% if show_detail or show_entry %}<th>操作</th>{% endif %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+        {% for key, label in columns %}
+        <td>{% if key in money_fields %}&yen;{{ "{:,}".format(row[key] or 0) }}{% elif key in rate_fields %}{{ row[key] }}%{% else %}{{ row[key] }}{% endif %}</td>
+        {% endfor %}
+        {% if show_detail or show_entry %}
+        <td class="ops">
+            {% if show_detail %}<a href="{{ bp }}/{{ entity_path }}/Detail/{{ row[id_field] }}">詳細</a>{% endif %}
+            {% if show_entry %}<a href="{{ bp }}/{{ entity_path }}/Entry/{{ row[id_field] }}">編集</a>{% endif %}
+        </td>
+        {% endif %}
+    </tr>
+    {% else %}
+    <tr><td colspan="{{ columns|length + 1 }}">データがありません</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% if page_info %}
+<div class="pager">
+    {% if page_info.page > 1 %}<a href="?page={{ page_info.page - 1 }}">&laquo; 前へ</a>{% endif %}
+    <span>{{ page_info.page }} / {{ page_info.total_pages }} ページ（全{{ page_info.total }}件）</span>
+    {% if page_info.page < page_info.total_pages %}<a href="?page={{ page_info.page + 1 }}">次へ &raquo;</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

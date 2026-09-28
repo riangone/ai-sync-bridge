@@ -34,7 +34,11 @@
     persistWidth,
   };
 
-  window.AISB.uiBase.initShell({
+  // shared/demo-scenario-engine.js が「▶ 自動デモを見る」でパネルを開閉・操作するために
+  // shellハンドル(host/shadow/root/showPanel)をグローバルに保持しておく。shadowは
+  // mode:"closed"だが、closedが制限するのは外部コードが`host.shadowRoot`から新規に
+  // 参照を取得することだけなので、ここで保持した参照経由の操作は問題なく行える。
+  window.AISB.shell = window.AISB.uiBase.initShell({
     profile,
     sidebarOpen,
     panels: window.AISB.panels,

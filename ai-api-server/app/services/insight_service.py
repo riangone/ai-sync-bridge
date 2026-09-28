@@ -12,9 +12,16 @@ AiProvider に渡し、トレンドの解釈コメントを自然言語で生成
   (トークン節約とモデルの解釈精度向上が目的)。
 - どの統計も「これはAIの判断ではなく統計/ルール評価の結果である」旨をプロンプトに明記し、
   AIの解釈コメントと機械的な計算結果が混同されないようにしている。
-- 生成失敗(プロバイダエラー)はここで揉み消さず素通しする。各 AiProvider.complete() は
-  例外を "[xxx-error-fallback] ..." という文字列に変換して返す設計(ai_client.py参照)なので、
-  ここでも同じ文字列がそのまま comment に入る(既存のchat/summarize経路と同じ挙動に揃えた)。
+- 生成失敗(プロバイダエラー)はここで揉み消さず素通しする。AiProvider.complete() は失敗時に
+  文字列ではなく AIProviderError を送出する設計(ai_client.py参照、旧実装は
+  "[xxx-error-fallback] ..." という文字列を正常応答と区別なくreturnしていたため、
+  interpret_* の呼び出し元(analytics/recommend/purchase_order等の各routerの
+  `/insight` 系サブエンドポイント)がその文字列をそのまま「AIの解釈コメント」として
+  ユーザーに表示してしまうサイレント破損があった)。ここでは意図的にtry/exceptを
+  書かず伝播させ、app.main の AIProviderError 用 exception_handler が一律502の
+  構造化エラーに変換する。本体の統計・一覧データは `/insight` とは別の独立した
+  エンドポイントで提供されるため(routerのコメント参照)、この502はAIコメントの
+  取得失敗のみを意味し、本体機能には影響しない。
 """
 from app.services.ai_client import AiProvider
 
@@ -212,5 +219,47 @@ async def interpret_admin_stats(ai: AiProvider, stats: dict) -> str:
         f"実行回数={stats['workflow_execution_count']}, "
         f"未読通知数={stats['unread_notification_count']}, "
         f"AIプロバイダ={stats['ai_provider']}, デモモード={stats['demo_mode']}"
+    )
+    return await ai.complete(prompt)
+
+
+async def interpret_valuation(ai: AiProvider, valuation_result: dict) -> str:
+    """realestate_advisory_service.RealestateAdvisoryService.valuation() の出力
+    (類似物件の㎡単価統計から算出した想定成約価格帯)をAIに解釈させる。instance=="realestate"
+    専用。他demoには「資産の値付け」という業務概念自体が無いため対応する report は無い。"""
+    if not valuation_result.get("comparable_count"):
+        return "比較可能な類似物件データが無いため、解釈できません。"
+    comps = valuation_result.get("comparables", [])
+    lines = [
+        f"{c.get('name')}({c.get('address')}): 価格={c.get('price', 0):,.0f}円, "
+        f"㎡単価={c.get('unit_price', 0):,.1f}円/㎡, ステータス={c.get('status')}"
+        for c in comps[:_MAX_ITEMS_IN_PROMPT]
+    ]
+    prompt = (
+        f"以下は類似物件{valuation_result['comparable_count']}件の㎡単価統計から算出した"
+        f"想定成約価格帯です(㎡単価: 下限={valuation_result['unit_price_low']:,.1f}円, "
+        f"中央値={valuation_result['unit_price_median']:,.1f}円, "
+        f"上限={valuation_result['unit_price_high']:,.1f}円。統計計算の結果であり、AIの査定"
+        "判断ではありません)。\n"
+        f"想定成約価格帯: {valuation_result['suggested_price_low']:,.0f}円〜"
+        f"{valuation_result['suggested_price_high']:,.0f}円\n"
+        "参考にした類似物件:\n" + "\n".join(lines) + "\n\n"
+        "査定担当のエージェント向けに、この価格帯の妥当性・売主への説明時に注意すべき点を"
+        "日本語で3〜4行程度でまとめてください。"
+    )
+    return await ai.complete(prompt)
+
+
+async def interpret_commission_check(ai: AiProvider, check_result: dict) -> str:
+    """realestate_advisory_service.RealestateAdvisoryService.commission_check() の出力
+    (宅建業法の速算式による仲介手数料上限チェック)をAIに解釈させる。instance=="realestate"専用。"""
+    prompt = (
+        f"契約金額{check_result['contract_amount']:,.0f}円に対する宅建業法上の仲介手数料"
+        f"上限(税込)は{check_result['legal_cap_incl_tax']:,.0f}円、請求予定額は"
+        f"{check_result['requested_amount']:,.0f}円です"
+        f"(超過={'はい' if check_result['over_legal_cap'] else 'いいえ'}、"
+        "速算式によるルールベース判定であり、AIの判断ではありません)。\n"
+        "宅建士向けに、法令上のリスクと顧客への説明時に留意すべき点を"
+        "日本語で2〜3行程度でまとめてください。"
     )
     return await ai.complete(prompt)

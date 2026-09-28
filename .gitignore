@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .DS_Store
 demo-legacy-system/aisb_embed/state.json
+demo-legacy-system-dealer/aisb_embed/state.json
+demo-legacy-system-realestate/aisb_embed/state.json
 
 # SQLite永続化データ(ERP/ディーラー各システム・各プロセス専用。デモの実行時状態
 # であり、リポジトリにはスキーマ/シードコードだけ含めればよいためコミット対象外)

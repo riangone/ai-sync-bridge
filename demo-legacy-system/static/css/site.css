@@ -614,6 +614,87 @@ button, input[type=submit] {
     font-weight: bold;
 }
 
+/* ---- 機能デモ(自動演示)---- */
+.ai-intro-demo-btn {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #17497e;
+    background: #eaf2fd;
+    border: 1px solid #b9d3ec;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background .12s ease, transform .12s ease;
+}
+.ai-intro-demo-btn:hover {
+    background: #d6e7fb;
+    transform: translateY(-1px);
+}
+.ai-intro-demo-btn:focus-visible {
+    outline: 2px solid #2a78d6;
+    outline-offset: 2px;
+}
+
+/* 1枚のカードに複数機能ぶんの自動デモを並べる場合(例: AI検索カードの
+   定型レポート/AIレポート生成/自然文検索)用の横並びラッパー。
+   .ai-intro-card は flex-direction:column なので、これで囲まないと
+   ボタンが1個ずつ縦積みになってしまう。 */
+.ai-intro-demo-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+.ai-intro-demo-row .ai-intro-demo-btn {
+    margin-top: 0;
+}
+
+.aisb-demo-bubble {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    z-index: 2147483000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 360px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #17497e, #2a78d6);
+    color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(23, 73, 126, .35);
+    font-size: 13px;
+    line-height: 1.6;
+    animation: aisb-demo-bubble-in .18s ease-out;
+}
+@keyframes aisb-demo-bubble-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.aisb-demo-bubble-text {
+    flex: 1;
+}
+.aisb-demo-bubble-stop {
+    flex: 0 0 auto;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #17497e;
+    background: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.aisb-demo-bubble-stop:hover {
+    background: #eaf2fd;
+}
+
 /* ---- ダッシュボード ---- */
 .summary-boxes {
     display: flex;

@@ -31,6 +31,7 @@ _SCRIPT_FILES = [
     "shared/api-base.js",
     "shared/ui-base.js",
     "shared/auto-input-engine.js",
+    "shared/demo-scenario-engine.js",
     "modules/panel-chat.js",
     "modules/panel-legacy.js",
     "modules/panel-nlsql.js",
@@ -51,6 +52,7 @@ _SCRIPT_FILES = [
     "modules/panel-conv-input.js",
     "modules/panel-admin.js",
     "modules/bootstrap.js",
+    "shared/demo-scenarios.js",
 ]
 
 

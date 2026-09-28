@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>顧客検索</h2>
+<form method="post" action="{{ bp }}/Customer/Search">
+<table class="form-table">
+    <tr>
+        <th>キーワード</th>
+        <td><input type="text" class="textbox" name="keyword" value="{{ keyword or '' }}" placeholder="会社名・TEL・住所など"></td>
+    </tr>
+</table>
+<div class="form-actions">
+    <input type="submit" class="button" value="検索">
+    <a class="button-link" href="{{ bp }}/Customer/List">戻る</a>
+</div>
+</form>
+
+{% if results is not none %}
+<h3>検索結果（{{ results|length }}件）</h3>
+<table class="grid">
+    <thead>
+    <tr><th>ID</th><th>会社名</th><th>TEL</th><th>住所</th><th>与信限度額</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+    {% for c in results %}
+    <tr>
+        <td>{{ c.Id }}</td>
+        <td>{{ c.Name }}</td>
+        <td>{{ c.Tel }}</td>
+        <td>{{ c.Address }}</td>
+        <td>&yen;{{ "{:,}".format(c.CreditLimit) }}</td>
+        <td class="ops"><a href="{{ bp }}/Customer/Detail/{{ c.Id }}">詳細</a> <a href="{{ bp }}/Customer/Entry/{{ c.Id }}">編集</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">該当する顧客がありません</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -21,7 +21,7 @@ import json
 
 from app.config import Settings
 from app.services import ai_json_util, filter_ops, legacy_client
-from app.services.ai_client import AiProvider
+from app.services.ai_client import AiProvider, AIProviderError
 
 ALLOWED_OPS = filter_ops.ALLOWED_OPS  # 後方互換のため引き続きこの名前でも参照可能にする
 _MAX_ROWS_FETCHED = legacy_client.MAX_ROWS_FETCHED  # プロンプト肥大化/レイテンシ防止の上限
@@ -204,11 +204,20 @@ class NLSQLService:
 
         value_hints = self._field_value_hints(rows)
         prompt = self._build_prompt(label, question, sorted(fields), rows[:_MAX_SAMPLE_ROWS], value_hints)
-        ai_text = await self.ai.complete(prompt)
-        raw = self._extract_json(ai_text)
         warnings = []
-        if not raw:
-            warnings.append("AI応答から条件を解釈できなかったため、絞り込みなしで返します")
+        try:
+            ai_text = await self.ai.complete(prompt)
+            raw = self._extract_json(ai_text)
+            if not raw:
+                warnings.append("AI応答から条件を解釈できなかったため、絞り込みなしで返します")
+        except AIProviderError as exc:
+            # 本機能の核はホワイトリスト検証済みルールベースのフィルタ評価であり、AIは
+            # あくまで条件生成の補助(5.4.11差分実装のdocstring参照)。AI呼び出し自体が
+            # 失敗した場合も検索機能全体を落とさず、絞り込みなし(=全件)で返す方が
+            # 業務継続性が高いと判断し、ここで局所的に吸収する(chat/assistantのような
+            # 「応答そのものがAI」なユースケースとは性質が異なる)。
+            raw = {}
+            warnings.append(f"AIプロバイダ呼び出しに失敗したため、絞り込みなしで返します({exc.provider})")
         flt, filter_warnings = self._validate_filter(raw, fields)
         warnings.extend(filter_warnings)
 

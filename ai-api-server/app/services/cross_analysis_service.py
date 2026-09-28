@@ -202,8 +202,9 @@ class CrossAnalysisService:
     # -----------------------------------------------------------------
     # 3. 滞留債権(焦げ付き)分析: Invoice(延滞) × Customer
     #    内訳集計の軸はinstanceで異なる: erpのCustomerはIndustry(業種)列を持つが、
-    #    dealerのCustomerにはIndustry列自体が存在せず(CustomerType=法人/個人のみ)、
-    #    Industryで集計すると全件「未設定」1本にまとまる無意味な内訳になる。
+    #    dealer/realestateのCustomerにはIndustry列自体が存在せず(CustomerType=
+    #    法人/個人 or 買主/売主のみ)、Industryで集計すると全件「未設定」1本に
+    #    まとまる無意味な内訳になる。
     #    web_search_service.py/panel-nlsql.jsのGENERATE_PRESETS_BY_INSTANCEと同じ
     #    「instanceで実在する属性に出し分ける」方針をここにも適用する。
     # -----------------------------------------------------------------
@@ -213,9 +214,9 @@ class CrossAnalysisService:
         warnings = []
         customer_by_id = {c.get("Id"): c for c in customers}
         today = datetime.utcnow().date()
-        is_dealer = self.settings.instance == "dealer"
-        breakdown_field = "CustomerType" if is_dealer else "Industry"
-        breakdown_label = "顧客区分(法人/個人)" if is_dealer else "業種"
+        _CUSTOMER_TYPE_LABELS = {"dealer": "顧客区分(法人/個人)", "realestate": "顧客区分(買主/売主)"}
+        breakdown_label = _CUSTOMER_TYPE_LABELS.get(self.settings.instance, "業種")
+        breakdown_field = "CustomerType" if self.settings.instance in _CUSTOMER_TYPE_LABELS else "Industry"
 
         rows = []
         for inv in invoices:
