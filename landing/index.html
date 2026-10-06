@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y1P7PMMM6V"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-Y1P7PMMM6V');
+    </script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI-Sync Bridge デモ選択</title>
@@ -220,6 +230,7 @@
     .concept-cols { grid-template-columns: 1fr; }
   }
 </style>
+    <link rel="canonical" href="https://aisync.0101.click/">
 </head>
 <body>
 
@@ -300,6 +311,36 @@
         <div class="card-actions">
           <a class="btn btn-primary" href="/realestate/">仲介デモを開く</a>
           <a class="btn btn-secondary" href="/realestate/ai-panel">AI機能一覧</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">LEGACY 自治体窓口</span>
+        <h2>自治体窓口向け戸籍住民システム</h2>
+        <p class="card-sub">住民・世帯・戸籍・証明書交付申請・来庁受付を扱う、戸籍住民課の窓口業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
+        <ul>
+          <li><b>業務データ:</b> 住民/世帯/戸籍/証明書交付申請/来庁受付(整理券)/窓口職員/異動履歴 など7エンティティ</li>
+          <li><b>AI検索の例:</b> 「今月の証明書交付申請を、手数料の高い順に5件」</li>
+          <li><b>想定シーン:</b> 紙の交付申請書をOCRで読み取り自動入力、自然文での住民検索、来庁受付の混雑予測</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/koseki/">窓口デモを開く</a>
+          <a class="btn btn-secondary" href="/koseki/ai-panel">AI機能一覧</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">LEGACY 年金相談窓口</span>
+        <h2>日本年金機構コールセンター/窓口向け年金照会端末</h2>
+        <p class="card-sub">被保険者・適用事業所・年金請求(裁定請求)・来所/電話相談受付を扱う、年金相談業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
+        <ul>
+          <li><b>業務データ:</b> 被保険者/適用事業所/適用記録/相談員/年金請求(裁定請求)/来所・電話相談受付/資格異動履歴 など7エンティティ</li>
+          <li><b>AI検索の例:</b> 「今月の年金請求を、支給見込額の高い順に5件」</li>
+          <li><b>想定シーン:</b> 紙の裁定請求書をOCRで読み取り自動入力、自然文での被保険者検索、相談受付の混雑予測</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/nenkin/">年金相談デモを開く</a>
+          <a class="btn btn-secondary" href="/nenkin/ai-panel">AI機能一覧</a>
         </div>
       </div>
 
