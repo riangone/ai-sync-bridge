@@ -122,6 +122,73 @@
     .arch-banner { flex-wrap: wrap; }
     .arch-banner-arrow { margin-left: 40px; }
   }
+  .easy {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px 24px 20px;
+    box-shadow: 0 8px 24px rgba(23,73,126,.08);
+    margin-bottom: 20px;
+  }
+  .easy h2 { font-size: 17px; margin: 0 0 4px; }
+  .easy-lead { font-size: 13px; color: var(--sub); margin: 0 0 18px; line-height: 1.8; }
+  .easy-flow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .easy-box {
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    text-align: center;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--sub);
+  }
+  .easy-box .ico { font-size: 28px; display: block; line-height: 1.2; }
+  .easy-box b { display: block; color: var(--ink); font-size: 14px; margin: 4px 0 2px; }
+  .easy-box .tag {
+    display: table; margin: 8px auto 0; font-size: 11px; font-weight: bold;
+    border-radius: 999px; padding: 2px 10px;
+  }
+  .easy-old { background: #f3f4f6; border: 1px dashed #b8c0cc; }
+  .easy-old .tag { background: #e5e7eb; color: #4b5563; }
+  .easy-new { background: #eaf2fd; border: 1px solid #b9d3f3; }
+  .easy-new .tag { background: var(--blue); color: #fff; }
+  .easy-arrow {
+    align-self: center; text-align: center; font-size: 11px; color: var(--sub);
+    line-height: 1.4; white-space: nowrap;
+  }
+  .easy-arrow span { display: block; font-size: 22px; color: var(--blue); }
+  .easy-steps {
+    list-style: none; margin: 18px 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    counter-reset: st;
+  }
+  .easy-steps li {
+    counter-increment: st;
+    background: #f5f8fc; border-radius: 8px; padding: 10px 12px 10px 44px;
+    position: relative; font-size: 12.5px; line-height: 1.7; color: var(--ink);
+  }
+  .easy-steps li::before {
+    content: counter(st);
+    position: absolute; left: 12px; top: 10px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--blue); color: #fff; font-weight: bold; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .easy-point {
+    margin: 14px 0 0; font-size: 12.5px; color: var(--sub); line-height: 1.8;
+    border-left: 3px solid var(--blue); padding-left: 10px;
+  }
+  .easy-point b { color: var(--ink); }
+  @media (max-width: 720px) {
+    .easy-flow { grid-template-columns: 1fr; }
+    .easy-arrow { padding: 2px 0; }
+    .easy-arrow span { transform: rotate(90deg); }
+    .easy-steps { grid-template-columns: 1fr; }
+  }
   .concept {
     background: var(--card);
     border: 1px solid var(--line);
@@ -262,6 +329,49 @@
       </span>
       <span class="arch-banner-arrow">見る →</span>
     </a>
+
+
+    <section class="easy" aria-labelledby="easy-title">
+      <h2 id="easy-title">ひと目でわかる仕組み</h2>
+      <p class="easy-lead">
+        いま使っている業務画面の横に「AIの窓口」を足すだけ。
+        画面もデータベースも作り直さず、AIは別の場所で動きます。
+      </p>
+
+      <div class="easy-flow">
+        <div class="easy-box easy-old">
+          <span class="ico">🏢</span>
+          <b>いまの業務システム</b>
+          今までどおりの画面とデータ。
+          <span class="tag">手を加えない</span>
+        </div>
+        <div class="easy-arrow"><span>→</span>横に追加</div>
+        <div class="easy-box easy-new">
+          <span class="ico">🤖</span>
+          <b>AIパネル</b>
+          画面右下のボタンで開く小窓。ここに質問や指示を書く。
+          <span class="tag">後から追加</span>
+        </div>
+        <div class="easy-arrow"><span>→</span>質問を渡す</div>
+        <div class="easy-box easy-new">
+          <span class="ico">🧠</span>
+          <b>AIサーバー</b>
+          業務システムとは別の場所で、質問を理解して答えを作る。
+          <span class="tag">別の場所で動く</span>
+        </div>
+      </div>
+
+      <ol class="easy-steps">
+        <li>画面右下の 🤖 ボタンを押して、AIパネルを開く。</li>
+        <li>「延滞している請求を見せて」のように、ふつうの言葉で質問する。</li>
+        <li>AIが業務データを読み取り、結果や要約をパネルに表示する。</li>
+      </ol>
+
+      <p class="easy-point">
+        <b>ポイント：</b>AIを止めても、業務システムはこれまでどおり動きます。
+        パネルの入れ方は「ブラウザ拡張機能」と「サーバー側で自動で差し込む方式」の2通りから選べます。
+      </p>
+    </section>
 
     <div class="concept">
       <b>このデモについて</b> —
