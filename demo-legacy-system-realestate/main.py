@@ -58,7 +58,7 @@ def redirect_to(request: Request, path: str, status_code: int = 303) -> Redirect
     return RedirectResponse(f"{prefix}{path}", status_code=status_code)
 
 
-aisb_embed.mount(app)
+aisb_embed.mount(app, profile_dir=Path(__file__).parent / "aisb_profile")
 
 
 # ---------------------------------------------------------------------------

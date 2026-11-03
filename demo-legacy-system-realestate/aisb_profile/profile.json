@@ -1,0 +1,4 @@
+{
+  "system_label": "不動産仲介基幹システム",
+  "extra_modules": ["modules/panel-valuation.js"]
+}

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aisb-core"
+version = "0.1.0"
+description = "AI-Sync Bridge 共通コア: レガシー画面へのAIサイドバー埋め込み(aisb_embed)"
+requires-python = ">=3.10"
+dependencies = ["fastapi>=0.100", "starlette>=0.27"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+aisb_embed = ["static/**/*"]
