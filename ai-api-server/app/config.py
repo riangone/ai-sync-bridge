@@ -54,6 +54,9 @@ class Settings(BaseModel):
     # image=true のモデルを明示指定する。無料枠で確認できたのは mimo-v2.5-free のみ
     # (image/audio/video対応、pdfは非対応)。
     opencode_vision_model_id: str = os.getenv("OPENCODE_VISION_MODEL_ID", "mimo-v2.5-free")
+    # ツール無し・安全プロンプト付きの専用エージェント名(ops/opencode/aisync-opencode.json で定義)。
+    # 既定の build エージェントは bash/read 等を持つため、デモからは絶対に使わない(2026-10-26 インシデント)。
+    opencode_agent: str = os.getenv("OPENCODE_AGENT", "aisync-demo")
 
     # ベクトル検索エンジン選択 (8.3): sqlite-vec -> ann -> brute-force
     vector_backend: str = os.getenv("AISB_VECTOR_BACKEND", "brute-force")

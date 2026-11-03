@@ -7,6 +7,7 @@ import base64
 from abc import ABC, abstractmethod
 import httpx
 from app.config import Settings
+from app.services.ai_guard import GUARDRAIL_SYSTEM_PROMPT, build_tool_flags, redact_output
 
 
 class AIProviderError(Exception):
@@ -69,7 +70,8 @@ class OpenAIProvider(AiProvider):
     async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
         # OpenAI chat completions APIはopencodeの{"websearch": true}形式のtools指定と
         # 互換性が無いため、ここではtoolsを無視する(素のchat completionのみ対応)。
-        messages = (history or []) + [{"role": "user", "content": prompt}]
+        # 安全ガード(ai_guard)の system を必ず先頭に置く。履歴側の system は業務文脈として後ろに続ける。
+        messages = [{"role": "system", "content": GUARDRAIL_SYSTEM_PROMPT}] + (history or []) + [{"role": "user", "content": prompt}]
         async with httpx.AsyncClient(timeout=30) as client:
             try:
                 resp = await client.post(
@@ -78,7 +80,7 @@ class OpenAIProvider(AiProvider):
                     json={"model": "gpt-4o-mini", "messages": messages},
                 )
                 resp.raise_for_status()
-                return resp.json()["choices"][0]["message"]["content"]
+                return redact_output(resp.json()["choices"][0]["message"]["content"])
             except Exception as exc:
                 raise AIProviderError(self.name, exc) from exc
 
@@ -110,10 +112,13 @@ class GeminiProvider(AiProvider):
         )
         async with httpx.AsyncClient(timeout=30) as client:
             try:
-                resp = await client.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
+                resp = await client.post(url, json={
+                    "systemInstruction": {"parts": [{"text": GUARDRAIL_SYSTEM_PROMPT}]},
+                    "contents": [{"parts": [{"text": prompt}]}],
+                })
                 resp.raise_for_status()
                 data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
+                return redact_output(data["candidates"][0]["content"]["parts"][0]["text"])
             except Exception as exc:
                 raise AIProviderError(self.name, exc) from exc
 
@@ -139,7 +144,14 @@ class OpenCodeProvider(AiProvider):
     """
     name = "opencode"
 
-    def __init__(self, endpoint: str, provider_id: str, model_id: str, vision_model_id: str | None = None):
+    # セッション単位の権限: 全ツール deny、websearch のみ allow (後勝ち評価)。
+    # opencode 側設定(ops/opencode/aisync-opencode.json)でも deny 済みだが二重に塞ぐ。
+    _SESSION_PERMISSION = [
+        {"permission": "*", "pattern": "*", "action": "deny"},
+        {"permission": "websearch", "pattern": "*", "action": "allow"},
+    ]
+
+    def __init__(self, endpoint: str, provider_id: str, model_id: str, vision_model_id: str | None = None, agent: str = "aisync-demo"):
         # 既定モデル(model_id)はテキスト専用のことが多いため vision_model_id を別枠で持つ。
         # 未指定(None)の場合は complete_vision() 自体を非サポート扱いにする(誤って
         # テキスト専用モデルに画像を送って静かに無視されるより、明示的に弾く方が安全)。
@@ -148,6 +160,19 @@ class OpenCodeProvider(AiProvider):
         self.model_id = model_id
         self.vision_model_id = vision_model_id
         self.supports_vision = bool(vision_model_id)
+        # ops/opencode/aisync-opencode.json で定義した、ツール無し・安全プロンプト付きの専用エージェント。
+        # 既定の build エージェント(bash等フル装備)を絶対に使わないよう常に明示する。
+        # 設定が読み込まれていない opencode に繋いだ場合はエージェント不明で失敗する(fail closed)。
+        self.agent = agent
+
+    def _session_body(self) -> dict:
+        return {"title": "aisync-demo", "agent": self.agent, "permission": self._SESSION_PERMISSION}
+
+    def _assert_no_forbidden_tool_use(self, parts: list[dict]) -> None:
+        """許可外ツールが1つでも実行されていたら応答ごと破棄する(設定が効いていない異常系の検知)。"""
+        for p in parts:
+            if p.get("type") == "tool" and p.get("tool") not in ("websearch",):
+                raise AIProviderError(self.name, f"許可されていないツール実行を検知したため応答を破棄しました: {p.get('tool')}")
 
     def _build_prompt(self, prompt: str, history: list[dict] | None) -> str:
         if not history:
@@ -157,21 +182,24 @@ class OpenCodeProvider(AiProvider):
         return "これまでの会話:\n" + "\n".join(lines)
 
     async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
-        """tools: {"websearch": true} のように明示指定すると、モデルの自発的判断任せに
-        せずopencode側にツール利用を強制できる(未指定時は全ツール利用可のデフォルト挙動)。"""
+        """tools: {"websearch": true} のように明示指定すると、そのツールだけを有効化する。
+        ai_guard.ALLOWED_TOOLS 以外(bash/read/webfetch等)は要求されても常に無効。
+        未指定時は全ツール無効(旧実装は「未指定=全ツール利用可」で、チャットから実サーバーの
+        bash が実行された。2026-10-26 インシデント)。"""
         full_prompt = self._build_prompt(prompt, history)
         try:
             async with httpx.AsyncClient(timeout=120) as client:
-                session_resp = await client.post(f"{self.endpoint}/session", json={})
+                session_resp = await client.post(f"{self.endpoint}/session", json=self._session_body())
                 session_resp.raise_for_status()
                 session_id = session_resp.json()["id"]
 
                 body: dict = {
                     "model": {"providerID": self.provider_id, "modelID": self.model_id},
+                    "agent": self.agent,
+                    "system": GUARDRAIL_SYSTEM_PROMPT,
+                    "tools": build_tool_flags(tools),
                     "parts": [{"type": "text", "text": full_prompt}],
                 }
-                if tools:
-                    body["tools"] = tools
 
                 msg_resp = await client.post(
                     f"{self.endpoint}/session/{session_id}/message",
@@ -187,8 +215,9 @@ class OpenCodeProvider(AiProvider):
                     message = (error.get("data") or {}).get("message") or error.get("name") or str(error)
                     raise AIProviderError(self.name, message)
                 parts = msg_json.get("parts", [])
+                self._assert_no_forbidden_tool_use(parts)
                 text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
-                return text or "[opencode-empty-response]"
+                return redact_output(text) or "[opencode-empty-response]"
         except AIProviderError:
             raise
         except Exception as exc:
@@ -206,7 +235,7 @@ class OpenCodeProvider(AiProvider):
         data_url = f"data:{mime};base64,{base64.b64encode(image_bytes).decode()}"
         try:
             async with httpx.AsyncClient(timeout=120) as client:
-                session_resp = await client.post(f"{self.endpoint}/session", json={})
+                session_resp = await client.post(f"{self.endpoint}/session", json=self._session_body())
                 session_resp.raise_for_status()
                 session_id = session_resp.json()["id"]
 
@@ -214,6 +243,9 @@ class OpenCodeProvider(AiProvider):
                     f"{self.endpoint}/session/{session_id}/message",
                     json={
                         "model": {"providerID": self.provider_id, "modelID": self.vision_model_id},
+                        "agent": self.agent,
+                        "system": GUARDRAIL_SYSTEM_PROMPT,
+                        "tools": build_tool_flags(None),
                         "parts": [
                             {"type": "file", "mime": mime, "url": data_url},
                             {"type": "text", "text": prompt},
@@ -222,8 +254,11 @@ class OpenCodeProvider(AiProvider):
                 )
                 msg_resp.raise_for_status()
                 parts = msg_resp.json().get("parts", [])
+                self._assert_no_forbidden_tool_use(parts)
                 text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
-                return text or "[opencode-empty-response]"
+                return redact_output(text) or "[opencode-empty-response]"
+        except AIProviderError:
+            raise
         except Exception as exc:
             raise AIProviderError(self.name, exc) from exc
 
@@ -245,5 +280,6 @@ def build_ai_provider(settings: Settings) -> AiProvider:
             settings.opencode_provider_id,
             settings.opencode_model_id,
             settings.opencode_vision_model_id,
+            settings.opencode_agent,
         )
     return MockProvider()
