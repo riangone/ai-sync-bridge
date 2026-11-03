@@ -30,6 +30,8 @@ class AIProviderError(Exception):
 
 class AiProvider(ABC):
     name: str
+    # 埋め込みベクトルの互換性ID。これが変わるとブリッジは全文書を再埋め込みする。
+    embedder_id: str = "unknown"
     supports_vision: bool = False
 
     @abstractmethod
@@ -47,6 +49,7 @@ class AiProvider(ABC):
 class MockProvider(AiProvider):
     """デモモード/APIキー未設定時のフォールバック。決定論的な擬似応答を返す。"""
     name = "mock"
+    embedder_id = "ngram-hash-64"
 
     async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
         return f"[mock-ai] 「{prompt[:50]}」について回答します。これはデモ応答です。"
@@ -63,6 +66,7 @@ class MockProvider(AiProvider):
 
 class OpenAIProvider(AiProvider):
     name = "openai"
+    embedder_id = "openai:text-embedding-3-small"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -100,6 +104,7 @@ class OpenAIProvider(AiProvider):
 
 class GeminiProvider(AiProvider):
     name = "gemini"
+    embedder_id = "ngram-hash-64"  # embed() は MockProvider へ委譲している
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -143,6 +148,7 @@ class OpenCodeProvider(AiProvider):
     作成し、history をプロンプト先頭に文脈として埋め込む設計にした。
     """
     name = "opencode"
+    embedder_id = "ngram-hash-64"  # embed() は MockProvider へ委譲している
 
     # セッション単位の権限: 全ツール deny、websearch のみ allow (後勝ち評価)。
     # opencode 側設定(ops/opencode/aisync-opencode.json)でも deny 済みだが二重に塞ぐ。

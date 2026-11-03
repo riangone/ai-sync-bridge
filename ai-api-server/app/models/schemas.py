@@ -59,6 +59,8 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str = Field(default="default")
     message: str
+    # True: 業務データ(ブリッジ)を根拠に、呼び出し主体の権限内だけで回答する(/api/bridge/ask と同じ経路)
+    grounded: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -66,6 +68,9 @@ class ChatResponse(BaseModel):
     reply: str
     provider: str
     history_length: int
+    grounded: bool | None = None
+    citations: list[dict] | None = None
+    audit_id: str | None = None
 
 
 # ---------- OCR ----------

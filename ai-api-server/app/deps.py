@@ -46,6 +46,7 @@ from app.services.nlsql_service import NLSQLService
 from app.services.cross_analysis_service import CrossAnalysisService
 from app.services.dynamic_analysis_service import DynamicAnalysisService
 from app.services.realestate_advisory_service import RealestateAdvisoryService
+from app.bridge.runtime import BridgeRuntime
 
 
 @lru_cache
@@ -57,6 +58,22 @@ def get_ai_provider() -> AiProvider:
 def get_vector_index() -> VectorIndexManager:
     """Singleton: sqlite-vec -> ann -> brute-force を起動時に一度だけ解決する。"""
     return VectorIndexManager(get_settings().vector_backend)
+
+
+@lru_cache
+def get_bridge() -> BridgeRuntime:
+    """Singleton: 同期状態/ベクトル/監査チェーンをプロセス全体で共有する。
+    起動時に BridgeStore から埋め込み済みベクトルを復元する(再埋め込みしない)。"""
+    s = get_settings()
+    ai = get_ai_provider()
+    return BridgeRuntime.from_file(
+        s.bridge_profile,
+        embed=ai.embed,
+        embedder_id=ai.embedder_id,
+        complete=ai.complete,
+        default_store_path=s.bridge_db_path,
+        vector_backend=s.vector_backend,
+    )
 
 
 @lru_cache

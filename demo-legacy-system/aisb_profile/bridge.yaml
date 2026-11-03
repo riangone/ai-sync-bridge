@@ -1,0 +1,116 @@
+# ============================================================================
+# AI-Sync Bridge 導入先プロファイル: レガシーERP(製造業)デモ
+#   ai-api-server 起動時に AISB_BRIDGE_PROFILE=<このファイル> を指定する(start-erp.sh)。
+#   コアのコードには業種知識を書かず、取り込み対象・権限・接続方式はすべてここで宣言する。
+# ============================================================================
+
+auth:
+  # api_key: X-AISB-Key ヘッダ(または Authorization: Bearer)で利用者を識別する。
+  # ※以下はデモ用キー。本番では環境変数で差し替えること(${VAR:-default} 展開に対応)。
+  mode: api_key
+  api_keys:
+    - key: ${AISB_DEMO_KEY_ADMIN:-demo-admin-key}
+      user_id: admin
+      tenant: acme
+      roles: [bridge_admin, sales, accounting, purchasing, hr, "dept:*"]
+    - key: ${AISB_DEMO_KEY_SALES:-demo-sales-key}
+      user_id: sales01          # 営業担当: 顧客・受注・出荷は見えるが人事データは見えない
+      tenant: acme
+      roles: [sales]
+      depts: [営業部]
+    - key: ${AISB_DEMO_KEY_MGR:-demo-mgr-key}
+      user_id: keiri_kacho      # 経理部の課長: 請求と「自部署の」従業員情報のみ
+      tenant: acme
+      roles: [accounting, manager]
+      depts: [経理部]
+    - key: ${AISB_DEMO_KEY_HR:-demo-hr-key}
+      user_id: hr01             # 人事: 全部署の従業員情報
+      tenant: acme
+      roles: [hr, "dept:*"]
+    - key: ${AISB_DEMO_KEY_OTHER:-demo-other-tenant-key}
+      user_id: guest_other      # 別テナント: 何も見えないこと(テナント越境なし)の確認用
+      tenant: other-co
+      roles: [sales, hr, "dept:*"]
+
+audit:
+  store_query_text: true
+
+sync:
+  interval_sec: 0   # >0 で定期差分同期。デモは POST /api/bridge/sync で手動実行
+
+sources:
+  # ① 既存の読み取り専用 HTTP 一覧API(最も侵襲が少ない)
+  - name: legacy_api
+    type: http_list
+    config:
+      base_url: ${AISB_LEGACY_BASE_URL:-http://localhost:5010}
+    entities:
+      - name: Customer
+        pk: Id
+        title: Name
+        text: [Name, NameKana, Industry, Address, Representative, Notes]
+        acl: {tenant: acme, roles: [sales, accounting]}
+      - name: Order
+        pk: Id
+        title: Id
+        text: [CustomerName, OrderDate, DeliveryDate, TotalAmount, Status, Notes]
+        acl: {tenant: acme, roles: [sales, accounting]}
+      - name: Invoice
+        pk: Id
+        title: Id
+        text: [CustomerName, InvoiceDate, DueDate, TotalAmount, Status, Notes]
+        acl: {tenant: acme, roles: [accounting]}
+      - name: Supplier
+        pk: Id
+        title: Name
+        text: [Name, Category, ContactPerson, PaymentTerms, Notes]
+        acl: {tenant: acme, roles: [purchasing, accounting]}
+      - name: Product
+        pk: Id
+        title: Name
+        text: [Name, Category, UnitPrice, Stock]
+        acl: {tenant: acme}            # 社内なら誰でも可
+
+  # ② レガシーDBを直接 SELECT(読み取り専用接続)。本番は dsn: "odbc:DRIVER={SQL Server};..." 等
+  - name: legacy_db
+    type: sql
+    config:
+      dsn: sqlite:///${AISB_LEGACY_DB_PATH:-../demo-legacy-system/erp.db}
+    entities:
+      - name: Employee
+        pk: Id
+        title: Name
+        text: [Name, Department, Position, HireDate]
+        # 人事データ: hr または manager ロールのみ。さらに部署単位で制限(dept:* は全部署)
+        acl: {tenant: acme, roles: [hr, manager], depts: $Department}
+        options:
+          query: >
+            SELECT json_extract(value,'$.Id') AS Id, json_extract(value,'$.Name') AS Name,
+                   json_extract(value,'$.Department') AS Department,
+                   json_extract(value,'$.Position') AS Position,
+                   json_extract(value,'$.HireDate') AS HireDate
+            FROM employees
+
+  # ③ 夜間バッチの固定長テキスト(cp932・バイト位置指定)
+  - name: legacy_files
+    type: file
+    config:
+      base_dir: ${AISB_LEGACY_EXPORT_DIR:-../demo-legacy-system/aisb_profile/legacy_exports}
+      encoding: cp932
+    entities:
+      - name: Shipment
+        pk: ShipNo
+        title: ShipNo
+        text: [ShipDate, CustomerName, ItemName, Qty, Dept]
+        acl: {tenant: acme, roles: [sales], depts: $Dept}
+        options:
+          path: shipments_fixed.txt
+          format: fixed
+          skip_lines: 1
+          columns:
+            - {name: ShipNo,       start: 0,  length: 10}
+            - {name: ShipDate,     start: 10, length: 8}
+            - {name: CustomerName, start: 18, length: 20}
+            - {name: ItemName,     start: 38, length: 30}
+            - {name: Qty,          start: 68, length: 6}
+            - {name: Dept,         start: 74, length: 12}

@@ -82,6 +82,17 @@ class Settings(BaseModel):
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", f"aisb_{instance}.db"),
     )
 
+    # Legacy-to-AI ブリッジ(app/bridge)の導入先プロファイル(YAML)。
+    # 未指定ならソース0件の空ブリッジとして起動する(API自体は応答する)。
+    bridge_profile: str | None = os.getenv("AISB_BRIDGE_PROFILE") or None
+    bridge_db_path: str = os.getenv(
+        "AISB_BRIDGE_DB_PATH",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", f"bridge_{instance}.db"),
+    )
+
+    # 有効化する業種ドメインのルーター(カンマ区切り。"all"=全部、""=コアのみ)。app/domains.py 参照。
+    domains: str = os.getenv("AISB_DOMAINS", "all")
+
     # CORS: Chrome拡張(content script)からのアクセスを許可
     cors_origins: list[str] = ["*"]
 
