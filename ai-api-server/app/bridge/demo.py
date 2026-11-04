@@ -24,51 +24,10 @@ from __future__ import annotations
 
 import threading
 import time
-from collections import OrderedDict, deque
 from dataclasses import dataclass
 
-from fastapi import Request
-
 from app.bridge.acl import ADMIN_ROLE, Principal
-
-_LOOPBACK = {"127.0.0.1", "::1"}
-
-
-def client_ip(request: Request) -> str:
-    """送信元 IP。X-Forwarded-For はローカルの前段プロキシ経由のときだけ信用し、
-    そのプロキシが付けた末尾の値を使う(先頭側はクライアントが偽装できる)。"""
-    peer = request.client.host if request.client else ""
-    if peer in _LOOPBACK:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[-1].strip()
-    return peer or "unknown"
-
-
-class SlidingWindowLimiter:
-    """キーごとのスライディングウィンドウ。キー数は上限を超えると古い順に捨てる。"""
-
-    def __init__(self, limit: int, window_sec: float, max_keys: int = 10000):
-        self.limit = limit
-        self.window = window_sec
-        self.max_keys = max_keys
-        self._hits: OrderedDict[str, deque[float]] = OrderedDict()
-        self._lock = threading.Lock()
-
-    def allow(self, key: str) -> bool:
-        now = time.monotonic()
-        with self._lock:
-            hits = self._hits.setdefault(key, deque())
-            self._hits.move_to_end(key)
-            while hits and now - hits[0] >= self.window:
-                hits.popleft()
-            while len(self._hits) > self.max_keys:
-                self._hits.popitem(last=False)
-            if len(hits) >= self.limit:
-                return False
-            hits.append(now)
-            return True
-
+from app.services.rate_limit import SlidingWindowLimiter, client_ip  # noqa: F401 (client_ip は公開名)
 
 @dataclass(frozen=True)
 class Persona:

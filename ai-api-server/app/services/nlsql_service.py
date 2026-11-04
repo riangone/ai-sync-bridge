@@ -21,6 +21,7 @@ import json
 
 from app.config import Settings
 from app.services import ai_json_util, filter_ops, legacy_client
+from app.public_errors import log_upstream
 from app.services.ai_client import AiProvider, AIProviderError
 
 ALLOWED_OPS = filter_ops.ALLOWED_OPS  # 後方互換のため引き続きこの名前でも参照可能にする
@@ -217,7 +218,8 @@ class NLSQLService:
             # 業務継続性が高いと判断し、ここで局所的に吸収する(chat/assistantのような
             # 「応答そのものがAI」なユースケースとは性質が異なる)。
             raw = {}
-            warnings.append(f"AIプロバイダ呼び出しに失敗したため、絞り込みなしで返します({exc.provider})")
+            log_upstream("nlsql filter generation failed", exc)
+            warnings.append("AI呼び出しに失敗したため、絞り込みなしで返します")
         flt, filter_warnings = self._validate_filter(raw, fields)
         warnings.extend(filter_warnings)
 

@@ -2,6 +2,11 @@
 from datetime import datetime
 from typing import Any
 from pydantic import BaseModel, Field
+from typing import Annotated
+from pydantic import AfterValidator
+from app.public_errors import public_provider
+
+PublicProvider = Annotated[str, AfterValidator(public_provider)]
 
 
 # ---------- Customer ----------
@@ -66,7 +71,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
-    provider: str
+    provider: PublicProvider
     history_length: int
     grounded: bool | None = None
     citations: list[dict] | None = None
@@ -149,7 +154,7 @@ class PredictionResponse(BaseModel):
 # ---------- AI Insight (統計/ルール結果 -> AIによる解釈コメント) ----------
 class InsightResponse(BaseModel):
     comment: str
-    provider: str  # 生成に使ったAiProvider名(mock|opencode|openai|gemini)
+    provider: PublicProvider  # 生成に使ったAiProvider名(公開表記は mock|live)
 
 
 # ---------- 自然言語 → 構造化フィルタ検索 (5.4.11 差分実装) ----------
@@ -188,7 +193,7 @@ class NLSQLQueryResponse(BaseModel):
     total_scanned: int
     count: int
     rows: list[dict]
-    provider: str
+    provider: PublicProvider
 
 
 # ---------- クロス分析(複数エンティティを跨いだ集計・分析 + チャート) ----------
@@ -282,7 +287,7 @@ class DynamicAnalysisResponse(BaseModel):
     chart: ChartData
     rows: list[dict]
     warnings: list[str] = []
-    provider: str
+    provider: PublicProvider
 
 
 # ---------- Workflow Engine (マルチステップ・パイプライン, README 5.4.10) ----------
@@ -538,7 +543,7 @@ class ArApAgingResponse(BaseModel):
 # ---------- Admin ----------
 class AdminStats(BaseModel):
     demo_mode: bool
-    ai_provider: str
+    ai_provider: PublicProvider
     vector_backend: str
     customer_count: int
     order_count: int
@@ -714,7 +719,7 @@ class AssistResponse(BaseModel):
     response: str
     conversation_id: str
     suggested_actions: list[str]
-    provider: str
+    provider: PublicProvider
 
 
 # ---------- Conversational Input (Phase3: README 5.4.7「自然言語→フォームデータ変換」) ----------

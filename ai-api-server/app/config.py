@@ -29,6 +29,10 @@ class Settings(BaseModel):
     # 以下2つはインスタンス(プロセス)ごとの値。
     antigravity_max_concurrency: int = int(os.getenv("ANTIGRAVITY_MAX_CONCURRENCY", "2"))
     antigravity_max_calls_per_hour: int = int(os.getenv("ANTIGRAVITY_MAX_CALLS_PER_HOUR", "120"))
+    # 送信元 IP ごとの LLM 呼び出し上限(インスタンス単位)。0 で無効
+    ai_per_ip_per_hour: int = int(os.getenv("AISB_AI_PER_IP_PER_HOUR", "60"))
+    # /docs と /openapi.json は内部の API 構成を公開するので既定で閉じる
+    expose_api_docs: bool = os.getenv("AISB_EXPOSE_API_DOCS", "").lower() in ("1", "true")
     opencode_endpoint: str = os.getenv("OPENCODE_ENDPOINT", "http://localhost:4096")
     # opencode serve が公開する実APIのモデル指定 (GET /config/providers で確認: 無料枠モデル)
     # 2026-08-19: デフォルトだった north-mini-code-free が上流(opencode Zen)で401廃止済みと判明

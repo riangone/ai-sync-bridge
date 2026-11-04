@@ -18,7 +18,8 @@ from app.bridge import demo as demo_api
 from app.bridge.demo import DemoGateway, Persona, client_ip
 from app.bridge.runtime import BridgeRuntime
 from app.deps import get_bridge
-from app.services.ai_client import AIProviderError
+from app.public_errors import AI_RATE_LIMITED, AI_UNAVAILABLE, log_upstream
+from app.services.ai_client import AIProviderError, AIRateLimitError
 
 router = APIRouter(prefix="/api/bridge/demo", tags=["bridge-demo"])
 
@@ -79,9 +80,11 @@ async def ask(body: DemoAskRequest, request: Request, demo: DemoGateway = Depend
     session_id = f"demo-{uuid.uuid4().hex}"
     try:
         return demo_api.public_answer(await bridge.ask(persona.principal, body.question, session_id))
-    except AIProviderError:
-        # 上流のエラー文面は公開しない(詳細はサーバー側のログで確認する)
-        raise HTTPException(status_code=502, detail="AIサービスが一時的に利用できません") from None
+    except AIRateLimitError:
+        raise HTTPException(status_code=429, detail=AI_RATE_LIMITED) from None
+    except AIProviderError as e:
+        log_upstream("demo answer failed", e)
+        raise HTTPException(status_code=502, detail=AI_UNAVAILABLE) from None
     finally:
         bridge.reset_conversation(persona.principal, session_id)
 

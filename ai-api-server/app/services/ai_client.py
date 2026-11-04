@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 from app.config import Settings
 from app.services.ai_guard import GUARDRAIL_SYSTEM_PROMPT, build_tool_flags, redact_output
+from app.services.rate_limit import SlidingWindowLimiter, current_client
 
 
 class AIProviderError(Exception):
@@ -33,7 +34,12 @@ class AIProviderError(Exception):
     def __init__(self, provider: str, original: Exception | str):
         self.provider = provider
         self.original = original
-        super().__init__(f"[{provider}] AIプロバイダ呼び出しに失敗しました: {original}")
+        # httpx のタイムアウト等は str() が空になるので、原因が消えないよう repr に倒す
+        super().__init__(f"[{provider}] AIプロバイダ呼び出しに失敗しました: {str(original) or repr(original)}")
+
+
+class AIRateLimitError(AIProviderError):
+    """送信元ごとの回数上限に達した。縮退応答を持つ呼び出し側では通常の AI 失敗と同じ扱いになる。"""
 
 
 def _prompt_with_history(prompt: str, history: list[dict] | None) -> str:
@@ -452,6 +458,39 @@ class AntigravityProvider(AiProvider):
         # CLI は埋め込みを公開していないため n-gram 擬似埋め込みに委譲する。opencode と同じ
         # embedder_id なので、プロバイダを切り替えても再埋め込みは発生しない。
         return await MockProvider().embed(text)
+
+
+class PerClientLimitedProvider(AiProvider):
+    """LLM を呼ぶ前に送信元ごとの回数を数えるラッパー。送信元のない呼び出しは数えない。
+    埋め込みは数えない(CLI 系はローカル処理で、呼び出し回数が LLM 消費に対応しないため)。"""
+
+    def __init__(self, inner: AiProvider, per_hour: int):
+        self.inner = inner
+        self._limiter = SlidingWindowLimiter(per_hour, 3600)
+
+    name = property(lambda self: self.inner.name)
+    embedder_id = property(lambda self: self.inner.embedder_id)
+    supports_vision = property(lambda self: self.inner.supports_vision)
+    supports_web_search = property(lambda self: self.inner.supports_web_search)
+
+    def __getattr__(self, item):
+        return getattr(self.inner, item)
+
+    def _check(self) -> None:
+        client = current_client.get()
+        if client is not None and not self._limiter.allow(client):
+            raise AIRateLimitError(self.inner.name, f"送信元ごとの上限に達しました: {client}")
+
+    async def complete(self, prompt: str, history: list[dict] | None = None, tools: dict[str, bool] | None = None) -> str:
+        self._check()
+        return await self.inner.complete(prompt, history, tools)
+
+    async def complete_vision(self, prompt: str, image_bytes: bytes, mime: str) -> str:
+        self._check()
+        return await self.inner.complete_vision(prompt, image_bytes, mime)
+
+    async def embed(self, text: str) -> list[float]:
+        return await self.inner.embed(text)
 
 
 def build_ai_provider(settings: Settings) -> AiProvider:

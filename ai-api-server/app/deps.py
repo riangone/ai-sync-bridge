@@ -19,7 +19,7 @@ from functools import lru_cache
 from fastapi import HTTPException
 
 from app.config import Settings, get_settings
-from app.services.ai_client import AiProvider, build_ai_provider
+from app.services.ai_client import AiProvider, PerClientLimitedProvider, build_ai_provider
 from app.services.admin_service import AdminService, AuditLog
 from app.services.demo_data import DemoDataStore, get_demo_store
 from app.services.customer_service import CustomerService
@@ -51,7 +51,11 @@ from app.bridge.runtime import BridgeRuntime
 
 @lru_cache
 def get_ai_provider() -> AiProvider:
-    return build_ai_provider(get_settings())
+    settings = get_settings()
+    provider = build_ai_provider(settings)
+    if provider.name == "mock" or settings.ai_per_ip_per_hour <= 0:
+        return provider
+    return PerClientLimitedProvider(provider, settings.ai_per_ip_per_hour)
 
 
 @lru_cache

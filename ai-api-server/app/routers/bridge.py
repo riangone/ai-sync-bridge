@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field
 from app.bridge.acl import Principal, require_admin
 from app.bridge.runtime import BridgeRuntime
 from app.deps import get_bridge
-from app.services.ai_client import AIProviderError
+from app.public_errors import AI_RATE_LIMITED, AI_UNAVAILABLE, log_upstream
+from app.services.ai_client import AIProviderError, AIRateLimitError
 
 router = APIRouter(prefix="/api/bridge", tags=["bridge"])
 
@@ -77,8 +78,11 @@ async def answer_or_http_error(bridge: BridgeRuntime, p: Principal, question: st
         raise HTTPException(status_code=503, detail="LLM が未設定のため回答生成は利用できません")
     try:
         return await bridge.ask(p, question, session_id, top_k, entities)
+    except AIRateLimitError:
+        raise HTTPException(status_code=429, detail=AI_RATE_LIMITED) from None
     except AIProviderError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from None
+        log_upstream("bridge answer failed", e)
+        raise HTTPException(status_code=502, detail=AI_UNAVAILABLE) from None
 
 
 @router.get("/status")

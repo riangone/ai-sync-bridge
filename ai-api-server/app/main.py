@@ -7,12 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.services.ai_client import AIProviderError
+from app.public_errors import AI_RATE_LIMITED, AI_UNAVAILABLE, log_upstream
+from app.services.ai_client import AIProviderError, AIRateLimitError
+from app.services.rate_limit import ClientContextMiddleware
 from app.domains import register_routers
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, version="1.0.0")
+docs_kwargs = {} if settings.expose_api_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title=settings.app_name, version="1.0.0", **docs_kwargs)
+
+app.add_middleware(ClientContextMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,15 +52,13 @@ async def ai_provider_error_handler(request: Request, exc: AIProviderError):
     ことで、AI応答とエラーが型として絶対に混同されないことを保証する。
     個々のservice(nlsql/web_search等)で縮退応答が業務的に妥当な場合は、そちら側で
     個別にキャッチしてこのハンドラに到達させない。"""
-    return JSONResponse(
-        status_code=502,
-        content={
-            "error": True,
-            "message": "AIサービスが一時的に利用できません。しばらくしてから再度お試しください。",
-            "provider": exc.provider,
-            "detail": str(exc.original),
-        },
-    )
+    log_upstream("ai provider error", exc)
+    return JSONResponse(status_code=502, content={"error": True, "message": AI_UNAVAILABLE})
+
+
+@app.exception_handler(AIRateLimitError)
+async def ai_rate_limit_handler(request: Request, exc: AIRateLimitError):
+    return JSONResponse(status_code=429, content={"error": True, "message": AI_RATE_LIMITED})
 
 
 @app.get("/api/health")
@@ -63,9 +66,6 @@ def health():
     return {
         "status": "ok",
         "demo_mode": settings.demo_mode,
-        "ai_provider": settings.ai_provider,
-        "vector_backend": settings.vector_backend,
-        "domains": enabled_domains,
     }
 
 

@@ -39,6 +39,7 @@ import hashlib
 import random
 
 from app.services import ai_json_util
+from app.public_errors import AI_UNAVAILABLE, log_upstream
 from app.services.ai_client import AiProvider, AIProviderError
 from app.services.normalize_util import normalize as _normalize
 
@@ -166,7 +167,8 @@ class CompanySearchService:
             # 例外化されたため型で捕捉できるようになった)。検索は元々ベストエフォートな
             # 補助機能(登録はChrome拡張側の自動入力が担う)なので、ここでは呼び出し元
             # (company/property検索API)全体を落とさず0件+errorとして返す。
-            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": str(exc)}
+            log_upstream("web search failed", exc)
+            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": AI_UNAVAILABLE}
         parsed = ai_json_util.extract_json(ai_text)
         raw_results = parsed.get("results")
         results = []
@@ -263,7 +265,8 @@ class PropertySearchService:
                 self._PROMPT_TEMPLATE.format(keyword=keyword), tools={"websearch": True}
             )
         except AIProviderError as exc:
-            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": str(exc)}
+            log_upstream("web search failed", exc)
+            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": AI_UNAVAILABLE}
         parsed = ai_json_util.extract_json(ai_text)
         raw_results = parsed.get("results")
         results = []

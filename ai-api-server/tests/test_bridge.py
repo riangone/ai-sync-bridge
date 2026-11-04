@@ -488,6 +488,89 @@ def test_erp_demo_profile_has_no_public_keys_or_visitor_text():
             assert not key and not p.is_admin
 
 
+def test_per_client_limit_counts_llm_calls_by_ip_only():
+    from app.services.ai_client import AIRateLimitError, PerClientLimitedProvider
+    from app.services.rate_limit import ClientContextMiddleware, current_client
+
+    limited = PerClientLimitedProvider(MockProvider(), 2)
+    for _ in range(2):
+        current_client.set("1.1.1.1")
+        assert run(limited.complete("x"))
+    current_client.set("1.1.1.1")
+    try:
+        run(limited.complete("x"))
+        raise AssertionError("上限を超えて呼べた")
+    except AIRateLimitError:
+        pass
+    current_client.set("2.2.2.2")
+    assert run(limited.complete("x"))  # 別 IP は別枠
+    current_client.set(None)
+    for _ in range(5):
+        assert run(limited.complete("x"))  # 送信元のない内部呼び出しは数えない
+    assert run(limited.embed("x"))  # 埋め込みは数えない
+    assert limited.name == "mock" and limited.embedder_id == MockProvider().embedder_id
+
+    # ミドルウェア経由: プロキシの付けた IP がエンドポイントから見える
+    seen = []
+
+    async def inner(scope, receive, send):
+        seen.append(current_client.get())
+
+    def through(peer, xff=None):
+        headers = [(b"x-forwarded-for", xff.encode())] if xff else []
+        run(ClientContextMiddleware(inner)({"type": "http", "client": (peer, 1), "headers": headers}, None, None))
+        return seen[-1]
+
+    assert through("127.0.0.1") is None
+    assert through("127.0.0.1", "9.9.9.9, 8.8.8.8") == "8.8.8.8"
+    assert through("5.5.5.5", "9.9.9.9") == "5.5.5.5"
+
+
+def test_public_responses_hide_upstream_errors_and_provider_name():
+    import httpx
+
+    from app.main import app as real_app
+    from app.models.schemas import ChatResponse
+    from app.routers.nlsql import nlsql_query
+    from app.services.ai_client import AIProviderError, AIRateLimitError
+
+    assert ChatResponse(session_id="s", reply="r", provider="antigravity", history_length=0).provider == "live"
+    assert ChatResponse(session_id="s", reply="r", provider="mock", history_length=0).provider == "mock"
+
+    secret = "http://10.0.0.5:4096 credit exhausted big-pickle"
+    cl = TestClient(real_app, raise_server_exceptions=False)
+    health = cl.get("/api/health").json()
+    assert set(health) == {"status", "demo_mode"}, health
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert cl.get(path).status_code == 404, path
+
+    class Boom:
+        def __init__(self, exc):
+            self.exc = exc
+
+        async def send(self, *a, **k):
+            raise self.exc
+
+    from app.deps import get_ai_provider, get_chat_service
+    real_app.dependency_overrides[get_ai_provider] = MockProvider
+    for exc, code in ((AIProviderError("antigravity", secret), 502), (AIRateLimitError("antigravity", secret), 429)):
+        boom = Boom(exc)
+        real_app.dependency_overrides[get_chat_service] = lambda: boom  # noqa: B023
+        r = cl.post("/api/chat", json={"session_id": "s", "message": "x"})
+        assert r.status_code == code and "10.0.0.5" not in r.text and "antigravity" not in r.text, r.text
+    real_app.dependency_overrides.clear()
+
+    class LegacyDown:
+        async def query(self, *a):
+            raise httpx.ConnectError(f"cannot reach {secret}")
+
+    try:
+        run(nlsql_query(type("B", (), {"entity": "Customer", "question": "q"})(), LegacyDown()))
+        raise AssertionError("例外にならなかった")
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 502 and "10.0.0.5" not in str(e.detail), e
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
