@@ -147,7 +147,7 @@ class CompanySearchService:
         self.register_entity = "Supplier" if instance == "dealer" else "Customer"
 
     async def search(self, keyword: str) -> dict:
-        if self.ai is not None and getattr(self.ai, "name", "") == "opencode":
+        if self.ai is not None and getattr(self.ai, "supports_web_search", False):
             return await self._ai_search(keyword)
         if self.demo_mode:
             return {"keyword": keyword, "results": self._mock_search(keyword), "source": "mock"}
@@ -251,7 +251,7 @@ class PropertySearchService:
         self.ai = ai
 
     async def search(self, keyword: str) -> dict:
-        if self.ai is not None and getattr(self.ai, "name", "") == "opencode":
+        if self.ai is not None and getattr(self.ai, "supports_web_search", False):
             return await self._ai_search(keyword)
         if self.demo_mode:
             return {"keyword": keyword, "results": self._mock_search(keyword), "source": "mock"}

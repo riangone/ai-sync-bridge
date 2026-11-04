@@ -6,5 +6,5 @@
 cd "$(dirname "$0")"
 export AISB_INSTANCE=realestate
 export AISB_LEGACY_BASE_URL="${AISB_LEGACY_BASE_URL:-http://localhost:5030}"
-export AISB_AI_PROVIDER="${AISB_AI_PROVIDER:-opencode}"
+source ./ai-provider.sh
 exec .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 5031
