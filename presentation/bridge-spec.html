@@ -40,7 +40,7 @@
 
 <h1>AI-Sync Bridge 概要仕様書</h1>
 <p class="lead">既存の業務システムを改修せず、権限と監査を保ったまま AI 検索・AI 回答を追加する連携基盤</p>
-<p class="meta">2026年11月4日時点の実装に基づく。実測値の条件は第7章、未実装の項目は第8章に記載。</p>
+<p class="meta">2026年11月4日時点の実装に基づく。実測値の条件は第7章、未実装の項目は第8章に記載。実測は <code>ai-api-server/scripts/bench_bridge.py</code> で再現できます。</p>
 
 <h2>1. 解決する課題</h2>
 <p>基幹システムのデータを AI から使いたくても、次の理由で進まないことがあります。</p>
@@ -120,10 +120,10 @@
 <table>
   <tr><th>利用者</th><th>見える範囲</th><th class="num">権限で除外</th></tr>
   <tr><td>管理者</td><td>全データ</td><td class="num">0 件</td></tr>
-  <tr><td>人事</td><td>全部署の従業員</td><td class="num">98 件</td></tr>
-  <tr><td>経理課長</td><td>経理部の従業員のみ</td><td class="num">14 件</td></tr>
-  <tr><td>営業担当</td><td>人事データは見えない</td><td class="num">42 件</td></tr>
-  <tr><td>別テナント</td><td>何も見えない</td><td class="num">127 件</td></tr>
+  <tr><td>人事</td><td>全部署の従業員と、社内共通データ</td><td class="num">98 件</td></tr>
+  <tr><td>経理課長</td><td>従業員は経理部のみ。出荷データは見えない</td><td class="num">14 件</td></tr>
+  <tr><td>営業担当</td><td>従業員・請求・仕入先・他部署の出荷は見えない</td><td class="num">42 件</td></tr>
+  <tr><td>別テナント</td><td>ロールに関係なく何も見えない</td><td class="num">127 件</td></tr>
 </table>
 
 <h2>5. AI 回答(権限内 RAG)</h2>
@@ -134,7 +134,8 @@
   <li>回答中の引用番号を実際に渡した文書と照合し、一致しない番号は除去します。</li>
   <li>回答ごとに、元の検索・使用文書・引用・回答本文を監査ログに記録します。</li>
 </ol>
-<p>LLM にはツール実行権限を与えません。文書本文はデータとして区切って渡し、文書内の命令に従わないよう指示しています。</p>
+<p>LLM にはシェルやファイル読み取りのツールを与えません。antigravity 接続では、許可していないツールの呼び出しを検知すると、その回答を破棄します。文書本文はデータとして区切って渡し、文書内の命令に従わないよう指示しています。</p>
+<p>文書の関連度が低いときは候補から外します。残る文書が1件もなければ、LLM を呼ばずに定型文を返します。</p>
 
 <h2>6. 監査ログ</h2>
 <table>
@@ -144,32 +145,34 @@
   <tr><td><code>retrieval</code></td><td>利用者、検索語、渡した文書(内容ハッシュ付き)、権限で除外した件数</td></tr>
   <tr><td><code>rag.answer</code></td><td>関連する検索、使用文書、引用、回答本文</td></tr>
 </table>
-<p>各レコードは <code>sha256(前レコードのハッシュ + 本体)</code> で連結され、途中の書き換えや削除は検証 API で検出できます。検索語と回答本文を残すかどうかは設定で変更できます。</p>
+<p>各レコードは <code>sha256(前レコードのハッシュ + 本体)</code> で連結され、途中の書き換えや削除は検証 API で検出できます。検索語と回答本文を残すかどうかは設定で変更できます。公開デモでは残さず、ハッシュと件数だけを記録します。</p>
 
 <h2>7. 実測値</h2>
-<p class="note">条件: 本デモサーバー(aarch64, 2 vCPU, 12 GB RAM)、合成 CSV データ、ハイブリッド検索 ON、top_k=5、60クエリを逐次実行、全文書が閲覧可能な利用者。埋め込みは外部通信のない 64 次元 n-gram ハッシュのため、<strong>OpenAI 等の埋め込み API を使う場合、初回同期はこの値より大幅に長くなります。</strong></p>
+<p class="note">条件: 本デモサーバー(aarch64, 2 vCPU, 約 12 GB RAM)、合成 CSV データ、ハイブリッド検索 ON、top_k=5、60クエリを逐次実行、全文書が閲覧可能な利用者。埋め込みは外部通信のない 64 次元の簡易ハッシュ(文字と位置から計算)のため、<strong>外部の埋め込み API を使う場合、初回同期の時間はこの表に当てはまりません。</strong></p>
 <table>
   <tr><th>文書数</th><th class="num">初回同期</th><th class="num">1行変更の同期</th><th class="num">再起動時の読込</th><th class="num">検索 p50</th><th class="num">検索 p95</th><th class="num">最大メモリ</th></tr>
-  <tr><td>1,000</td><td class="num">0.19 秒</td><td class="num">0.05 秒</td><td class="num">0.05 秒</td><td class="num">16 ms</td><td class="num">17 ms</td><td class="num">73 MB</td></tr>
-  <tr><td>10,000</td><td class="num">2.0 秒</td><td class="num">0.54 秒</td><td class="num">0.62 秒</td><td class="num">146 ms</td><td class="num">160 ms</td><td class="num">183 MB</td></tr>
-  <tr><td>50,000</td><td class="num">10.9 秒</td><td class="num">2.8 秒</td><td class="num">3.5 秒</td><td class="num">767 ms</td><td class="num">846 ms</td><td class="num">673 MB</td></tr>
+  <tr><td>1,000</td><td class="num">0.17 秒</td><td class="num">0.05 秒</td><td class="num">0.05 秒</td><td class="num">16 ms</td><td class="num">17 ms</td><td class="num">72 MB</td></tr>
+  <tr><td>10,000</td><td class="num">1.9 秒</td><td class="num">0.54 秒</td><td class="num">0.49 秒</td><td class="num">141 ms</td><td class="num">144 ms</td><td class="num">184 MB</td></tr>
+  <tr><td>50,000</td><td class="num">11.0 秒</td><td class="num">2.8 秒</td><td class="num">3.3 秒</td><td class="num">728 ms</td><td class="num">740 ms</td><td class="num">684 MB</td></tr>
 </table>
 <ul>
   <li><strong>埋め込み回数:</strong> 全規模で、変更なしの同期は 0 回、1行変更は 1 回、再起動は 0 回でした。</li>
-  <li><strong>検索時間:</strong> 文書数にほぼ比例します。BM25 が閲覧可能な全文書を走査するためで、ベクトルバックエンドを変えても 10,000 件での差はほとんどありませんでした。</li>
-  <li><strong>稼働中の ERP デモ:</strong> 同期対象は百数十件、API プロセスのメモリは約 81 MB です。</li>
+  <li><strong>検索時間:</strong> 文書数にほぼ比例します。BM25 が閲覧可能な全文書を走査するためで、10,000 件で brute-force と ANN を比べても、差はほとんどありませんでした(141 ms / 144 ms)。</li>
+  <li><strong>稼働中の ERP デモ:</strong> 同期対象は 127 件、API プロセスのメモリは計測時に約 76 MB でした。</li>
 </ul>
 <div class="callout">現状で実用的に応答できる目安は<strong>1万件程度まで</strong>です。それを超える規模では、BM25 の転置インデックス化が必要です。</div>
 
 <h2>8. 実装状況と制約</h2>
 <table>
   <tr><th style="width:39%">項目</th><th style="width:13%">状態</th><th>補足</th></tr>
-  <tr><td>差分同期、ACL、監査チェーン、権限内 RAG の処理</td><td class="ok">実装・試験済</td><td>自動テストおよび ERP デモのデータで確認。RAG の確認は模擬 LLM によるもの</td></tr>
-  <tr><td>実 LLM での AI 回答の通し確認</td><td class="todo">未確認</td><td>デモで使う LLM の無料利用枠が上限に達しており、未実施</td></tr>
+  <tr><td>差分同期、ACL、監査チェーン、権限内 RAG の処理</td><td class="ok">実装・試験済</td><td>自動テストと ERP デモのデータで確認</td></tr>
+  <tr><td>実 LLM での AI 回答の通し確認</td><td class="ok">確認済</td><td>antigravity(gemini-3.8-flash-low)で、ERP デモの1問を5つの利用者で確認した範囲。回答精度の評価ではない</td></tr>
+  <tr><td>OpenAI / Gemini API の実接続</td><td class="todo">未検証</td><td>接続コードはあるが、実キーでの確認はしていない</td></tr>
+  <tr><td>ブリッジ以外の業務機能の実データ接続</td><td class="todo">未実装</td><td>在庫・発注・OCR 登録などはデモモード専用のものが多く、本番モードでは未実装エラーを返す</td></tr>
   <tr><td>ODBC 接続(SQL Server / Oracle / Access)</td><td class="todo">実機未検証</td><td>コードはあるが、試験は SQLite のみ</td></tr>
-  <tr><td>sqlite-vec 層</td><td class="todo">本サーバーで無効</td><td>導入済みパッケージのネイティブ拡張を読み込めず、ANN 層へ自動で切り替わっている</td></tr>
+  <tr><td>sqlite-vec 層</td><td class="todo">本サーバーで無効</td><td>aarch64 用パッケージのネイティブ拡張を読み込めない(32 ビット形式)。指定しても ANN 層へ切り替わる。公開デモの既定は brute-force</td></tr>
   <tr><td>完全閉域での AI 回答</td><td class="todo">未実装</td><td>ローカル LLM 用プロバイダがない。検索と同期は外部通信なしで動作する</td></tr>
-  <tr><td>意味検索の精度</td><td class="todo">要実モデル</td><td>外部通信なしの構成は n-gram ハッシュのため、キーワード一致(BM25)が中心</td></tr>
+  <tr><td>意味検索の精度</td><td class="todo">要実モデル</td><td>外部通信なしの構成は簡易ハッシュのため、キーワード一致(BM25)が中心。精度の定量評価は未実施</td></tr>
   <tr><td>SSO(SAML / OIDC)、権限の自動同期</td><td class="todo">未実装</td><td>権限の対応付けは導入時にプロファイルへ定義する</td></tr>
   <tr><td>個人情報の自動マスキング</td><td class="todo">未実装</td><td>現状の伏せ字処理は、サーバーのパス・IP・鍵らしき文字列のみが対象</td></tr>
   <tr><td>ブリッジ以外の API への ACL 適用</td><td class="todo">未対応</td><td>従来の検索・自然言語検索 API には ACL が効かない。本番では公開範囲を絞る必要がある</td></tr>
@@ -186,7 +189,7 @@
   <tr><td>第3週</td><td>LLM の接続、利用者ごとの検索・回答の確認</td><td>権限外データが回答に出ない</td></tr>
   <tr><td>第4週</td><td>現場での試用、精度と応答時間の計測、監査ログの確認</td><td>本番化の可否と追加開発の範囲を判断</td></tr>
 </table>
-<p class="note">接続先の環境やデータ規模により期間は変わります。第8章の項目が要件に含まれる場合は、別途開発期間が必要です。</p>
+<p class="note">この計画は目安で、所要期間を実績で裏づけたものではありません。接続先の環境やデータ規模により変わります。第8章の項目が要件に含まれる場合は、別途開発期間が必要です。</p>
 
 </main>
 </body>

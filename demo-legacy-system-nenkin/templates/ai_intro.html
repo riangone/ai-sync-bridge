@@ -25,7 +25,7 @@
         <div class="ai-intro-benefits">
             <div class="ai-intro-benefit">
                 <div class="ai-intro-benefit-icon">⌨️</div>
-                <h3>探す・入れるが1発で終わる</h3>
+                <h3>探す・入れる手間を減らす</h3>
                 <p>「北沢に住む山田さんの加入記録」で検索完了。台帳を1件ずつめくる手間が不要に。</p>
             </div>
             <div class="ai-intro-benefit">
@@ -105,12 +105,12 @@
                 </button>
                 <button type="button" class="ai-intro-card" aria-expanded="false">
                     <span class="ai-intro-card-head"><span class="ai-intro-card-title">セマンティック検索</span><span class="ai-intro-card-chevron">▾</span></span>
-                    <span class="ai-intro-card-sub">キーワードが多少あいまいでも意味で探し当てる</span>
+                    <span class="ai-intro-card-sub">入力文と文字列が近い顧客データを探す</span>
                     <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="search">▶ 自動デモを見る</span>
                     <span class="ai-intro-card-detail">
-                        <span class="ai-intro-detail-row"><b>できること</b>完全一致でなくても、言葉の意味が近い被保険者・事業所・請求などをAIが探し出す。</span>
+                        <span class="ai-intro-detail-row"><b>できること</b>デモ用の顧客データの中から、入力文と文字列が近いものを探す。この公開デモは外部の埋め込みモデルを使わない簡易ベクトルのため、言葉の意味の近さまでは判定しない。</span>
                         <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「セマンティック検索」タブ → 自然文またはキーワードを入力 →「検索」</span>
-                        <span class="ai-intro-detail-row"><b>入力例</b>「北沢に住む高齢の被保険者」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「山田」</span>
                     </span>
                 </button>
                 <button type="button" class="ai-intro-card" aria-expanded="false">
@@ -130,9 +130,9 @@
             <div class="ai-intro-cards">
                 <button type="button" class="ai-intro-card" aria-expanded="false">
                     <span class="ai-intro-card-head"><span class="ai-intro-card-title">自然言語入力</span><span class="ai-intro-card-chevron">▾</span></span>
-                    <span class="ai-intro-card-sub">「◯◯さんの老齢基礎年金を裁定請求したい」で入力フォームを自動作成</span>
+                    <span class="ai-intro-card-sub">「◯◯さんの老齢基礎年金を裁定請求したい」で入力内容の下書きを作成</span>
                     <span class="ai-intro-card-detail">
-                        <span class="ai-intro-detail-row"><b>できること</b>話し言葉のまま伝えた依頼内容を、対象画面(年金請求/被保険者登録/相談受付)の項目に自動でマッピング。結果は一覧表示のみで、実フォームへの書き込み・送信は行わない(内容確認は必ず人が行う)。</span>
+                        <span class="ai-intro-detail-row"><b>できること</b>話し言葉のまま伝えた依頼内容を、対象画面(年金請求/被保険者登録/相談受付)の項目に自動でマッピング。結果を一覧で確認し、ボタン操作で新規登録ページを開いて入力できる。保存は人が行い、自動送信はしない。</span>
                         <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「自然言語入力」タブ → 対象画面を選択 → 依頼内容を日本語で入力 → マッピング結果を確認</span>
                         <span class="ai-intro-detail-row"><b>入力例</b>「山田太郎さんの老齢基礎年金を裁定請求したい」</span>
                     </span>
@@ -142,7 +142,7 @@
                     <span class="ai-intro-card-sub">紙の裁定請求書や本人確認書類を画像から読み取り自動入力</span>
                     <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="ocr">▶ 自動デモを見る</span>
                     <span class="ai-intro-card-detail">
-                        <span class="ai-intro-detail-row"><b>できること</b>裁定請求書・年金加入記録に関する届出書などの画像をAIビジョンが読み取り、テキスト化して抽出。窓口・コールセンターでの聞き取り・手入力の手間を削減する。</span>
+                        <span class="ai-intro-detail-row"><b>できること</b>裁定請求書・年金加入記録に関する届出書などの画像をAIビジョンが読み取り、テキスト化して抽出。窓口・コールセンターでの聞き取り・手入力の手間を削減する。画像に対応したAIプロバイダが未接続の間はサンプル結果を返す。</span>
                         <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「OCR取込」タブ → 画像/PDFファイルを選択 →「OCR実行」</span>
                         <span class="ai-intro-detail-row"><b>入力例</b>窓口に持ち込まれた裁定請求書を撮影した写真、またはスキャンPDF</span>
                     </span>
@@ -155,7 +155,7 @@
             <div class="ai-intro-cards">
                 <button type="button" class="ai-intro-card" aria-expanded="false">
                     <span class="ai-intro-card-head"><span class="ai-intro-card-title">予測分析</span><span class="ai-intro-card-chevron">▾</span></span>
-                    <span class="ai-intro-card-sub">相談件数・年金請求件数の先行きをAIが予測しグラフ表示</span>
+                    <span class="ai-intro-card-sub">相談件数・年金請求件数の先行きを統計計算で推定しグラフ表示</span>
                     <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="analytics">▶ 自動デモを見る</span>
                     <span class="ai-intro-card-detail">
                         <span class="ai-intro-detail-row"><b>できること</b>年金請求・相談受付の件数を線形回帰で予測しグラフ表示。「AIでトレンドを解釈する」で数字の意味をAIが解説し、繁忙日に向けた窓口/オペレーター配置の判断材料にできる。</span>
@@ -165,10 +165,10 @@
                 </button>
                 <button type="button" class="ai-intro-card" aria-expanded="false">
                     <span class="ai-intro-card-head"><span class="ai-intro-card-title">アラート</span><span class="ai-intro-card-chevron">▾</span></span>
-                    <span class="ai-intro-card-sub">滞留している年金請求や再連絡待ちの相談を自動検知</span>
+                    <span class="ai-intro-card-sub">滞留している年金請求や再連絡待ちの相談をまとめて確認</span>
                     <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="alerts">▶ 自動デモを見る</span>
                     <span class="ai-intro-card-detail">
-                        <span class="ai-intro-detail-row"><b>できること</b>「受付」のまま処理が進んでいない年金請求や、再連絡待ち・保留のままの相談受付をまとめてワンクリックで確認。「AIで対応優先度を解釈する」で何から対応すべきかを本物のAIが解説し、この端末を通知購読しておくこともできる。</span>
+                        <span class="ai-intro-detail-row"><b>できること</b>「受付」のまま処理が進んでいない年金請求や、再連絡待ち・保留のままの相談受付をまとめてワンクリックで確認。「AIで対応優先度を解釈する」で何から対応すべきかを本物のAIが解説し、この端末の通知購読を登録できる(プッシュ通知の送信は未実装)。</span>
                         <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「アラート」タブ →「アラートを確認」→ 必要なら「AIで対応優先度を解釈する」または「この端末を購読する」</span>
                         <span class="ai-intro-detail-row"><b>入力例</b>入力不要。ボタン1つで滞留請求・再連絡待ちの相談をまとめて確認。</span>
                     </span>

@@ -21,7 +21,7 @@ window.AISB = window.AISB || {};
 window.AISB.demoScenarios = {
   search: {
     title: "セマンティック検索を1クリックで体験",
-    doneText: "完全一致でなくても、意味が近い住民をAIが探し出しました。",
+    doneText: "完全一致でなくても、文字列が近い住民を探し出しました。",
     steps: [
       { type: "openPanel", panel: "search", text: "AIパネルの「セマンティック検索」タブを自動で開きます…" },
       { type: "narrate", text: "検索ボックスに条件を入力してみます(この入力は自動デモです)" },

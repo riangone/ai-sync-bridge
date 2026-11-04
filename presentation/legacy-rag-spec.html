@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>レガシーシステム向け RAG・データ連携基盤 概要仕様書</title>
+<style>
+  :root {
+    --bg-main: #0a0e17;
+    --bg-card: #121927;
+    --bg-card-hover: #1a2336;
+    --bg-card-subtle: rgba(255, 255, 255, 0.03);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-accent: rgba(56, 189, 248, 0.3);
+    
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    
+    --accent-blue: #38bdf8;
+    --accent-teal: #2dd4bf;
+    --accent-indigo: #818cf8;
+    --accent-amber: #fbbf24;
+    --accent-rose: #fb7185;
+    
+    --code-bg: #070a10;
+    --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, monospace;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Presentation Container */
+  #deck {
+    width: 100vw;
+    height: 100vh;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+
+  .slide {
+    width: 100vw;
+    height: 100vh;
+    scroll-snap-align: start;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 50px 70px 80px 70px;
+    background: 
+      radial-gradient(1000px 500px at 85% 10%, rgba(56, 189, 248, 0.08), transparent 60%),
+      radial-gradient(900px 600px at 15% 90%, rgba(45, 212, 191, 0.05), transparent 50%),
+      linear-gradient(180deg, #0a0e17 0%, #0d1320 100%);
+  }
+
+  .slide-container {
+    width: 100%;
+    max-width: 1240px;
+    height: 100%;
+    max-height: 720px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Slide Headers */
+  .slide-header {
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
+  .slide-category {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .slide-category::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--accent-teal);
+    border-radius: 50%;
+  }
+  .slide-title {
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #fff;
+  }
+  .slide-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+  }
+  .slide-badge {
+    padding: 4px 10px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-mono: var(--font-mono);
+    color: var(--accent-blue);
+  }
+
+  /* Slide Body & Layouts */
+  .slide-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; height: 100%; align-items: stretch; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; height: 100%; align-items: stretch; }
+  .grid-3-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; height: 100%; align-items: stretch; }
+
+  .slide-content > .grid-3, .slide-content > .grid-2 { height: auto; flex: 0 1 auto; }
+  .slide-content { min-height: 0; }
+  .spec-table td, .spec-table th { padding: 7px 12px; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .card.highlight {
+    border-color: var(--border-accent);
+    background: linear-gradient(145deg, rgba(18, 25, 39, 0.95), rgba(26, 35, 54, 0.9));
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .card-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+  .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .card p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+
+  /* Lists */
+  .spec-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .spec-list li {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.5;
+  }
+  .spec-list li strong {
+    color: #fff;
+  }
+  .spec-list li::before {
+    content: "▹";
+    color: var(--accent-teal);
+    font-weight: bold;
+  }
+
+  /* Tables */
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  .spec-table th, .spec-table td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .spec-table th {
+    background: var(--bg-card-subtle);
+    color: var(--accent-blue);
+    font-weight: 600;
+  }
+  .spec-table td {
+    color: var(--text-secondary);
+  }
+  .spec-table tr:hover td {
+    background: rgba(255,255,255,0.02);
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .tag-green { background: rgba(45, 212, 191, 0.15); color: var(--accent-teal); border: 1px solid rgba(45, 212, 191, 0.3); }
+  .tag-blue { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.3); }
+  .tag-amber { background: rgba(251, 191, 36, 0.15); color: var(--accent-amber); border: 1px solid rgba(251, 191, 36, 0.3); }
+
+  /* Code block */
+  .code-container {
+    background: var(--code-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+  .code-keyword { color: var(--accent-rose); font-weight: 600; }
+  .code-fn { color: var(--accent-blue); }
+  .code-str { color: var(--accent-teal); }
+  .code-comment { color: var(--text-muted); font-style: italic; }
+
+  /* Diagram Box */
+  .diagram-box {
+    background: #080c14;
+    border: 1px dashed rgba(56, 189, 248, 0.35);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: #cbd5e1;
+    white-space: pre;
+  }
+
+  /* Slide Footers */
+  .slide-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  /* Title Slide Specifics */
+  .cover-slide {
+    text-align: left;
+    align-items: flex-start;
+  }
+  .cover-tagline {
+    font-size: 1.1rem;
+    color: var(--accent-teal);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cover-h1 {
+    font-size: 3.2rem;
+    font-weight: 800;
+    line-height: 1.15;
+    background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 20px;
+    max-width: 950px;
+  }
+  .cover-desc {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    max-width: 780px;
+    line-height: 1.6;
+    margin-bottom: 40px;
+  }
+  .cover-meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 24px;
+    width: 100%;
+    max-width: 860px;
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .meta-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .meta-value { font-size: 0.95rem; color: var(--text-primary); font-weight: 600; }
+
+  /* Navigation Bar (Sticky Bottom) */
+  #controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 54px;
+    background: rgba(10, 14, 23, 0.92);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    z-index: 100;
+  }
+  .controls-left, .controls-right { display: flex; align-items: center; gap: 14px; }
+  .nav-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-btn:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent-blue);
+    color: #fff;
+  }
+  #slide-select {
+    background: rgba(18, 25, 39, 0.9);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    outline: none;
+    cursor: pointer;
+    max-width: 320px;
+  }
+  #slide-select:focus { border-color: var(--accent-blue); }
+
+  /* Progress Bar */
+  #progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-teal), var(--accent-blue));
+    width: 0%;
+    transition: width 0.3s ease;
+    z-index: 101;
+  }
+
+  /* Dots Nav */
+  #dots-nav {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 90;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .dot.active {
+    background: var(--accent-blue);
+    transform: scale(1.4);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+  }
+
+  @media (max-height: 760px) {
+    .slide { padding: 26px 56px 62px; }
+    .slide-header { margin-bottom: 10px; padding-bottom: 8px; }
+    .slide-title { font-size: 1.45rem; }
+    .slide-content { gap: 10px; }
+    .card { padding: 12px 16px; }
+    .card-header { margin-bottom: 6px; }
+    .spec-table { font-size: 0.76rem; }
+    .spec-table td, .spec-table th { padding: 4px 10px; }
+    .spec-list { gap: 4px; }
+    .spec-list li { font-size: 0.78rem; line-height: 1.35; }
+    .card p { font-size: 0.8rem; margin-bottom: 4px; }
+    .slide-footer { padding-top: 6px; font-size: 0.72rem; }
+  }
+
+  /* Print Styles */
+  @media print {
+    body, #deck { overflow: visible !important; height: auto !important; }
+    .slide { height: 100vh !important; page-break-after: always; padding: 40px !important; }
+    #controls, #dots-nav, #progress-bar { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<div id="dots-nav"></div>
+
+<main id="deck">
+
+  <section class="slide" id="slide-1">
+    <div class="slide-container cover-slide">
+      <div>
+        <div class="cover-tagline"><span>❖</span> ARCHITECTURE OVERVIEW</div>
+        <h1 class="cover-h1">レガシーシステム向け RAG・<br>データ連携基盤 概要仕様書</h1>
+        <p class="cover-desc">既存の業務システムを改修せず、読み取り専用の接続で取り込み、<br>利用者の権限内のデータだけで検索・AI回答を行い、その経緯を監査ログに残す</p>
+      </div>
+      <div class="cover-meta">
+        <div class="meta-item"><span class="meta-label">基準日</span><span class="meta-value">2026年11月4日の実装</span></div>
+        <div class="meta-item"><span class="meta-label">状態</span><span class="meta-value">デモ・PoC 段階</span></div>
+        <div class="meta-item"><span class="meta-label">動作確認環境</span><span class="meta-value">Linux aarch64 のみ</span></div>
+        <div class="meta-item"><span class="meta-label">本番導入</span><span class="meta-value">Slide 11 の制約を確認</span></div>
+      </div>
+      <div class="slide-footer"><span>数値はすべて Slide 10 の条件での実測値です</span><span>AI-Sync Bridge</span></div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-2">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Problem &amp; Approach</div>
+          <h2 class="slide-title">課題と本基盤の方針</h2>
+        </div>
+        <div class="slide-badge">SECTION 01</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-3">
+<div class="card"><div class="card-header"><div class="card-icon">!</div><div class="card-title">改修できない</div></div><p>長年稼働している基幹システムは、改修や検証の負担が大きい。ソースや設計書が揃っていない場合もある。</p></div>
+<div class="card"><div class="card-header"><div class="card-icon">!</div><div class="card-title">権限を守れない</div></div><p>文書をまとめて検索対象にすると、本来見られないデータまで AI 経由で見えてしまう。</p></div>
+<div class="card"><div class="card-header"><div class="card-icon">!</div><div class="card-title">説明できない</div></div><p>AI がどのデータを根拠に回答したのか、後から確認できない。</p></div>
+</div>
+<div class="card highlight"><div class="card-header"><div class="card-icon">✓</div><div class="card-title">本基盤の方針</div></div><ul class="spec-list"><li><span><strong>読み取りのみ:</strong> Connector は HTTP 一覧の取得、SQL の SELECT、ファイル読み込みだけを行う</span></li><li><span><strong>差分同期:</strong> 内容が変わった行だけ再埋め込みし、埋め込みと同期位置を永続化する</span></li><li><span><strong>権限の事前適用:</strong> 閲覧できない文書は、スコア計算にも LLM へのプロンプトにも入れない</span></li><li><span><strong>監査:</strong> 同期・検索・AI回答をハッシュチェーンで記録する</span></li></ul></div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 2 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-3">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">System Architecture</div>
+          <h2 class="slide-title">全体構成</h2>
+        </div>
+        <div class="slide-badge">SECTION 02</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-3-2">
+<div class="card"><div class="card-header"><div class="card-icon">01</div><div class="card-title">コンポーネント連携</div></div><div class="diagram-box">┌────────── 既存システム(無改修) ──────────┐
+│ 業務 Web API   業務 DB    出力ファイル      │
+└───────┬────────────┬───────────┬────────────┘
+        │ 一覧取得   │ SELECT    │ CSV/TSV/固定長
+┌───────▼────────────▼───────────▼────────────┐
+│ Connector (http_list / sql / file)          │
+│ SyncEngine: 行ハッシュで差分判定            │
+│ BridgeStore: 文書・ベクトル・カーソル       │
+│ Retriever + ACL: 権限フィルタ → BM25+ベクトル│
+│ GroundedAnswerer: 権限内の文書で回答        │
+│ AuditLog: ハッシュチェーン                  │
+└───────┬─────────────────────┬───────────────┘
+        ▼                     ▼
+  サイドパネル            LLM プロバイダ
+ (拡張 / 組込み)  (antigravity / opencode /
+                           openai / gemini / mock)</div></div>
+<div class="card"><div class="card-header"><div class="card-icon">02</div><div class="card-title">役割分担</div></div><ul class="spec-list"><li><span><strong>既存システム:</strong> 書き込み経路を持たない</span></li><li><span><strong>ai-api-server:</strong> FastAPI。ブリッジは <code>app/bridge/</code></span></li><li><span><strong>aisb-core:</strong> サイドパネルの共通コードと組込み用ミドルウェア</span></li><li><span><strong>導入先ごとの差分:</strong> <code>bridge.yaml</code> と <code>profile.json</code> に記述</span></li><li><span><strong>デモ:</strong> ERP・ディーラー・不動産仲介・自治体窓口・年金相談の5種。ブリッジを設定しているのは ERP のみ</span></li></ul></div>
+</div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 3 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-4">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Client Layer</div>
+          <h2 class="slide-title">画面への組み込み</h2>
+        </div>
+        <div class="slide-badge">SECTION 03</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-icon">UI</div><div class="card-title">2つの方式</div></div><table class="spec-table"><thead><tr><th>方式</th><th>既存システムの変更</th><th>制約</th></tr></thead><tbody><tr><td>Chrome 拡張</td><td>コード変更なし</td><td>対象 URL の追加と配布が必要</td></tr><tr><td>組込み(aisb-core)</td><td>FastAPI の起動処理に2行追加</td><td>現状は FastAPI アプリのみ</td></tr></tbody></table><ul class="spec-list"><li><span>サイドパネルは <code>mode: closed</code> の Shadow DOM に描画し、CSS の衝突を避ける</span></li><li><span>古いブラウザ・IE 専用画面での動作は未確認</span></li></ul></div>
+<div class="card"><div class="card-header"><div class="card-icon">DOM</div><div class="card-title">画面の読み取りと入力</div></div><ul class="spec-list"><li><span><strong>読み取り:</strong> URL・タイトル・入力欄・一覧を取得し、AI への文脈として渡す</span></li><li><span><strong>入力:</strong> 自然文や OCR の結果を項目に対応づけ、ボタン操作で新規登録ページに入力する</span></li><li><span><strong>送信:</strong> 自動送信はしない。保存は人が行う</span></li><li><span><strong>OCR:</strong> 画像に対応したプロバイダが必要。未接続の間はサンプル結果を返す</span></li></ul></div>
+</div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 4 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-5">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Retrieval</div>
+          <h2 class="slide-title">検索の仕組み</h2>
+        </div>
+        <div class="slide-badge">SECTION 04</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-icon">H</div><div class="card-title">ハイブリッド検索</div></div><ul class="spec-list"><li><span>文字 bigram の BM25 とベクトル検索を RRF で統合する</span></li><li><span>BM25 の統計は閲覧可能な文書だけで計算し、隠れた文書の存在を推測されないようにする</span></li><li><span>簡易ハッシュの埋め込みではベクトルの重みを下げ、関連度の低い文書を除外する</span></li><li><span>件数・重み・足切りは <code>bridge.yaml</code> で変更できる</span></li></ul></div>
+<div class="card"><div class="card-header"><div class="card-icon">V</div><div class="card-title">ベクトルバックエンド</div></div><table class="spec-table"><thead><tr><th>層</th><th>方式</th><th>このサーバーの状態</th></tr></thead><tbody><tr><td>sqlite-vec</td><td>ネイティブ拡張</td><td>読み込めない(32 ビット形式の配布物)</td></tr><tr><td>ANN</td><td>ランダム射影</td><td>動作する</td></tr><tr><td>brute-force</td><td>全件のコサイン計算</td><td>公開デモの既定</td></tr></tbody></table><p style="margin-top:12px">外部通信なしの埋め込みは簡易ハッシュで、意味の近さは判定しません。意味検索には実モデルの接続が必要で、精度の定量評価はまだ行っていません。</p></div>
+</div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 5 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-6">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Incremental Sync</div>
+          <h2 class="slide-title">差分同期</h2>
+        </div>
+        <div class="slide-badge">SECTION 05</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-icon">S</div><div class="card-title">処理の流れ</div></div><div class="code-container" style="white-space:pre"><span class="code-comment"># 同期の流れ(実装: app/bridge/sync_engine.py の要約)</span>
+<span class="code-keyword">for</span> row <span class="code-keyword">in</span> connector.fetch_changes(entity, cursor):
+    content_hash = sha256(本文 + ACL)
+    <span class="code-keyword">if</span> 保存済みのハッシュと埋め込みモデル ID が同じ:
+        <span class="code-keyword">continue</span>   <span class="code-comment"># 再埋め込みしない</span>
+    保存(row, embed(本文), content_hash)
+    監査ログ("sync.upsert")
+カーソルを保存   <span class="code-comment"># 再起動後は続きから</span></div></div>
+<div class="card"><div class="card-header"><div class="card-icon">M</div><div class="card-title">確認できたこと</div></div><table class="spec-table"><thead><tr><th>操作</th><th>埋め込み回数</th></tr></thead><tbody><tr><td>初回同期</td><td>文書数と同じ</td></tr><tr><td>変更なしで再同期</td><td>0 回</td></tr><tr><td>1行変更して再同期</td><td>1 回</td></tr><tr><td>再起動</td><td>0 回</td></tr></tbody></table><ul class="spec-list"><li><span>1,000 / 10,000 / 50,000 件のすべてで同じ結果</span></li><li><span>SQL のウォーターマーク方式では行の削除を検出できないため、全件比較の周期か論理削除列が必要</span></li><li><span>同期は手動または <code>interval_sec</code> による定期実行</span></li></ul></div>
+</div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 6 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-7">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Access Control &amp; Answer</div>
+          <h2 class="slide-title">権限制御と AI 回答</h2>
+        </div>
+        <div class="slide-badge">SECTION 06</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-icon">ACL</div><div class="card-title">判定ルール(既定は拒否)</div></div><table class="spec-table"><thead><tr><th>判定軸</th><th>内容</th></tr></thead><tbody><tr><td>テナント</td><td>一致が必須。管理者も越境不可</td></tr><tr><td>ロール</td><td>エンティティごとに許可ロールを宣言</td></tr><tr><td>部署</td><td>行の列値と対応付け可能</td></tr></tbody></table><p style="margin-top:10px">ERP デモ(127 件)で「経理部 課長」を検索したときの除外件数:</p><table class="spec-table"><thead><tr><th>管理者</th><th>人事</th><th>経理課長</th><th>営業</th><th>別テナント</th></tr></thead><tbody><tr><td>0</td><td>98</td><td>14</td><td>42</td><td>127</td></tr></tbody></table></div>
+<div class="card"><div class="card-header"><div class="card-icon">RAG</div><div class="card-title">AI 回答の規則</div></div><ul class="spec-list"><li><span>LLM に渡すのは権限内の文書だけ</span></li><li><span>該当する文書がなければ LLM を呼ばず定型文を返す</span></li><li><span>会話履歴は「テナント + 利用者 + セッション」で分離</span></li><li><span>回答中の引用番号を照合し、一致しない番号を除去</span></li><li><span>文書はデータとして区切って渡す(プロンプトインジェクション対策の第一層で、完全な防御ではない)</span></li><li><span>実 LLM(antigravity)では ERP デモの1問で確認した。回答精度の評価ではない</span></li></ul></div>
+</div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 7 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-8">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Audit</div>
+          <h2 class="slide-title">監査ログ</h2>
+        </div>
+        <div class="slide-badge">SECTION 07</div>
+      </div>
+      <div class="slide-content">
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-icon">LOG</div><div class="card-title">記録する内容</div></div><table class="spec-table"><thead><tr><th>種別</th><th>内容</th></tr></thead><tbody><tr><td><code>sync.upsert / delete</code></td><td>取り込み・削除した行と内容ハッシュ</td></tr><tr><td><code>sync.run</code></td><td>同期ごとの件数・所要時間・エラー</td></tr><tr><td><code>retrieval</code></td><td>利用者、渡した文書、権限で除外した件数</td></tr><tr><td><code>rag.answer</code></td><td>関連する検索、使用文書、引用</td></tr></tbody></table></div>
+<div class="card"><div class="card-header"><div class="card-icon">!</div><div class="card-title">確認できることと限界</div></div><ul class="spec-list"><li><span>各レコードは前レコードのハッシュと連結し、途中の書き換えや削除を検証 API で検出する</span></li><li><span>検索語と回答本文を残すかは設定できる。公開デモでは残さず、ハッシュと件数だけを記録する</span></li><li><span><strong>限界:</strong> DB の書き込み権限を持つ者がチェーン全体を再計算すると検出できない。外部への定期保管が別途必要</span></li><li><span>端末や画面の記録、SIEM 連携は未実装</span></li></ul></div>
+</div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 8 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-9">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Connectors</div>
+          <h2 class="slide-title">データ接続</h2>
+        </div>
+        <div class="slide-badge">SECTION 08</div>
+      </div>
+      <div class="slide-content">
+<div class="card"><div class="card-header"><div class="card-icon">DB</div><div class="card-title">実装済みの Connector</div></div><table class="spec-table"><thead><tr><th>Connector</th><th>接続先</th><th>差分の検出</th><th>削除の検出</th><th>確認状況</th></tr></thead><tbody><tr><td><code>http_list</code></td><td>既存の一覧 API</td><td>全件取得して行ハッシュで比較</td><td>可</td><td><span class="tag tag-green">実装・試験済</span></td></tr><tr><td><code>file</code></td><td>CSV / TSV / 固定長(既定 cp932)</td><td>ファイルの SHA-256 → 行ハッシュ</td><td>可</td><td><span class="tag tag-green">実装・試験済</span></td></tr><tr><td><code>sql</code>(SQLite)</td><td>SQLite</td><td>ウォーターマークまたは全件比較</td><td>全件比較時のみ</td><td><span class="tag tag-green">実装・試験済</span></td></tr><tr><td><code>sql</code>(ODBC)</td><td>SQL Server / Oracle / Access など</td><td>同上</td><td>全件比較時のみ</td><td><span class="tag tag-amber">未検証</span></td></tr></tbody></table></div>
+<div class="grid-2"><div class="card"><div class="card-header"><div class="card-icon">×</div><div class="card-title">未実装のデータ源</div></div><ul class="spec-list"><li><span>図面(DXF / DWG)の解析</span></li><li><span>施工実測値と公差の照合、報告書の様式出力</span></li><li><span>業務パッケージ専用の連携</span></li><li><span>ファイルのリアルタイム監視(inotify 等)</span></li></ul></div>
+<div class="card"><div class="card-header"><div class="card-icon">⚙</div><div class="card-title">追加の方法</div></div><ul class="spec-list"><li><span><code>Connector</code> は <code>entities()</code> と <code>fetch_changes()</code> を実装する</span></li><li><span>業種固有の知識はコアに書かず、YAML プロファイルに置く</span></li></ul></div></div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 9 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-10">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Measured Performance</div>
+          <h2 class="slide-title">実測値</h2>
+        </div>
+        <div class="slide-badge">SECTION 09</div>
+      </div>
+      <div class="slide-content">
+<div class="card"><div class="card-header"><div class="card-icon">⚡</div><div class="card-title">ブリッジ単体の実測</div></div><table class="spec-table"><thead><tr><th>文書数</th><th>初回同期</th><th>1行変更の同期</th><th>再起動時の読込</th><th>検索 p50</th><th>検索 p95</th><th>最大メモリ</th></tr></thead><tbody><tr><td>1,000</td><td>0.17 秒</td><td>0.05 秒</td><td>0.05 秒</td><td>16 ms</td><td>17 ms</td><td>72 MB</td></tr><tr><td>10,000</td><td>1.9 秒</td><td>0.54 秒</td><td>0.49 秒</td><td>141 ms</td><td>144 ms</td><td>184 MB</td></tr><tr><td>50,000</td><td>11.0 秒</td><td>2.8 秒</td><td>3.3 秒</td><td>728 ms</td><td>740 ms</td><td>684 MB</td></tr></tbody></table></div>
+<div class="grid-2"><div class="card"><div class="card-header"><div class="card-icon">C</div><div class="card-title">条件</div></div><ul class="spec-list"><li><span>本デモサーバー(aarch64, 2 vCPU, 約 12 GB RAM)</span></li><li><span>合成 CSV、ハイブリッド検索、top_k=5、60クエリを逐次実行</span></li><li><span>外部通信なしの簡易ハッシュ埋め込み。外部の埋め込み API の待ち時間は含まない</span></li><li><span>再現: <code>ai-api-server/scripts/bench_bridge.py</code></span></li></ul></div>
+<div class="card"><div class="card-header"><div class="card-icon">!</div><div class="card-title">読み方</div></div><ul class="spec-list"><li><span>検索時間は文書数にほぼ比例する。BM25 が閲覧可能な全文書を走査するため</span></li><li><span>10,000 件で brute-force と ANN に差はほとんどない(141 ms / 144 ms)</span></li><li><span><strong>現状の目安は 1 万件程度まで。</strong>超える場合は BM25 の転置インデックス化が必要</span></li><li><span>稼働率や導入費用の実績値はまだない</span></li></ul></div></div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 10 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-11">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">Implementation Status</div>
+          <h2 class="slide-title">実装状況と制約</h2>
+        </div>
+        <div class="slide-badge">SECTION 10</div>
+      </div>
+      <div class="slide-content">
+<div class="card"><div class="card-header"><div class="card-icon">✓</div><div class="card-title">本番導入の前に確認する項目</div></div><table class="spec-table"><thead><tr><th>項目</th><th>状態</th><th>補足</th></tr></thead><tbody><tr><td>完全閉域での AI 回答</td><td><span class="tag tag-amber">未実装</span></td><td>ローカル LLM 用プロバイダがない。検索と同期は外部通信なしで動作する</td></tr><tr><td>SSO、権限の自動同期</td><td><span class="tag tag-amber">未実装</span></td><td>権限の対応付けは導入時に定義する</td></tr><tr><td>個人情報の自動マスキング</td><td><span class="tag tag-amber">未実装</span></td><td>現状の伏せ字はサーバーのパス・IP・鍵らしき文字列のみ</td></tr><tr><td>ブリッジ以外の API への ACL</td><td><span class="tag tag-amber">未実装</span></td><td>従来の検索・自然言語検索 API には ACL が効かない</td></tr><tr><td>業務パネルの実データ接続</td><td><span class="tag tag-amber">未実装</span></td><td>在庫・発注・OCR 登録などはデモモード専用のものが多い</td></tr><tr><td>定期実行のワークフロー</td><td><span class="tag tag-amber">未実装</span></td><td>手動実行または API 呼び出しのみ</td></tr><tr><td>プッシュ通知の送信</td><td><span class="tag tag-amber">未実装</span></td><td>購読情報の登録まで</td></tr><tr><td>OpenAI / Gemini の実接続</td><td><span class="tag tag-amber">未検証</span></td><td>接続コードはあるが、実キーでは未確認</td></tr><tr><td>.NET 版</td><td><span class="tag tag-amber">未実装</span></td><td>現在の実装は Python(FastAPI)のみ</td></tr></tbody></table></div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 11 / 12</span>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="slide" id="slide-12">
+    <div class="slide-container">
+      <div class="slide-header">
+        <div class="header-left">
+          <div class="slide-category">PoC Plan</div>
+          <h2 class="slide-title">PoC の進め方(目安)</h2>
+        </div>
+        <div class="slide-badge">SECTION 11</div>
+      </div>
+      <div class="slide-content">
+<div class="card"><div class="card-header"><div class="card-icon">W</div><div class="card-title">4週間の計画例</div></div><table class="spec-table"><thead><tr><th>時期</th><th>実施内容</th><th>完了条件</th></tr></thead><tbody><tr><td>第1週</td><td>対象データの選定、読み取り専用の接続確認、権限表の整理</td><td>取り込み対象と権限の対応が確定</td></tr><tr><td>第2週</td><td>プロファイル作成、初回同期、差分同期の確認</td><td>変更行だけが更新される</td></tr><tr><td>第3週</td><td>LLM の接続、利用者ごとの検索・回答の確認</td><td>権限外データが回答に出ない</td></tr><tr><td>第4週</td><td>現場での試用、精度と応答時間の計測、監査ログの確認</td><td>本番化の可否と追加開発の範囲を判断</td></tr></tbody></table></div>
+<div class="card"><div class="card-header"><div class="card-icon">!</div><div class="card-title">注意</div></div><ul class="spec-list"><li><span>この計画は目安で、所要期間を実績で裏づけたものではない</span></li><li><span>接続先の環境やデータ規模により期間は変わる</span></li><li><span>Slide 11 の項目が要件に含まれる場合は、別途開発が必要</span></li><li><span>詳細は <code>presentation/bridge-spec.html</code> を参照</span></li></ul></div>
+      </div>
+      <div class="slide-footer">
+        <span>レガシーシステム向け RAG・データ連携基盤 概要仕様書</span>
+        <span>Slide 12 / 12 (END)</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- BOTTOM CONTROLS -->
+<footer id="controls">
+  <div class="controls-left">
+    <button class="nav-btn" id="btn-prev" title="前のスライド (← / ↑ / PageUp)">
+      <span>◀</span> 前へ
+    </button>
+    <button class="nav-btn" id="btn-next" title="次のスライド (→ / ↓ / Space / PageDown)">
+      次へ <span>▶</span>
+    </button>
+    <select id="slide-select" aria-label="スライド選択">
+      <!-- Generated by JS -->
+    </select>
+  </div>
+
+  <div class="controls-right">
+    <button class="nav-btn" id="btn-fullscreen" title="全画面表示の切替 (F)">
+      <span>⛶</span> 全画面
+    </button>
+    <button class="nav-btn" id="btn-print" title="印刷 / PDF保存">
+      <span>🖨</span> 印刷/PDF
+    </button>
+    <span id="counter" style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);min-width:60px;text-align:right;">
+      01 / 12
+    </span>
+  </div>
+</footer>
+
+<script>
+(function() {
+  const deck = document.getElementById('deck');
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  const progressBar = document.getElementById('progress-bar');
+  const counter = document.getElementById('counter');
+  const dotsNav = document.getElementById('dots-nav');
+  const slideSelect = document.getElementById('slide-select');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnFullscreen = document.getElementById('btn-fullscreen');
+  const btnPrint = document.getElementById('btn-print');
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  // Generate Dots & Select Options
+  slides.forEach((slide, i) => {
+    // Dot
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('title', 'Slide ' + (i + 1));
+    dot.addEventListener('click', () => scrollToSlide(i));
+    dotsNav.appendChild(dot);
+
+    // Option
+    const titleElem = slide.querySelector('.slide-title') || slide.querySelector('.cover-h1');
+    const rawTitle = titleElem ? titleElem.textContent.replace(/\s+/g, ' ').trim() : 'Slide ' + (i + 1);
+    const shortTitle = rawTitle.length > 28 ? rawTitle.substring(0, 28) + '...' : rawTitle;
+    
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${pad(i + 1)}. ${shortTitle}`;
+    slideSelect.appendChild(opt);
+  });
+
+  const dots = Array.from(dotsNav.children);
+
+  function getCurrentIndex() {
+    let bestIdx = 0;
+    let minDiff = Infinity;
+    const mid = deck.scrollTop + deck.clientHeight / 2;
+    slides.forEach((s, i) => {
+      const sMid = s.offsetTop + s.clientHeight / 2;
+      const diff = Math.abs(sMid - mid);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestIdx = i;
+      }
+    });
+    return bestIdx;
+  }
+
+  function scrollToSlide(index) {
+    if (index >= 0 && index < total) {
+      slides[index].scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  function updateState() {
+    const idx = getCurrentIndex();
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    slideSelect.value = idx;
+    counter.textContent = `${pad(idx + 1)} / ${pad(total)}`;
+    progressBar.style.width = `${((idx + 1) / total) * 100}%`;
+  }
+
+  deck.addEventListener('scroll', () => {
+    window.requestAnimationFrame(updateState);
+  }, { passive: true });
+
+  // Navigation Click Handlers
+  btnPrev.addEventListener('click', () => {
+    const cur = getCurrentIndex();
+    if (cur > 0) scrollToSlide(cur - 1);
+  });
+
+  btnNext.addEventListener('click', () => {
+    const cur = getCurrentIndex();
+    if (cur < total - 1) scrollToSlide(cur + 1);
+  });
+
+  slideSelect.addEventListener('change', (e) => {
+    scrollToSlide(parseInt(e.target.value, 10));
+  });
+
+  btnFullscreen.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  btnPrint.addEventListener('click', () => {
+    window.print();
+  });
+
+  // Keyboard Navigation
+  window.addEventListener('keydown', (e) => {
+    // If inside a select, ignore arrow keys
+    if (document.activeElement === slideSelect) return;
+
+    const cur = getCurrentIndex();
+    if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) {
+      e.preventDefault();
+      if (cur < total - 1) scrollToSlide(cur + 1);
+    } else if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) {
+      e.preventDefault();
+      if (cur > 0) scrollToSlide(cur - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      scrollToSlide(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      scrollToSlide(total - 1);
+    } else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+  });
+
+  updateState();
+})();
+</script>
+</body>
+</html>
