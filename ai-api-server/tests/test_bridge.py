@@ -317,6 +317,134 @@ def test_grounded_answer_acl_history_citations_audit():
         assert TestClient(app).post("/api/bridge/ask", json={"question": "x"}).status_code == 503
 
 
+def _demo_client(rt):
+    from app import deps
+    from app.routers import bridge as bridge_router
+    from app.routers import bridge_demo
+
+    app = FastAPI()
+    app.include_router(bridge_router.router)
+    app.include_router(bridge_demo.router)
+    app.dependency_overrides[deps.get_bridge] = lambda: rt
+    return TestClient(app)
+
+
+DEMO_PERSONAS = [
+    {"id": "sales", "label": "営業", "user_id": "sales", "tenant": "t1", "roles": ["sales"], "depts": ["営業部"]},
+    {"id": "mgr", "label": "課長", "user_id": "mgr", "tenant": "t1", "roles": ["manager"], "depts": ["経理部"]},
+]
+
+
+def test_demo_gateway_exposes_no_keys_and_no_visitor_text():
+    """公開デモの入口: キー不要で主体を切り替えられるが、管理権限はなく、他の訪問者の入力や
+    サーバー情報は返らない。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        llm = FakeLLM()
+        profile = make_env(tmp)
+        profile["demo"] = {"personas": DEMO_PERSONAS, "ask_per_ip_per_hour": 3, "sync_cooldown_sec": 60}
+        rt = BridgeRuntime(profile, embed=counting_embed, embedder_id="x",
+                           default_store_path=profile["store"]["path"], complete=llm.complete)
+        cl = _demo_client(rt)
+
+        listed = cl.get("/api/bridge/demo/personas").json()["personas"]
+        assert [p["id"] for p in listed] == ["sales", "mgr"]
+        assert set(listed[0]) == {"id", "label", "note"}
+
+        # 同期: エラー文面(接続先やパスを含み得る)は返さず、クールダウン中は再実行しない
+        os.remove(os.path.join(tmp, "items.csv"))
+        first = cl.post("/api/bridge/demo/sync").json()
+        assert first["cached"] is False and any(e["failed"] for e in first["entities"]), first
+        assert tmp not in str(first) and "error" not in str(first)
+        EMBED_CALLS.clear()
+        again = cl.post("/api/bridge/demo/sync").json()
+        assert again["cached"] is True and again["upserted"] == first["upserted"] and EMBED_CALLS == []
+
+        # 検索: ペルソナの権限で絞られ、本文は返らない
+        res = cl.post("/api/bridge/demo/search", json={"persona": "sales", "query": "経理部 山田"}).json()
+        assert {r["entity"] for r in res["results"]} <= {"Ship", "Item"} and res["acl_filtered"] > 0
+        assert set(res["results"][0]) == {"entity", "pk", "title"}
+        assert cl.post("/api/bridge/demo/search", json={"persona": "nobody", "query": "x"}).status_code == 404
+        # 管理者ペルソナは指定できず、キーなしで管理APIも使えない
+        assert cl.post("/api/bridge/demo/search", json={"persona": "k-admin", "query": "x"}).status_code == 404
+        assert cl.get("/api/bridge/audit").status_code == 403
+        assert cl.post("/api/bridge/sync").status_code == 403
+
+        # 回答: 訪問者どうしで履歴を共有しない
+        secret = "ひみつの質問文 山田"
+        a1 = cl.post("/api/bridge/demo/ask", json={"persona": "sales", "question": secret}).json()
+        assert a1["llm_called"] and a1["context_count"] > 0 and "context" not in a1
+        a2 = cl.post("/api/bridge/demo/ask", json={"persona": "sales", "question": "山田"}).json()
+        assert a2["llm_called"] and llm.histories[-1] == []
+        assert len(rt.answerer.history._data) == 0
+
+        # 回数制限は IP ごと
+        assert cl.post("/api/bridge/demo/ask", json={"persona": "mgr", "question": "x"}).status_code == 200
+        assert cl.post("/api/bridge/demo/ask", json={"persona": "mgr", "question": "x"}).status_code == 429
+
+        # 監査の公開要約: 検索語・回答本文が保存されていても返さない
+        stored = str(rt.audit.query(limit=1000))
+        assert secret in stored
+        items = cl.get("/api/bridge/demo/audit").json()["items"]
+        assert items and secret not in str(items) and "回答です" not in str(items)
+        assert "detail" not in items[0] and "principal" not in str(items)
+        v = cl.get("/api/bridge/demo/audit/verify").json()
+        assert v["ok"] and set(v) == {"ok", "checked", "head"}
+
+    # 管理者ロールのペルソナは起動時に拒否する
+    with tempfile.TemporaryDirectory() as tmp:
+        profile = make_env(tmp)
+        profile["demo"] = {"personas": [{"id": "a", "user_id": "a", "roles": ["bridge_admin"]}]}
+        try:
+            build(profile)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("bridge_admin のペルソナが拒否されなかった")
+
+    # demo 節が無い導入先では入口ごと無効
+    with tempfile.TemporaryDirectory() as tmp:
+        assert _demo_client(build(make_env(tmp))).get("/api/bridge/demo/personas").status_code == 404
+
+
+def test_demo_client_ip_trusts_forwarded_header_only_from_local_proxy():
+    from types import SimpleNamespace
+
+    from app.bridge.demo import client_ip
+
+    def req(peer, xff=None):
+        return SimpleNamespace(client=SimpleNamespace(host=peer), headers={"x-forwarded-for": xff} if xff else {})
+
+    assert client_ip(req("127.0.0.1", "1.1.1.1, 2.2.2.2")) == "2.2.2.2"  # 先頭は偽装できる
+    assert client_ip(req("203.0.113.9", "1.1.1.1")) == "203.0.113.9"
+    assert client_ip(req("127.0.0.1")) == "127.0.0.1"
+
+
+def test_erp_demo_profile_has_no_public_keys_or_visitor_text():
+    """公開リポジトリにあった既定キーが無効で、訪問者の入力を監査に残さないこと。"""
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "demo-legacy-system", "aisb_profile", "bridge.yaml")
+    saved = os.environ.pop("AISB_BRIDGE_ADMIN_KEY", None)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            rt = BridgeRuntime.from_file(path, embed=counting_embed, embedder_id="x",
+                                         default_store_path=os.path.join(tmp, "b.db"))
+    finally:
+        if saved is not None:
+            os.environ["AISB_BRIDGE_ADMIN_KEY"] = saved
+    assert rt.store_query_text is False and rt.answerer.store_answer_text is False
+    assert rt.demo and not any(p.principal.is_admin for p in rt.demo.personas.values())
+    for key in (b"demo-admin-key", b"demo-sales-key", b"", "管理".encode()):
+        scope = {"type": "http", "headers": [(b"x-aisb-key", key)]}
+        try:
+            p = rt.resolver.resolve(Request(scope))
+        except HTTPException as e:
+            assert e.status_code == 401
+        else:
+            assert not key and not p.is_admin
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

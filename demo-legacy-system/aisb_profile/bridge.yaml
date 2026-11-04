@@ -5,38 +5,62 @@
 # ============================================================================
 
 auth:
-  # api_key: X-AISB-Key ヘッダ(または Authorization: Bearer)で利用者を識別する。
-  # ※以下はデモ用キー。本番では環境変数で差し替えること(${VAR:-default} 展開に対応)。
+  # /api/bridge/* の管理操作用。キーはこのファイルにもブラウザにも置かず、環境変数で渡す。
+  # 未設定ならキー認証は無効で、管理操作は誰にも実行できない。
   mode: api_key
   api_keys:
-    - key: ${AISB_DEMO_KEY_ADMIN:-demo-admin-key}
+    - key: ${AISB_BRIDGE_ADMIN_KEY:-}
       user_id: admin
       tenant: acme
       roles: [bridge_admin, sales, accounting, purchasing, hr, "dept:*"]
-    - key: ${AISB_DEMO_KEY_SALES:-demo-sales-key}
-      user_id: sales01          # 営業担当: 顧客・受注・出荷は見えるが人事データは見えない
+
+# 公開デモの入口(/api/bridge/demo/*)。サイドパネルはここの主体をサーバー側で切り替える。
+# 管理者ロールは付与できない。
+demo:
+  ask_per_ip_per_hour: 40       # 比較1回で5回分消費する
+  read_per_ip_per_minute: 60
+  sync_cooldown_sec: 60
+  personas:
+    - id: admin
+      label: 管理者
+      note: 全ロール
+      user_id: demo_admin
+      tenant: acme
+      roles: [sales, accounting, purchasing, hr, "dept:*"]
+    - id: sales
+      label: 営業担当
+      note: 営業部
+      user_id: sales01          # 顧客・受注・出荷は見えるが人事データは見えない
       tenant: acme
       roles: [sales]
       depts: [営業部]
-    - key: ${AISB_DEMO_KEY_MGR:-demo-mgr-key}
-      user_id: keiri_kacho      # 経理部の課長: 請求と「自部署の」従業員情報のみ
+    - id: manager
+      label: 経理課長
+      note: 経理部
+      user_id: keiri_kacho      # 請求と「自部署の」従業員情報のみ
       tenant: acme
       roles: [accounting, manager]
       depts: [経理部]
-    - key: ${AISB_DEMO_KEY_HR:-demo-hr-key}
-      user_id: hr01             # 人事: 全部署の従業員情報
+    - id: hr
+      label: 人事
+      note: 全部署
+      user_id: hr01             # 全部署の従業員情報
       tenant: acme
       roles: [hr, "dept:*"]
-    - key: ${AISB_DEMO_KEY_OTHER:-demo-other-tenant-key}
-      user_id: guest_other      # 別テナント: 何も見えないこと(テナント越境なし)の確認用
+    - id: other
+      label: 別テナント
+      note: 越境不可
+      user_id: guest_other      # 何も見えないこと(テナント越境なし)の確認用
       tenant: other-co
       roles: [sales, hr, "dept:*"]
 
 audit:
-  store_query_text: true
+  # 公開デモには訪問者が何でも入力できるため、本文は残さずハッシュと件数だけを記録する。
+  store_query_text: false
+  store_answer_text: false
 
 sync:
-  interval_sec: 0   # >0 で定期差分同期。デモは POST /api/bridge/sync で手動実行
+  interval_sec: 0   # >0 で定期差分同期。デモはパネルの差分同期ボタンで手動実行
 
 sources:
   # ① 既存の読み取り専用 HTTP 一覧API(最も侵襲が少ない)

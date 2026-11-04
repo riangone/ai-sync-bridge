@@ -10,6 +10,7 @@ BridgeRuntime (Singleton): プロファイル(YAML)から Connector/EntitySpec/�
     audit:   {store_query_text: true,            # 検索クエリ本文を監査ログに残すか(既定 true)
               store_answer_text: true}           # AI回答本文を監査ログに残すか(既定 true)
     answer:  {top_k: 5, max_doc_chars: 1200}     # /api/bridge/ask(権限付きRAG)の既定値
+    demo:    {personas: [...]}                   # 公開デモ用の入口(demo.py 参照。省略時は無効)
     sync:    {interval_sec: 0}                   # >0 で起動時から定期同期
     sources:
       - name: legacy_erp
@@ -38,6 +39,7 @@ from app.bridge.acl import Principal, PrincipalResolver
 from app.bridge.answerer import GroundedAnswerer
 from app.bridge.audit import AuditLog
 from app.bridge.connectors import Connector, build_connector
+from app.bridge.demo import DemoGateway
 from app.bridge.models import EntitySpec
 from app.bridge.retriever import Retriever
 from app.bridge.store import BridgeStore
@@ -83,6 +85,7 @@ class BridgeRuntime:
         self.store = BridgeStore((profile.get("store") or {}).get("path") or default_store_path)
         self.audit = AuditLog(self.store)
         self.resolver = PrincipalResolver(profile.get("auth"))
+        self.demo = DemoGateway(profile["demo"]) if profile.get("demo") else None
         acfg = profile.get("audit") or {}
         self.store_query_text = bool(acfg.get("store_query_text", True))
         anscfg = profile.get("answer") or {}

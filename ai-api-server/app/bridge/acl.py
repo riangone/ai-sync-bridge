@@ -93,7 +93,7 @@ class PrincipalResolver:
         if not key:
             return ANONYMOUS
         for k, p in self._keys.items():
-            if hmac.compare_digest(k, key):
+            if hmac.compare_digest(k.encode(), key.encode()):
                 return p
         raise HTTPException(status_code=401, detail="invalid API key")
 

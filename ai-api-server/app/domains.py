@@ -18,6 +18,7 @@ from app.routers import (
     analytics,
     ar_ap,
     bridge,
+    bridge_demo,
     chat,
     conversational_input,
     cross_analysis,
@@ -40,6 +41,7 @@ from app.routers import (
 
 CORE_ROUTERS: list[APIRouter] = [
     bridge.router,
+    bridge_demo.router,
     chat.router,
     ocr.router,
     search.router,
