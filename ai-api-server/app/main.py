@@ -7,35 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.services.ai_client import AIProviderError
-from app.routers import (
-    admin,
-    analysis_history,
-    analytics,
-    chat,
-    conversational_input,
-    cross_analysis,
-    customers,
-    inventory,
-    local_ai,
-    nlsql,
-    notifications,
-    ocr,
-    orders,
-    profit_report,
-    purchase_order,
-    push,
-    ar_ap,
-    realestate,
-    recommend,
-    search,
-    web_search,
-    workflows,
-)
+from app.public_errors import AI_RATE_LIMITED, AI_UNAVAILABLE, log_upstream
+from app.services.ai_client import AIProviderError, AIRateLimitError
+from app.services.rate_limit import ClientContextMiddleware
+from app.domains import register_routers
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, version="1.0.0")
+docs_kwargs = {} if settings.expose_api_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title=settings.app_name, version="1.0.0", **docs_kwargs)
+
+app.add_middleware(ClientContextMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,28 +27,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(customers.router)
-app.include_router(orders.router)
-app.include_router(chat.router)
-app.include_router(ocr.router)
-app.include_router(search.router)
-app.include_router(analytics.router)
-app.include_router(workflows.router)
-app.include_router(notifications.router)
-app.include_router(admin.router)
-app.include_router(nlsql.router)
-app.include_router(cross_analysis.router)
-app.include_router(inventory.router)
-app.include_router(purchase_order.router)
-app.include_router(profit_report.router)
-app.include_router(ar_ap.router)
-app.include_router(realestate.router)
-app.include_router(push.router)
-app.include_router(analysis_history.router)
-app.include_router(recommend.router)
-app.include_router(web_search.router)
-app.include_router(local_ai.router)
-app.include_router(conversational_input.router)
+# コア(業種非依存) + AISB_DOMAINS で選択した業種ドメインのルーターを登録(app/domains.py)
+enabled_domains = register_routers(app, settings.domains)
+
+
+@app.on_event("startup")
+async def _start_bridge_scheduler():
+    """ブリッジ profile の sync.interval_sec > 0 なら定期差分同期を開始する。"""
+    import asyncio
+
+    from app.deps import get_bridge
+
+    bridge = get_bridge()
+    if bridge.sync_interval > 0:
+        app.state.bridge_task = asyncio.create_task(bridge.run_periodic())
 
 
 @app.exception_handler(AIProviderError)
@@ -78,15 +52,13 @@ async def ai_provider_error_handler(request: Request, exc: AIProviderError):
     ことで、AI応答とエラーが型として絶対に混同されないことを保証する。
     個々のservice(nlsql/web_search等)で縮退応答が業務的に妥当な場合は、そちら側で
     個別にキャッチしてこのハンドラに到達させない。"""
-    return JSONResponse(
-        status_code=502,
-        content={
-            "error": True,
-            "message": "AIサービスが一時的に利用できません。しばらくしてから再度お試しください。",
-            "provider": exc.provider,
-            "detail": str(exc.original),
-        },
-    )
+    log_upstream("ai provider error", exc)
+    return JSONResponse(status_code=502, content={"error": True, "message": AI_UNAVAILABLE})
+
+
+@app.exception_handler(AIRateLimitError)
+async def ai_rate_limit_handler(request: Request, exc: AIRateLimitError):
+    return JSONResponse(status_code=429, content={"error": True, "message": AI_RATE_LIMITED})
 
 
 @app.get("/api/health")
@@ -94,8 +66,6 @@ def health():
     return {
         "status": "ok",
         "demo_mode": settings.demo_mode,
-        "ai_provider": settings.ai_provider,
-        "vector_backend": settings.vector_backend,
     }
 
 

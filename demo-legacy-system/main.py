@@ -34,7 +34,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 # プレフィックスを補う。ヘッダーが無ければ従来通り""(=完全無改変の挙動)。
 templates.env.globals["base_path"] = lambda request: request.headers.get("x-forwarded-prefix", "")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-aisb_embed.mount(app)
+aisb_embed.mount(app, profile_dir=Path(__file__).parent / "aisb_profile")
 
 
 def redirect_to(request: Request, path: str, status_code: int = 303) -> RedirectResponse:

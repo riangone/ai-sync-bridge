@@ -1,4 +1,5 @@
 import httpx
+from app.public_errors import legacy_unavailable
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import get_nlsql_service
@@ -20,6 +21,6 @@ async def nlsql_query(
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             raise HTTPException(404, f"unknown entity: {body.entity}") from exc
-        raise HTTPException(502, f"legacy system error: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc

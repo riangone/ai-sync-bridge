@@ -1,0 +1,4 @@
+{
+  "system_label": "年金相談窓口システム",
+  "extra_modules": ["modules/panel-valuation.js"]
+}

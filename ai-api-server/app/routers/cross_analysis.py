@@ -1,3 +1,4 @@
+from app.public_errors import legacy_unavailable
 from fastapi import APIRouter, Depends, HTTPException, Query
 import httpx
 
@@ -35,7 +36,7 @@ async def generate_report(
     try:
         return await svc.generate(body.question)
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
 
 
 @router.get("/generate/insight", response_model=InsightResponse)
@@ -51,7 +52,7 @@ async def generate_report_insight(
     try:
         result = await svc.generate(question)
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
     comment = await insight_service.interpret_cross_analysis(ai, result)
     return InsightResponse(comment=comment, provider=ai.name)
 
@@ -63,7 +64,7 @@ async def run_report(report: str, svc: CrossAnalysisService = Depends(get_cross_
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
 
 
 # ---- AI解釈コメント (集計そのものはAI非依存。ここだけがオプトインでAIを使う) ----
@@ -78,6 +79,6 @@ async def report_insight(
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
     comment = await insight_service.interpret_cross_analysis(ai, result)
     return InsightResponse(comment=comment, provider=ai.name)

@@ -1,0 +1,61 @@
+# AI-Sync デモ用 opencode serve (127.0.0.1:4096)
+#
+# 【なぜ pm2 ではなく systemd + 専用ユーザーか】2026-10-26 インシデント:
+# デモのチャットから opencode の bash ツールで実サーバーのコマンドが実行された。
+# opencode の設定(permission/tools deny)はリクエスト側の tools 指定で上書きできることを
+# 実地確認したため、opencode 自身はセキュリティ境界にならない。OS レベルで隔離する:
+#   - 専用の無権限ユーザー aisync-ai で実行(ubuntu の資産・pm2・sudo に触れない)
+#   - /home /root 不可視、システム全体読み取り専用、書き込みは /srv/aisync-ai のみ
+#   - Caddy/SSH/ログ等の構成情報は不可視
+# インストール: sudo ops/opencode/install.sh
+[Unit]
+Description=AI-Sync demo opencode server (sandboxed)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aisync-ai
+Group=aisync-ai
+WorkingDirectory=/srv/aisync-ai/sandbox
+Environment=HOME=/srv/aisync-ai
+Environment=XDG_CONFIG_HOME=/srv/aisync-ai/xdg-config
+Environment=XDG_DATA_HOME=/srv/aisync-ai/data
+Environment=XDG_CACHE_HOME=/srv/aisync-ai/cache
+Environment=XDG_STATE_HOME=/srv/aisync-ai/state
+Environment=OPENCODE_CONFIG=/srv/aisync-ai/opencode.json
+Environment=OPENCODE_DISABLE_CLAUDE_CODE=1
+Environment=OPENCODE_DISABLE_AUTOUPDATE=1
+Environment=OPENCODE_DISABLE_LSP_DOWNLOAD=1
+ExecStart=/usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4096
+Restart=always
+RestartSec=3
+
+# --- サンドボックス ---
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/aisync-ai
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+InaccessiblePaths=-/etc/caddy -/etc/ssh -/etc/letsencrypt -/etc/sudoers -/etc/sudoers.d -/etc/pm2 -/var/log -/var/lib -/var/backups -/var/www -/opt -/mnt -/media
+MemoryMax=1G
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

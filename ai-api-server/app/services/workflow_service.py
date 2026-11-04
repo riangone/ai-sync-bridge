@@ -22,6 +22,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any
 
+from app.public_errors import STEP_FAILED, log_upstream
 from app.services.demo_data import DemoDataStore
 
 _VAR_RE = re.compile(r"\{\{\s*([\w.]+)\s*\}\}")
@@ -267,7 +268,8 @@ class WorkflowEngine:
                 output, ok = await runner.run(step["action_type"], resolved_config, context)
                 error = None
             except Exception as exc:  # ステップ内の例外はワークフロー全体を落とさず失敗として記録する
-                output, ok, error = None, False, str(exc)
+                log_upstream(f"workflow step {step.get('name', current_order)} failed", exc)
+                output, ok, error = None, False, STEP_FAILED
 
             context[f"step_{current_order}_output"] = output
             step_results.append({

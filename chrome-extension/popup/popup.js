@@ -46,7 +46,7 @@ async function init() {
     const res = await fetch(`${apiBase}/api/health`);
     const data = await res.json();
     dot.className = "dot dot-ok";
-    text.textContent = `API接続OK (demo=${data.demo_mode}, ai=${data.ai_provider})`;
+    text.textContent = `API接続OK (demo=${data.demo_mode})`;
   } catch (e) {
     dot.className = "dot dot-error";
     text.textContent = "APIサーバーに接続できません";

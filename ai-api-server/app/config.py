@@ -17,9 +17,22 @@ class Settings(BaseModel):
     demo_mode: bool = os.getenv("AISB_DEMO_MODE", "true").lower() == "true"
 
     # マルチAIプロバイダ抽象化 (8.2)
-    ai_provider: str = os.getenv("AISB_AI_PROVIDER", "mock")  # mock|opencode|openai|gemini
+    ai_provider: str = os.getenv("AISB_AI_PROVIDER", "mock")  # mock|opencode|antigravity|openai|gemini
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
+
+    # antigravity CLI。既定モデルは `antigravity models` の中で最も安い Flash の low。
+    antigravity_binary: str = os.getenv("ANTIGRAVITY_BINARY", os.path.expanduser("~/.local/bin/antigravity"))
+    antigravity_model: str = os.getenv("ANTIGRAVITY_MODEL", "gemini-3.8-flash-low")
+    antigravity_workdir: str = os.getenv("ANTIGRAVITY_WORKDIR", os.path.expanduser("~/.cache/aisync-antigravity"))
+    antigravity_timeout: float = float(os.getenv("ANTIGRAVITY_TIMEOUT", "90"))
+    # 以下2つはインスタンス(プロセス)ごとの値。
+    antigravity_max_concurrency: int = int(os.getenv("ANTIGRAVITY_MAX_CONCURRENCY", "2"))
+    antigravity_max_calls_per_hour: int = int(os.getenv("ANTIGRAVITY_MAX_CALLS_PER_HOUR", "120"))
+    # 送信元 IP ごとの LLM 呼び出し上限(インスタンス単位)。0 で無効
+    ai_per_ip_per_hour: int = int(os.getenv("AISB_AI_PER_IP_PER_HOUR", "60"))
+    # /docs と /openapi.json は内部の API 構成を公開するので既定で閉じる
+    expose_api_docs: bool = os.getenv("AISB_EXPOSE_API_DOCS", "").lower() in ("1", "true")
     opencode_endpoint: str = os.getenv("OPENCODE_ENDPOINT", "http://localhost:4096")
     # opencode serve が公開する実APIのモデル指定 (GET /config/providers で確認: 無料枠モデル)
     # 2026-08-19: デフォルトだった north-mini-code-free が上流(opencode Zen)で401廃止済みと判明
@@ -54,6 +67,9 @@ class Settings(BaseModel):
     # image=true のモデルを明示指定する。無料枠で確認できたのは mimo-v2.5-free のみ
     # (image/audio/video対応、pdfは非対応)。
     opencode_vision_model_id: str = os.getenv("OPENCODE_VISION_MODEL_ID", "mimo-v2.5-free")
+    # ツール無し・安全プロンプト付きの専用エージェント名(ops/opencode/aisync-opencode.json で定義)。
+    # 既定の build エージェントは bash/read 等を持つため、デモからは絶対に使わない(2026-10-26 インシデント)。
+    opencode_agent: str = os.getenv("OPENCODE_AGENT", "aisync-demo")
 
     # ベクトル検索エンジン選択 (8.3): sqlite-vec -> ann -> brute-force
     vector_backend: str = os.getenv("AISB_VECTOR_BACKEND", "brute-force")
@@ -78,6 +94,17 @@ class Settings(BaseModel):
         "AISB_DB_PATH",
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", f"aisb_{instance}.db"),
     )
+
+    # Legacy-to-AI ブリッジ(app/bridge)の導入先プロファイル(YAML)。
+    # 未指定ならソース0件の空ブリッジとして起動する(API自体は応答する)。
+    bridge_profile: str | None = os.getenv("AISB_BRIDGE_PROFILE") or None
+    bridge_db_path: str = os.getenv(
+        "AISB_BRIDGE_DB_PATH",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", f"bridge_{instance}.db"),
+    )
+
+    # 有効化する業種ドメインのルーター(カンマ区切り。"all"=全部、""=コアのみ)。app/domains.py 参照。
+    domains: str = os.getenv("AISB_DOMAINS", "all")
 
     # CORS: Chrome拡張(content script)からのアクセスを許可
     cors_origins: list[str] = ["*"]

@@ -39,6 +39,7 @@ import hashlib
 import random
 
 from app.services import ai_json_util
+from app.public_errors import AI_UNAVAILABLE, log_upstream
 from app.services.ai_client import AiProvider, AIProviderError
 from app.services.normalize_util import normalize as _normalize
 
@@ -147,7 +148,7 @@ class CompanySearchService:
         self.register_entity = "Supplier" if instance == "dealer" else "Customer"
 
     async def search(self, keyword: str) -> dict:
-        if self.ai is not None and getattr(self.ai, "name", "") == "opencode":
+        if self.ai is not None and getattr(self.ai, "supports_web_search", False):
             return await self._ai_search(keyword)
         if self.demo_mode:
             return {"keyword": keyword, "results": self._mock_search(keyword), "source": "mock"}
@@ -166,7 +167,8 @@ class CompanySearchService:
             # 例外化されたため型で捕捉できるようになった)。検索は元々ベストエフォートな
             # 補助機能(登録はChrome拡張側の自動入力が担う)なので、ここでは呼び出し元
             # (company/property検索API)全体を落とさず0件+errorとして返す。
-            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": str(exc)}
+            log_upstream("web search failed", exc)
+            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": AI_UNAVAILABLE}
         parsed = ai_json_util.extract_json(ai_text)
         raw_results = parsed.get("results")
         results = []
@@ -251,7 +253,7 @@ class PropertySearchService:
         self.ai = ai
 
     async def search(self, keyword: str) -> dict:
-        if self.ai is not None and getattr(self.ai, "name", "") == "opencode":
+        if self.ai is not None and getattr(self.ai, "supports_web_search", False):
             return await self._ai_search(keyword)
         if self.demo_mode:
             return {"keyword": keyword, "results": self._mock_search(keyword), "source": "mock"}
@@ -263,7 +265,8 @@ class PropertySearchService:
                 self._PROMPT_TEMPLATE.format(keyword=keyword), tools={"websearch": True}
             )
         except AIProviderError as exc:
-            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": str(exc)}
+            log_upstream("web search failed", exc)
+            return {"keyword": keyword, "results": [], "source": "opencode-error", "error": AI_UNAVAILABLE}
         parsed = ai_json_util.extract_json(ai_text)
         raw_results = parsed.get("results")
         results = []

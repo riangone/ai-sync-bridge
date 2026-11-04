@@ -1,0 +1,150 @@
+# ============================================================================
+# AI-Sync Bridge 導入先プロファイル: レガシーERP(製造業)デモ
+#   ai-api-server 起動時に AISB_BRIDGE_PROFILE=<このファイル> を指定する(start-erp.sh)。
+#   コアのコードには業種知識を書かず、取り込み対象・権限・接続方式はすべてここで宣言する。
+# ============================================================================
+
+auth:
+  # /api/bridge/* の管理操作用。キーはこのファイルにもブラウザにも置かず、環境変数で渡す。
+  # 未設定ならキー認証は無効で、管理操作は誰にも実行できない。
+  mode: api_key
+  api_keys:
+    - key: ${AISB_BRIDGE_ADMIN_KEY:-}
+      user_id: admin
+      tenant: acme
+      roles: [bridge_admin, sales, accounting, purchasing, hr, "dept:*"]
+
+# 公開デモの入口(/api/bridge/demo/*)。サイドパネルはここの主体をサーバー側で切り替える。
+# 管理者ロールは付与できない。
+demo:
+  ask_per_ip_per_hour: 40       # 比較1回で5回分消費する
+  read_per_ip_per_minute: 60
+  sync_cooldown_sec: 60
+  personas:
+    - id: admin
+      label: 管理者
+      note: 全ロール
+      user_id: demo_admin
+      tenant: acme
+      roles: [sales, accounting, purchasing, hr, "dept:*"]
+    - id: sales
+      label: 営業担当
+      note: 営業部
+      user_id: sales01          # 顧客・受注・出荷は見えるが人事データは見えない
+      tenant: acme
+      roles: [sales]
+      depts: [営業部]
+    - id: manager
+      label: 経理課長
+      note: 経理部
+      user_id: keiri_kacho      # 請求と「自部署の」従業員情報のみ
+      tenant: acme
+      roles: [accounting, manager]
+      depts: [経理部]
+    - id: hr
+      label: 人事
+      note: 全部署
+      user_id: hr01             # 全部署の従業員情報
+      tenant: acme
+      roles: [hr, "dept:*"]
+    - id: other
+      label: 別テナント
+      note: 越境不可
+      user_id: guest_other      # 何も見えないこと(テナント越境なし)の確認用
+      tenant: other-co
+      roles: [sales, hr, "dept:*"]
+
+audit:
+  # 公開デモには訪問者が何でも入力できるため、本文は残さずハッシュと件数だけを記録する。
+  store_query_text: false
+  store_answer_text: false
+
+answer:
+  top_k: 10         # 部署の全員のような一覧の質問に答えられる件数
+
+sync:
+  interval_sec: 0   # >0 で定期差分同期。デモはパネルの差分同期ボタンで手動実行
+
+sources:
+  # ① 既存の読み取り専用 HTTP 一覧API(最も侵襲が少ない)
+  - name: legacy_api
+    type: http_list
+    config:
+      base_url: ${AISB_LEGACY_BASE_URL:-http://localhost:5010}
+    entities:
+      - name: Customer
+        pk: Id
+        title: Name
+        label: 顧客 取引先
+        text: [Name, NameKana, Industry, Address, Representative, Notes]
+        acl: {tenant: acme, roles: [sales, accounting]}
+      - name: Order
+        pk: Id
+        title: Id
+        label: 受注 注文
+        text: [CustomerName, OrderDate, DeliveryDate, TotalAmount, Status, Notes]
+        acl: {tenant: acme, roles: [sales, accounting]}
+      - name: Invoice
+        pk: Id
+        title: Id
+        label: 請求 請求書
+        text: [CustomerName, InvoiceDate, DueDate, TotalAmount, Status, Notes]
+        acl: {tenant: acme, roles: [accounting]}
+      - name: Supplier
+        pk: Id
+        title: Name
+        label: 仕入先 取引先
+        text: [Name, Category, ContactPerson, PaymentTerms, Notes]
+        acl: {tenant: acme, roles: [purchasing, accounting]}
+      - name: Product
+        pk: Id
+        title: Name
+        label: 商品 製品
+        text: [Name, Category, UnitPrice, Stock]
+        acl: {tenant: acme}            # 社内なら誰でも可
+
+  # ② レガシーDBを直接 SELECT(読み取り専用接続)。本番は dsn: "odbc:DRIVER={SQL Server};..." 等
+  - name: legacy_db
+    type: sql
+    config:
+      dsn: sqlite:///${AISB_LEGACY_DB_PATH:-../demo-legacy-system/erp.db}
+    entities:
+      - name: Employee
+        pk: Id
+        title: Name
+        label: 従業員 社員 職員
+        text: [Name, Department, Position, HireDate]
+        # 人事データ: hr または manager ロールのみ。さらに部署単位で制限(dept:* は全部署)
+        acl: {tenant: acme, roles: [hr, manager], depts: $Department}
+        options:
+          query: >
+            SELECT json_extract(value,'$.Id') AS Id, json_extract(value,'$.Name') AS Name,
+                   json_extract(value,'$.Department') AS Department,
+                   json_extract(value,'$.Position') AS Position,
+                   json_extract(value,'$.HireDate') AS HireDate
+            FROM employees
+
+  # ③ 夜間バッチの固定長テキスト(cp932・バイト位置指定)
+  - name: legacy_files
+    type: file
+    config:
+      base_dir: ${AISB_LEGACY_EXPORT_DIR:-../demo-legacy-system/aisb_profile/legacy_exports}
+      encoding: cp932
+    entities:
+      - name: Shipment
+        pk: ShipNo
+        title: ShipNo
+        label: 出荷
+        text: [ShipDate, CustomerName, ItemName, Qty, Dept]
+        acl: {tenant: acme, roles: [sales], depts: $Dept}
+        options:
+          path: shipments_fixed.txt
+          format: fixed
+          skip_lines: 1
+          columns:
+            - {name: ShipNo,       start: 0,  length: 10}
+            - {name: ShipDate,     start: 10, length: 8}
+            - {name: CustomerName, start: 18, length: 20}
+            - {name: ItemName,     start: 38, length: 30}
+            - {name: Qty,          start: 68, length: 6}
+            - {name: Dept,         start: 74, length: 12}

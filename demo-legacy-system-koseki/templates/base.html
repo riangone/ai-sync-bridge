@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y1P7PMMM6V"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-Y1P7PMMM6V');
+    </script>
+
+<meta charset="UTF-8">
+<title>{{ title }} - 戸籍住民基本台帳システム(Legacy KOSEKI)</title>
+{% set bp = base_path(request) %}
+<link rel="stylesheet" href="{{ bp }}/static/css/site.css">
+</head>
+<body>
+<div id="header">戸籍住民基本台帳システム LEGACY-KOSEKI v1.0（〇〇市 戸籍住民課）</div>
+<div id="nav">
+    <a href="{{ bp }}/">ホーム</a>
+    <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
+    <a href="{{ bp }}/Resident/List">住民管理</a>
+    <a href="{{ bp }}/Household/List">世帯管理</a>
+    <a href="{{ bp }}/FamilyRegister/List">戸籍管理</a>
+    <a href="{{ bp }}/CertificateRequest/List">証明書交付申請</a>
+    <a href="{{ bp }}/VisitReception/List">来庁受付</a>
+    <a href="{{ bp }}/Employee/List">職員管理</a>
+    <a href="{{ bp }}/MoveHistory/List">異動履歴</a>
+</div>
+<div id="content">
+{% block content %}{% endblock %}
+</div>
+<div id="footer">Copyright (C) City Legacy Systems Inc. All Rights Reserved. (AIサポートなし・改変不可を想定したデモ画面)</div>
+<script src="{{ bp }}/static/js/site.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

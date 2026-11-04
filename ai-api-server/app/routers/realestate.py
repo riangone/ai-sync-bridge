@@ -1,4 +1,5 @@
 import httpx
+from app.public_errors import legacy_unavailable
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import get_ai_provider, get_realestate_advisory_service
@@ -26,7 +27,7 @@ async def valuation(
     try:
         return await svc.valuation(body.property_type, body.building_area, body.land_area, body.address_keyword)
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
 
 
 @router.get("/valuation/insight", response_model=InsightResponse)
@@ -44,7 +45,7 @@ async def valuation_insight(
     try:
         result = await svc.valuation(property_type, building_area, land_area, address_keyword)
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc
     comment = await insight_service.interpret_valuation(ai, result)
     return InsightResponse(comment=comment, provider=ai.name)
 
@@ -76,4 +77,4 @@ async def viewing_conflicts(svc: RealestateAdvisoryService = Depends(get_realest
     try:
         return await svc.viewing_conflicts()
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"legacy system unreachable: {exc}") from exc
+        raise legacy_unavailable(exc) from exc

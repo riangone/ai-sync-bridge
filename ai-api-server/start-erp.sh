@@ -6,5 +6,6 @@
 cd "$(dirname "$0")"
 export AISB_INSTANCE=erp
 export AISB_LEGACY_BASE_URL="${AISB_LEGACY_BASE_URL:-http://localhost:5010}"
-export AISB_AI_PROVIDER="${AISB_AI_PROVIDER:-opencode}"
+export AISB_BRIDGE_PROFILE="${AISB_BRIDGE_PROFILE:-../demo-legacy-system/aisb_profile/bridge.yaml}"
+source ./ai-provider.sh
 exec .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 5011

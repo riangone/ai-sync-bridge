@@ -56,6 +56,14 @@ _ENTITY_LABELS_BY_INSTANCE = {
         "PurchaseOrder": "工事発注", "InventoryTransaction": "物件ステータス履歴",
         "GoodsReceipt": "工事完了報告", "Viewing": "内見予約", "ArAp": "売掛買掛", "Profit": "利益",
     },
+    "koseki": {
+        "Resident": "住民", "Household": "世帯", "FamilyRegister": "戸籍", "Employee": "窓口職員",
+        "CertificateRequest": "証明書交付申請", "VisitReception": "来庁受付", "MoveHistory": "異動履歴",
+    },
+    "nenkin": {
+        "Insured": "被保険者", "Employer": "適用事業所", "EnrollmentRecord": "適用記録", "Staff": "相談員",
+        "PensionClaimRequest": "年金請求", "CallReception": "来所・電話相談受付", "ContributionHistory": "資格異動履歴",
+    },
 }
 
 _FEATURES_BY_INSTANCE = {
@@ -78,6 +86,20 @@ _FEATURES_BY_INSTANCE = {
         "仲介手数料/粗利レポート・AR/APエイジング分析", "類似物件推薦",
         "ワークフロー自動化(物件ステータスアラート/OCR自動入力/与信超過チェック等)",
         "内見予約の履歴照会・管理",
+    ],
+    "koseki": [
+        "住民/世帯/戸籍/証明書交付申請の検索・登録", "OCRによる交付申請書の読み取り・自動入力",
+        "ベクトル検索・横断検索・自然言語検索", "交付申請件数の推移予測・再申請リスク分析",
+        "手数料収納レポート・郵送請求のエイジング分析", "類似住民・類似申請の推薦",
+        "ワークフロー自動化(証紙在庫アラート/OCR自動入力等)",
+        "来庁受付(整理券)の履歴照会・管理",
+    ],
+    "nenkin": [
+        "被保険者/適用事業所/年金請求(裁定請求)の検索・登録", "OCRによる裁定請求書の読み取り・自動入力",
+        "ベクトル検索・横断検索・自然言語検索", "年金請求件数の推移予測・審査遅延リスク分析",
+        "郵送案内の未収レポート・書類用紙発注のエイジング分析", "類似被保険者・類似請求の推薦",
+        "ワークフロー自動化(書類用紙在庫アラート/OCR自動入力等)",
+        "来所・電話相談受付の履歴照会・管理",
     ],
 }
 
