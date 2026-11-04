@@ -79,7 +79,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
         const d = s.value;
         const items = d.results.length
           ? d.results.map((r) => `<li>${refLabel(r)}</li>`).join("")
-          : `<li style="color:#888">閲覧可能な文書なし</li>`;
+          : `<li style="color:#888">閲覧できる範囲に該当なし</li>`;
         return `<div class="aisb-card">${head}
           <div style="font-size:11px;color:#666">表示 ${d.results.length} 件 / 権限で除外 ${d.acl_filtered} 件 · ${esc(d.strategy)} · 監査ID ${esc(String(d.audit_id).slice(0, 8))}</div>
           <ul style="margin:4px 0 0 16px;padding:0">${items}</ul></div>`;
@@ -111,7 +111,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
         const d = await call("POST", "/ask", { persona: p.id, question: q });
         const cites = d.citations.length
           ? d.citations.map((c) => `<li>[${c.n}] ${refLabel(c)}</li>`).join("")
-          : `<li style="color:#888">${d.llm_called ? "根拠文書の引用なし" : "閲覧可能な文書がないため AI は呼び出していません"}</li>`;
+          : `<li style="color:#888">${d.llm_called ? "根拠文書の引用なし" : "閲覧できる範囲に関係する文書がないため AI は呼び出していません"}</li>`;
         html = `<div style="white-space:pre-wrap;font-size:12px;margin:4px 0">${esc(d.answer)}</div>
           <div style="font-size:11px;color:#666">根拠(閲覧可能な文書のみ): 渡した ${d.context_count} 件 / 権限で除外 ${d.acl_filtered} 件 · 監査ID ${esc(String(d.audit_id).slice(0, 8))}</div>
           <ul style="margin:2px 0 0 16px;padding:0;font-size:11px">${cites}</ul>`;

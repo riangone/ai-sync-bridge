@@ -50,6 +50,9 @@ def make_env(tmp: str) -> dict:
     c.close()
     return {
         "store": {"path": os.path.join(tmp, "bridge.db")},
+        # ACL のテストは「見える文書の集合」を厳密に比べるので関連度の足切りを外す
+        # (足切りは test_relevance_cutoff_* で確認する)
+        "retrieval": {"min_matched_terms": 1, "min_score_ratio": 0, "vector_only_hits": True},
         "auth": {"mode": "api_key", "api_keys": [
             {"key": "k-admin", "user_id": "admin", "tenant": "t1", "roles": ["bridge_admin", "sales", "hr", "dept:*"]},
             {"key": "k-sales", "user_id": "sales", "tenant": "t1", "roles": ["sales"], "depts": ["営業部"]},
@@ -486,6 +489,55 @@ def test_erp_demo_profile_has_no_public_keys_or_visitor_text():
             assert e.status_code == 401
         else:
             assert not key and not p.is_admin
+
+
+def _relevance_runtime(tmp):
+    src = os.path.join(tmp, "staff.csv")
+    rows = ["id,name,dept,role"] + [f"E{i},社員{i},{d},{r}" for i, (d, r) in enumerate(
+        [("経理部", "課長"), ("経理部", "主任"), ("製造部", "課長"), ("製造部", "主任"), ("人事部", "部長")])]
+    with open(src, "w", encoding="utf-8") as f:
+        f.write("\n".join(rows) + "\n")
+    with open(os.path.join(tmp, "items.csv"), "w", encoding="utf-8") as f:
+        f.write("code,name\nP1,ベアリング\nP2,配管部材\n")
+    em = MockProvider()
+    calls = []
+
+    async def complete(prompt, history=None, tools=None):
+        calls.append(prompt)
+        return "ok"
+
+    rt = BridgeRuntime({
+        "store": {"path": os.path.join(tmp, "b.db")},
+        "sources": [{"name": "f", "type": "file", "config": {"base_dir": tmp}, "entities": [
+            {"name": "Staff", "pk": "id", "title": "name", "label": "従業員 社員", "text": ["name", "dept", "role"],
+             "acl": {"tenant": "t", "roles": ["hr"]}, "options": {"path": "staff.csv", "encoding": "utf-8"}},
+            {"name": "Item", "pk": "code", "title": "name", "text": ["name"],
+             "acl": {"tenant": "t"}, "options": {"path": "items.csv", "encoding": "utf-8"}},
+        ]}],
+    }, embed=em.embed, embedder_id=em.embedder_id, default_store_path=os.path.join(tmp, "x.db"), complete=complete)
+    run(rt.sync("t"))
+    return rt, calls
+
+
+def test_relevance_cutoff_drops_noise_and_skips_llm_when_nothing_matches():
+    with tempfile.TemporaryDirectory() as tmp:
+        rt, calls = _relevance_runtime(tmp)
+        hr = Principal("h", "t", ("hr",))
+        sales = Principal("s", "t", ("sales",))
+        # 他部署の社員や品目で top_k を埋めない
+        got = [r["pk"] for r in run(rt.search(hr, "経理部の従業員を教えてください", top_k=5))["results"]]
+        assert set(got) == {"E0", "E1"}, got
+        # 語が多い丁寧な質問でも基準が変わらない
+        got = [r["pk"] for r in run(rt.search(hr, "経理部に所属している従業員の名前を一覧で教えてください", top_k=5))["results"]]
+        assert set(got) == {"E0", "E1"}, got
+        # 短い質問は 1 語一致でよい
+        assert {r["pk"] for r in run(rt.search(hr, "ベアリング", top_k=5))["results"]} == {"P1"}
+        # 人事データが見えない主体: 関係する文書が無いので LLM を呼ばない
+        res = run(rt.ask(sales, "経理部の従業員を教えてください"))
+        assert res["llm_called"] is False and calls == [] and res["context"] == []
+        # 閲覧可能な文書と一致すれば呼ぶ
+        res = run(rt.ask(sales, "配管部材"))
+        assert res["llm_called"] is True and len(calls) == 1 and "社員" not in calls[0]
 
 
 def test_per_client_limit_counts_llm_calls_by_ip_only():

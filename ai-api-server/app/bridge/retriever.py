@@ -9,6 +9,12 @@ Retriever: 権限フィルタ付きベクトル検索。
 
 ハイブリッド(既定ON): ベクトル順位と BM25 順位(lexical.py)を RRF で融合する。
 BM25 も閲覧可能文書の集合だけで統計を取るため、ACL 不変条件はそのまま保たれる。
+
+関連度の足切り: 質問と関係ない文書で top_k を埋めると、比較検索にノイズが混ざり、RAG では
+無駄な LLM 呼び出しになる。長い質問で 1 語しか一致しない文書(「社員」だけ一致など)と、
+最上位より大きくスコアが低い文書を落とし、擬似埋め込みの場合は語が一致しない文書をベクトル
+だけで通さない(0 件なら RAG は LLM を呼ばない)。比率でなく一致語の種類数で見るのは、
+「〜を教えてください」のような語が多い質問でも基準が変わらないようにするため。
 """
 from __future__ import annotations
 
@@ -16,7 +22,7 @@ import math
 import threading
 
 from app.bridge.acl import Principal, can_read
-from app.bridge.lexical import LexicalIndex
+from app.bridge.lexical import LexicalIndex, tokenize
 from app.bridge.store import DocRecord
 from app.services.vector_index import VectorBackend, build_vector_backend
 
@@ -31,7 +37,9 @@ def _cosine(a: list[float], b: list[float]) -> float:
 class Retriever:
     def __init__(self, preferred_backend: str, exact_threshold: int = 5000, oversample: int = 10,
                  hybrid: bool = True, vector_weight: float = 1.0, lexical_weight: float = 1.0,
-                 rrf_k: int = 60):
+                 rrf_k: int = 60, min_matched_terms: int = 1, short_query_terms: int = 3,
+                 min_score_ratio: float = 0.0,
+                 vector_only_hits: bool = True):
         self.preferred_backend = preferred_backend
         self.exact_threshold = exact_threshold
         self.oversample = oversample
@@ -39,6 +47,10 @@ class Retriever:
         self.vector_weight = vector_weight
         self.lexical_weight = lexical_weight
         self.rrf_k = rrf_k
+        self.min_matched_terms = min_matched_terms
+        self.short_query_terms = short_query_terms
+        self.min_score_ratio = min_score_ratio
+        self.vector_only_hits = vector_only_hits
         self.lexical = LexicalIndex()
         self._lock = threading.RLock()
         self._docs: dict[int, DocRecord] = {}
@@ -112,7 +124,13 @@ class Retriever:
             if not use_lex:
                 return vec[:top_k], filtered, strategy
 
-            lex_scores = self.lexical.scores(query, {d.doc_id for d in allowed})
+            lex_scores, matched = self.lexical.match(query, {d.doc_id for d in allowed})
+            if lex_scores:
+                floor = max(lex_scores.values()) * self.min_score_ratio
+                need = 1 if len(set(tokenize(query))) <= self.short_query_terms else self.min_matched_terms
+                lex_scores = {i: s for i, s in lex_scores.items() if s >= floor and matched[i] >= need}
+            if not self.vector_only_hits:
+                vec = [(d, s) for d, s in vec if d.doc_id in lex_scores]
             if not lex_scores:
                 return vec[:top_k], filtered, strategy
             lex = sorted(lex_scores.items(), key=lambda x: x[1], reverse=True)[:n_cand]

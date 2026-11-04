@@ -10,6 +10,9 @@ BridgeRuntime (Singleton): プロファイル(YAML)から Connector/EntitySpec/�
     audit:   {store_query_text: true,            # 検索クエリ本文を監査ログに残すか(既定 true)
               store_answer_text: true}           # AI回答本文を監査ログに残すか(既定 true)
     answer:  {top_k: 5, max_doc_chars: 1200}     # /api/bridge/ask(権限付きRAG)の既定値
+    retrieval: {min_matched_terms: 2,            # 関連度の足切り(retriever.py 参照)。既定は擬似埋め込みのときだけ有効
+                min_score_ratio: 0.5,
+                vector_only_hits: false}
     demo:    {personas: [...]}                   # 公開デモ用の入口(demo.py 参照。省略時は無効)
     sync:    {interval_sec: 0}                   # >0 で起動時から定期同期
     sources:
@@ -70,8 +73,12 @@ class Source:
 
 def _default_vector_weight(embedder_id: str) -> float:
     # n-gram ハッシュの順位はほぼノイズなので、BM25 と同じ重みで融合すると無関係な文書が
-    # 上位に入る(ERP デモの再現率: 重み 1.0 で 8/17、0.1 で 12/17)。実モデルでは対等に扱う。
-    return PSEUDO_EMBEDDING_VECTOR_WEIGHT if embedder_id.startswith(PSEUDO_EMBEDDER_PREFIX) else 1.0
+    # 上位に入る(ERP デモの再現率 top5: 重み 1.0 で 9/20、0.1 で 16/20)。実モデルでは対等に扱う。
+    return PSEUDO_EMBEDDING_VECTOR_WEIGHT if _is_pseudo_embedder(embedder_id) else 1.0
+
+
+def _is_pseudo_embedder(embedder_id: str) -> bool:
+    return embedder_id.startswith(PSEUDO_EMBEDDER_PREFIX)
 
 
 def _entity_from_cfg(e: dict) -> EntitySpec:
@@ -109,11 +116,16 @@ class BridgeRuntime:
         self._embed = embed
         self.engine = SyncEngine(self.store, self.audit, embed, embedder_id)
         rcfg = profile.get("retrieval") or {}
+        pseudo = _is_pseudo_embedder(embedder_id)
         self.retriever = Retriever(
             vector_backend,
             hybrid=bool(rcfg.get("hybrid", True)),
             vector_weight=float(rcfg.get("vector_weight", _default_vector_weight(embedder_id))),
             lexical_weight=float(rcfg.get("lexical_weight", 1.0)),
+            # 足切りの既定は擬似埋め込みのときだけ有効(語の一致が唯一の関連度の手がかりのため)
+            min_matched_terms=int(rcfg.get("min_matched_terms", 2 if pseudo else 1)),
+            min_score_ratio=float(rcfg.get("min_score_ratio", 0.5 if pseudo else 0.0)),
+            vector_only_hits=bool(rcfg.get("vector_only_hits", not pseudo)),
         )
         self.sources: dict[str, Source] = {}
         for s in profile.get("sources") or []:

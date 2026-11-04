@@ -70,15 +70,20 @@ class LexicalIndex:
     def scores(self, query: str, allowed: set[int] | None = None) -> dict[int, float]:
         """BM25 スコア。allowed を渡すとその文書集合だけで統計(N/df/平均長)を取り採点する。
         全体統計を使うと閲覧不可文書の有無でスコアが変わり、存在が推測できてしまうため。"""
+        return self.match(query, allowed)[0]
+
+    def match(self, query: str, allowed: set[int] | None = None) -> tuple[dict[int, float], dict[int, int]]:
+        """(BM25 スコア, 文書ごとの一致した質問語の種類数)。統計の扱いは scores と同じ。"""
         if allowed is None:
             universe_n, total = len(self._tf), self._total_len
         else:
             allowed = {d for d in allowed if d in self._tf}
             universe_n, total = len(allowed), sum(self._len[d] for d in allowed)
         if not universe_n:
-            return {}
+            return {}, {}
         avg = (total / universe_n) or 1.0
-        out: dict[int, float] = defaultdict(float)
+        scores: dict[int, float] = defaultdict(float)
+        matched: dict[int, int] = defaultdict(int)
         for t in set(tokenize(query)):
             post = self._postings.get(t)
             if not post:
@@ -91,5 +96,6 @@ class LexicalIndex:
             for d in post:
                 f = self._tf[d][t]
                 denom = f + self.k1 * (1 - self.b + self.b * self._len[d] / avg)
-                out[d] += idf * f * (self.k1 + 1) / denom
-        return dict(out)
+                scores[d] += idf * f * (self.k1 + 1) / denom
+                matched[d] += 1
+        return dict(scores), dict(matched)
