@@ -540,6 +540,36 @@ def test_relevance_cutoff_drops_noise_and_skips_llm_when_nothing_matches():
         assert res["llm_called"] is True and len(calls) == 1 and "社員" not in calls[0]
 
 
+def test_audit_rebase_removes_text_and_keeps_chain_and_links():
+    with tempfile.TemporaryDirectory() as tmp:
+        rt, _ = _relevance_runtime(tmp)
+        hr = Principal("h", "t", ("hr",))
+        secret = "秘密の検索語 経理部 従業員"
+        res = run(rt.ask(hr, secret))
+        old_head = rt.audit.verify()["head"]
+        out = rt.audit.rebase_redacting(("query", "answer"), "test", "ops")
+        assert out["ok"] and out["old_head"] == old_head and out["redacted_records"] == 2
+        assert rt.audit.verify()["ok"]
+        items = rt.audit.query(limit=1000)
+        assert secret not in str(items)
+        assert all("answer" not in i["detail"] for i in items)
+        marker = items[0]
+        assert marker["kind"] == "audit.rebase" and marker["detail"]["old_head"] == old_head
+        # rag.answer から retrieval への参照が新しいハッシュを指したまま
+        answer = next(i for i in items if i["kind"] == "rag.answer")
+        retrieval = next(i for i in items if i["kind"] == "retrieval")
+        assert answer["detail"]["retrieval_audit_id"] == retrieval["hash"] != res["retrieval_audit_id"]
+        # 張り直し後も改ざんは検出できる
+        rt.store.conn.execute("UPDATE audit SET actor='x' WHERE seq=1")
+        assert not rt.audit.verify()["ok"]
+        # 壊れたチェーンは張り直さない(改ざんの痕跡を消さない)
+        try:
+            rt.audit.rebase_redacting(("query",), "test", "ops")
+            raise AssertionError("壊れたチェーンを張り直した")
+        except ValueError:
+            pass
+
+
 def test_per_client_limit_counts_llm_calls_by_ip_only():
     from app.services.ai_client import AIRateLimitError, PerClientLimitedProvider
     from app.services.rate_limit import ClientContextMiddleware, current_client
