@@ -4,12 +4,18 @@ aisb_embed 自身の管理用エンドポイント。
 /aisb-embed/admin は「サイドバーが無効化されていて画面上にトグルUIが
 存在しない」状態でも常に直接アクセスできる、有効/無効の唯一の入口。
 レガシー側のナビゲーション(base.html)には一切リンクを追加していない
-(=ここも無改造)。URLを知っている運用者だけが切り替える想定。
+(=ここも無改造)。
+
+切り替えを実行できるのは次のどちらかだけ(閲覧は誰でもできる):
+  - リバースプロキシを経由しない、サーバー自身からのアクセス
+  - 環境変数 AISB_EMBED_ADMIN_KEY と一致する X-AISB-Admin-Key ヘッダ付きのアクセス
 """
+import hmac
 import html
+import ipaddress
 import os
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -20,8 +26,29 @@ router = APIRouter(prefix="/aisb-embed", tags=["aisb-embed"])
 SYSTEM_LABEL = "レガシーERP"
 
 
+_ADMIN_KEY_ENV = "AISB_EMBED_ADMIN_KEY"
+# 同一マシンの Caddy からの転送も接続元は 127.0.0.1 になるため、接続元だけでは公開経路と区別できない。
+# Caddy は X-Forwarded-For を常に付けるので、これらのヘッダがあれば公開経路として扱う。
+_PROXY_HEADERS = ("x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-prefix", "x-real-ip", "forwarded")
+
+
 class ToggleBody(BaseModel):
     enabled: bool
+
+
+def _is_local_direct(request: Request) -> bool:
+    if any(h in request.headers for h in _PROXY_HEADERS):
+        return False
+    try:
+        return ipaddress.ip_address(request.client.host if request.client else "").is_loopback
+    except ValueError:
+        return False
+
+
+def _has_admin_key(request: Request) -> bool:
+    expected = os.environ.get(_ADMIN_KEY_ENV, "")
+    given = request.headers.get("x-aisb-admin-key", "")
+    return bool(expected) and hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8"))
 
 
 @router.get("/status")
@@ -34,7 +61,9 @@ def status():
 
 
 @router.post("/toggle")
-def toggle(body: ToggleBody):
+def toggle(body: ToggleBody, request: Request):
+    if not (_is_local_direct(request) or _has_admin_key(request)):
+        raise HTTPException(status_code=403, detail="forbidden")
     config.set_enabled(body.enabled)
     return status()
 
@@ -45,6 +74,8 @@ def admin_page(request: Request):
     # へfetchすると別システム(同一ドメイン配下の別プロセス)を誤って叩いてしまうため、
     # 常にX-Forwarded-Prefixを踏まえた絶対パスで自分自身を叩く。
     prefix = request.headers.get("x-forwarded-prefix", "")
+    # ブラウザのボタンはキーを送れないので、キーの有無にかかわらず表示するのはサーバー自身からのアクセスだけ
+    can_toggle = _is_local_direct(request)
     locked = config.env_override() is not None
     enabled = config.is_enabled()
     lock_notice = (
@@ -54,6 +85,22 @@ def admin_page(request: Request):
         f"(env変数を外すかサーバー起動時の設定を変更してください)。</p>"
         if locked
         else ""
+    )
+    controls = (
+        f"""<button id="toggle-btn">{"無効化する" if enabled else "有効化する"}</button>
+  <script>
+    document.getElementById("toggle-btn").addEventListener("click", async () => {{
+      const nowEnabled = document.getElementById("state").classList.contains("on");
+      await fetch("{html.escape(prefix, quote=True)}/aisb-embed/toggle", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{ enabled: !nowEnabled }}),
+      }});
+      location.reload();
+    }});
+  </script>"""
+        if can_toggle
+        else '<p class="desc">公開経路からは切り替えできません。サーバー上で操作してください。</p>'
     )
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -81,18 +128,6 @@ def admin_page(request: Request):
   </p>
   <p>現在の状態: <span id="state" class="state {"on" if enabled else "off"}">{"有効" if enabled else "無効"}</span></p>
   {lock_notice}
-  <button id="toggle-btn">{"無効化する" if enabled else "有効化する"}</button>
-  <script>
-    document.getElementById("toggle-btn").addEventListener("click", async () => {{
-      const nowEnabled = document.getElementById("state").classList.contains("on");
-      const res = await fetch("{prefix}/aisb-embed/toggle", {{
-        method: "POST",
-        headers: {{ "Content-Type": "application/json" }},
-        body: JSON.stringify({{ enabled: !nowEnabled }}),
-      }});
-      const data = await res.json();
-      location.reload();
-    }});
-  </script>
+  {controls}
 </body>
 </html>"""
