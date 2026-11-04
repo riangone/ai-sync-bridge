@@ -19,19 +19,6 @@
 window.AISB = window.AISB || {};
 
 window.AISB.demoScenarios = {
-  search: {
-    title: "セマンティック検索を1クリックで体験",
-    doneText: "完全一致でなくても、文字列が近い被保険者を探し出しました。",
-    steps: [
-      { type: "openPanel", panel: "search", text: "AIパネルの「セマンティック検索」タブを自動で開きます…" },
-      { type: "narrate", text: "検索ボックスに条件を入力してみます(この入力は自動デモです)" },
-      { type: "setValue", selector: "#aisb-search-input", value: "北沢に住む高齢の被保険者" },
-      { type: "narrate", text: "「検索」を押すと、キーワードが多少あいまいでも意味で探し当てます" },
-      { type: "click", selector: "#aisb-search-run" },
-      { type: "waitFor", selector: "#aisb-search-results .aisb-badge", timeoutMs: 120000 },
-      { type: "highlight", selector: "#aisb-search-results" },
-    ],
-  },
   inventory: {
     title: "請求書類用紙・案内リーフレットの在庫不足を1クリックで発見",
     doneText: "人気の書類用紙で在庫切れ間近のものが一目でわかりました。",

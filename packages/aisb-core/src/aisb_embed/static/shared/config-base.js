@@ -40,7 +40,8 @@ window.AISB.configBase = (function () {
       { id: "nlsql", label: "AI検索", enabled: true },
       { id: "customers", label: "顧客検索", enabled: false },
       { id: "ocr", label: "OCR取込", enabled: true },
-      { id: "search", label: "セマンティック検索", enabled: true },
+      // 簡易ベクトルでは結果が検索語と無関係になるため非表示。検索の入口は bridge パネルに一本化した
+      { id: "search", label: "セマンティック検索", enabled: false },
       { id: "analytics", label: "予測分析", enabled: true },
       { id: "workflows", label: "ワークフロー", enabled: false },
       { id: "notifications", label: "通知", enabled: false },
