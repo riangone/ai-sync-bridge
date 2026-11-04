@@ -12,6 +12,21 @@ window.AISB.uiBase = (function () {
   const MIN_WIDTH = 300;
   const MAX_WIDTH_RATIO = 0.9;
 
+  // 文言は導入先の profile.json(ai_notice)由来。HTML として解釈させない。
+  function renderNotice(el, notice) {
+    if (!notice || !notice.text) return;
+    el.textContent = notice.text;
+    if (notice.link_url && /^https?:\/\//.test(notice.link_url)) {
+      const a = document.createElement("a");
+      a.href = notice.link_url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = notice.link_label || notice.link_url;
+      el.append(" ", a);
+    }
+    el.hidden = false;
+  }
+
   function initShell({ profile, sidebarOpen, panels, ctx }) {
     const host = document.createElement("div");
     host.id = "aisb-host";
@@ -46,9 +61,12 @@ window.AISB.uiBase = (function () {
         <div id="aisb-tabs">
           ${panelDefs.map((p, i) => `<button class="aisb-tab${i === 0 ? " active" : ""}" data-panel="${p.id}">${p.label}</button>`).join("")}
         </div>
+        <div id="aisb-notice" hidden></div>
         <div id="aisb-body"></div>
       </div>
     `;
+
+    renderNotice(root.querySelector("#aisb-notice"), window.AISB_AI_NOTICE);
 
     const bodyEl = root.querySelector("#aisb-body");
     const tabButtons = [...root.querySelectorAll(".aisb-tab")];

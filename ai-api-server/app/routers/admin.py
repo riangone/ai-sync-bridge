@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends
 
 from app.deps import get_admin_service, get_ai_provider
 from app.models.schemas import AdminStats, AuditLogEntry, InsightResponse
+from app.operator_auth import require_operator
 from app.services import insight_service
 from app.services.admin_service import AdminService
 from app.services.ai_client import AiProvider
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_operator)])
 
 
 @router.get("/stats", response_model=AdminStats)

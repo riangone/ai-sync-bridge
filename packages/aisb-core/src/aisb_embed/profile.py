@@ -26,6 +26,8 @@ class EmbedProfile:
     system_label: str = "レガシーERP"
     # コアの既定スクリプト列に加えて注入するモジュール(例: modules/panel-valuation.js)
     extra_modules: tuple[str, ...] = field(default_factory=tuple)
+    # AI パネルの上部に常時表示する注意書き。{"text", "link_label", "link_url"}。未指定なら表示しない
+    ai_notice: dict[str, str] | None = None
 
     @property
     def static_dir(self) -> Path:
@@ -46,4 +48,5 @@ class EmbedProfile:
             profile_dir=pdir,
             system_label=meta.get("system_label", cls.system_label),
             extra_modules=tuple(meta.get("extra_modules", [])),
+            ai_notice=meta.get("ai_notice"),
         )

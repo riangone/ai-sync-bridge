@@ -206,6 +206,22 @@
   --tab-c-tint: var(--aisb-violet-tint);
 }
 
+#aisb-notice {
+  padding: 6px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #7a4b00;
+  background: #fff7e0;
+  border-bottom: 1px solid #f0dca8;
+}
+#aisb-notice[hidden] {
+  display: none;
+}
+#aisb-notice a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 #aisb-body {
   flex: 1;
   overflow-y: auto;
@@ -582,6 +598,7 @@
   pointer-events: none;
 }
 .aisb-minimized #aisb-tabs,
+.aisb-minimized #aisb-notice,
 .aisb-minimized #aisb-body,
 .aisb-minimized #aisb-resize-handle {
   display: none;

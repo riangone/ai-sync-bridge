@@ -21,6 +21,11 @@ window.AISB.panels.search = function renderSearchPanel(el, ctx) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, top_k: 5 }),
       });
+      if (res.status === 403) {
+        resultsEl.textContent = "この機能はサーバー管理者のみ利用できます";
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       resultsEl.innerHTML =
         `<div class="aisb-badge">backend: ${data.backend}</div>` +

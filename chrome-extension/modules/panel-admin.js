@@ -20,9 +20,15 @@ window.AISB.panels.admin = function renderAdminPanel(el, ctx) {
     ctx.runInsight(`${ctx.API_BASE}/api/admin/stats/insight`, e.target, el.querySelector("#aisb-admin-insight"))
   );
 
+  const fetchJson = (url, options) =>
+    fetch(url, options).then((r) => {
+      if (r.status === 403) throw new Error("サーバー管理者のみ利用できます");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    });
+
   function loadStats() {
-    fetch(`${ctx.API_BASE}/api/admin/stats`)
-      .then((r) => r.json())
+    fetchJson(`${ctx.API_BASE}/api/admin/stats`)
       .then((s) => {
         statsEl.innerHTML = `
           <div class="aisb-card">
@@ -32,12 +38,11 @@ window.AISB.panels.admin = function renderAdminPanel(el, ctx) {
             未読通知: ${s.unread_notification_count}件
           </div>`;
       })
-      .catch((e) => (statsEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (statsEl.innerHTML = `<p>エラー: ${e.message}</p>`));
   }
 
   function loadAudit() {
-    fetch(`${ctx.API_BASE}/api/admin/audit-log`)
-      .then((r) => r.json())
+    fetchJson(`${ctx.API_BASE}/api/admin/audit-log`)
       .then((entries) => {
         auditEl.innerHTML =
           entries
@@ -49,19 +54,18 @@ window.AISB.panels.admin = function renderAdminPanel(el, ctx) {
             )
             .join("") || "<p>監査ログはまだありません</p>";
       })
-      .catch((e) => (auditEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (auditEl.innerHTML = `<p>エラー: ${e.message}</p>`));
   }
 
   el.querySelector("#aisb-admin-reset").addEventListener("click", () => {
     if (!confirm("デモデータ(顧客/受注/会話履歴)を初期状態にリセットします。よろしいですか?")) return;
-    fetch(`${ctx.API_BASE}/api/admin/reset-demo-data`, { method: "POST" })
-      .then((r) => r.json())
+    fetchJson(`${ctx.API_BASE}/api/admin/reset-demo-data`, { method: "POST" })
       .then(() => {
         loadStats();
         loadAudit();
         ctx.refreshUnreadBadge();
       })
-      .catch((e) => alert(`エラー: ${e}`));
+      .catch((e) => alert(`エラー: ${e.message}`));
   });
 
   loadStats();
