@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<div class="ai-intro">
+
+    <div class="ai-intro-hero">
+        <div class="ai-intro-hero-badge">🤖 AI SIDE PANEL</div>
+        <h1>窓口の画面はそのまま。<br>検索・入力はAIにまかせる。</h1>
+        <p class="ai-intro-hero-sub">
+            画面遷移もマニュアルもなし。右下の🤖ボタンを押して、日本語で話しかけるだけで
+            住民検索・証明書交付申請の入力・混雑状況の把握までこの1枚のパネルで完結します。
+        </p>
+        <div class="ai-intro-hero-cta">今すぐ試す ▶ 画面右下の <strong>🤖</strong> ボタンをクリック</div>
+        <div class="ai-intro-hero-stats">
+            <div class="ai-intro-hero-stat"><strong>11</strong><span>AI機能</span></div>
+            <div class="ai-intro-hero-stat"><strong>4</strong><span>カテゴリ</span></div>
+            <div class="ai-intro-hero-stat"><strong>3</strong><span>ステップ</span></div>
+            <div class="ai-intro-hero-stat"><strong>0</strong><span>学習コスト</span></div>
+        </div>
+    </div>
+
+    <div class="ai-intro-section">
+        <h2 class="ai-intro-h2">なぜ使うのか</h2>
+        <div class="ai-intro-benefits">
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">⌨️</div>
+                <h3>探す・入れるが1発で終わる</h3>
+                <p>「北沢に住む山田さんの住民票」で検索完了。台帳を1件ずつめくる手間が不要に。</p>
+            </div>
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">📝</div>
+                <h3>紙の申請書はOCRにまかせる</h3>
+                <p>住民票交付申請書等の手書き・印字をAIビジョンが読み取り、申請フォームに反映。</p>
+            </div>
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">📊</div>
+                <h3>混雑状況をその場でAIが要約</h3>
+                <p>来庁受付の件数推移や滞留を、開いたまま自然文で聞いて即確認。</p>
+            </div>
+            <div class="ai-intro-benefit">
+                <div class="ai-intro-benefit-icon">🗣️</div>
+                <h3>操作は全部、日本語</h3>
+                <p>専用コマンドやマニュアル学習は不要。話しかける感覚でそのまま伝わる。</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-intro-section">
+        <h2 class="ai-intro-h2">使い方（3ステップ）</h2>
+        <div class="ai-intro-steps">
+            <div class="ai-intro-step">
+                <div class="ai-intro-step-num">1</div>
+                <div>
+                    <h3>🤖ボタンを開く</h3>
+                    <p>どの画面からでも、右下の🤖ボタンでいつでもパネルが開きます。</p>
+                </div>
+            </div>
+            <div class="ai-intro-step-arrow">→</div>
+            <div class="ai-intro-step">
+                <div class="ai-intro-step-num">2</div>
+                <div>
+                    <h3>目的のタブを選ぶ</h3>
+                    <p>「AIチャット」「AI検索」など、上部タブからやりたいことを選択。</p>
+                </div>
+            </div>
+            <div class="ai-intro-step-arrow">→</div>
+            <div class="ai-intro-step">
+                <div class="ai-intro-step-num">3</div>
+                <div>
+                    <h3>日本語で話しかける</h3>
+                    <p>知りたいこと・やりたいことをそのまま入力・送信するだけ。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-intro-section">
+        <div class="ai-intro-list-head">
+            <h2 class="ai-intro-h2">できること一覧</h2>
+            <p class="ai-intro-list-hint">👆 各カードをクリックすると、機能ごとの「できること」「使い方」「入力例」が開きます</p>
+        </div>
+
+        <div class="ai-intro-group cat-search">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">🔎</span>探す・聞く</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">AIチャット</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">窓口業務全般を自然文で相談・質問できる基本タブ</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>住民検索・申請入力・混雑状況の確認などカテゴリを問わず、窓口業務の疑問をそのまま日本語で相談できる万能窓口。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「AIチャット」タブ → 下の入力欄に質問を入力 →「送信」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「今日受け付けた証明書交付申請の件数を教えて」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">AI検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">「先月の交付申請一覧」等を自動でデータ検索に変換</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="nlsql">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>日本語の検索条件をAIが安全な絞り込み条件に変換して検索。適用された条件は画面に表示されるので安心。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「AI検索」タブ → 条件を日本語で入力 → 実行</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「今月の証明書交付申請を、手数料の高い順に5件」「用件が転入届の来庁受付を一覧表示」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">セマンティック検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">キーワードが多少あいまいでも意味で探し当てる</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="search">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>完全一致でなくても、言葉の意味が近い住民・世帯・申請などをAIが探し出す。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「セマンティック検索」タブ → 自然文またはキーワードを入力 →「検索」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「北沢に住む高齢の住民」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">類似検索</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">似た住民・申請をAIが自動でピックアップ</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>住民・証明書交付申請の中から、指定した1件に近いレコードを文字類似度ベースで自動抽出。任意で一致理由の説明を付けられ、「AIで関連性を解釈する」を押すとその結果の意味を本物のAIが解説する。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「類似検索」タブ → 対象テーブルとID・件数を指定 →「説明を付与」の要否を選択 → 実行 → 必要なら「AIで関連性を解釈する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>テーブル「住民(residents)」+ ID「R00012」+ 件数「5」</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-input">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">✍️</span>入力を楽にする</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">自然言語入力</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">「◯◯さんに住民票の写しを2通交付して」で入力フォームを自動作成</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>話し言葉のまま伝えた依頼内容を、対象画面(証明書交付申請/住民登録/来庁受付)の項目に自動でマッピング。結果は一覧表示のみで、実フォームへの書き込み・送信は行わない(内容確認は必ず人が行う)。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「自然言語入力」タブ → 対象画面を選択 → 依頼内容を日本語で入力 → マッピング結果を確認</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「山田太郎さんに住民票の写しを2通、戸籍謄本を1通交付申請したい」</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">OCR取込</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">紙の申請書や本人確認書類を画像から読み取り自動入力</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="ocr">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>住民票交付申請書・戸籍関係届出書などの画像をAIビジョンが読み取り、テキスト化して抽出。窓口での聞き取り・手入力の手間を削減する。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「OCR取込」タブ → 画像/PDFファイルを選択 →「OCR実行」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>窓口に持ち込まれた交付申請書を撮影した写真、またはスキャンPDF</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-numbers">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">📈</span>数字をすぐ確認・見落としを防ぐ</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">予測分析</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">来庁件数・交付申請件数の先行きをAIが予測しグラフ表示</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="analytics">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>証明書交付申請・来庁受付の件数を線形回帰で予測しグラフ表示。「AIでトレンドを解釈する」で数字の意味をAIが解説し、繁忙日に向けた窓口人員配置の判断材料にできる。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「予測分析」タブ → グラフ/リストが自動表示 → 必要なら「AIで解釈する」ボタン</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。開くだけで予測グラフが表示される。</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">アラート</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">滞留している交付申請や呼出不応答を自動検知</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="alerts">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>「受付」のまま処理が進んでいない証明書交付申請や、呼出不応答の来庁受付をまとめてワンクリックで確認。「AIで対応優先度を解釈する」で何から対応すべきかを本物のAIが解説し、この端末を通知購読しておくこともできる。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「アラート」タブ →「アラートを確認」→ 必要なら「AIで対応優先度を解釈する」または「この端末を購読する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。ボタン1つで滞留申請・呼出不応答をまとめて確認。</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">在庫管理</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">収入証紙・戸籍謄本用紙などの在庫切れをその場で察知</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="inventory">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>収入証紙(手数料用)・戸籍謄本用紙などの窓口用品在庫を一覧表示し、「異常検知」で発注点を割り込んでいるものをワンクリックで洗い出す。証紙切れは証明書交付そのものを止めてしまうため、事前に気づける。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「在庫管理」タブ → 一覧が自動表示 → 必要なら「異常検知を実行」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。開くだけで一覧・異常検知が使える。</span>
+                    </span>
+                </button>
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">売掛買掛</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">郵送請求の未収手数料・証紙未払をまとめて即座に把握</span>
+                    <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="arap">▶ 自動デモを見る</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>郵送請求分の未収手数料・証紙や帳票の未払いを期日前～91日以上でエイジング分析し、リスク(低/中/高)をルールベースで判定。「AIでリスクを解釈する」で数字の背景を本物のAIが解説。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「売掛買掛」タブ →「エイジング分析を実行」→ 必要なら「AIでリスクを解釈する」</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>入力不要。ボタン1つで全件分を集計。</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ai-intro-group cat-support">
+            <h3 class="ai-intro-group-title"><span class="ai-intro-group-icon">💬</span>総合サポート</h3>
+            <div class="ai-intro-cards">
+                <button type="button" class="ai-intro-card" aria-expanded="false">
+                    <span class="ai-intro-card-head"><span class="ai-intro-card-title">AIアシスタント</span><span class="ai-intro-card-chevron">▾</span></span>
+                    <span class="ai-intro-card-sub">操作案内から窓口対応の相談まで幅広くサポート</span>
+                    <span class="ai-intro-card-detail">
+                        <span class="ai-intro-detail-row"><b>できること</b>今開いている画面の情報を自動で読み取りながら会話形式でサポート。操作案内から窓口対応の相談まで幅広く対応し、直近20往復までの会話を保持。</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「AIアシスタント」タブ → 質問や依頼を入力 →「送信」(↺で会話をリセット可能)</span>
+                        <span class="ai-intro-detail-row"><b>入力例</b>「戸籍謄本と抄本の違いを教えて」</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-intro-footer-cta">
+        <div class="ai-intro-footer-icon">🤖</div>
+        <p>準備は完了しています。<strong>画面右下の🤖ボタン</strong>を押して、いつでも話しかけてください。</p>
+        <a class="ai-intro-back" href="{{ bp }}/">← メインメニューに戻る</a>
+    </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.querySelectorAll(".ai-intro-cards .ai-intro-card").forEach(function (card) {
+    card.addEventListener("click", function () {
+      var open = card.classList.toggle("is-open");
+      card.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  });
+
+  // 「▶ 自動デモを見る」: クリック一発で対応するAIパネルを開き、実際に操作する様子を
+  // そのまま再生する(shared/demo-scenario-engine.js + shared/demo-scenarios.js)。
+  // カード本体(button)の中に配置しているため、クリックがカードの開閉トグルへ
+  // 伝播しないよう stopPropagation する。読み込み順の都合でこのスクリプトは
+  // window.AISB.demoEngine 等が定義される前に評価されるが、実際に参照するのは
+  // クリック/キー操作の発生時(=すべてのスクリプト読み込み後)なので問題ない。
+  document.querySelectorAll(".ai-intro-demo-btn").forEach(function (btn) {
+    function trigger(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      var id = btn.dataset.demo;
+      var scenario = window.AISB && window.AISB.demoScenarios && window.AISB.demoScenarios[id];
+      if (!window.AISB || !window.AISB.demoEngine || !scenario) {
+        window.alert("デモ機能の読み込みが完了していません。少し待ってからもう一度お試しください。");
+        return;
+      }
+      window.AISB.demoEngine.run(scenario);
+    }
+    btn.addEventListener("click", trigger);
+    btn.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") trigger(e);
+    });
+  });
+</script>
+{% endblock %}

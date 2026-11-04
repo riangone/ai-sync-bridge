@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>メインメニュー</h2>
+
+<div class="ai-guide">
+    <div class="ai-guide-head">
+        <span class="ai-guide-icon">🤖</span>
+        <div>
+            <h3>AIサイドパネルのご案内</h3>
+            <p class="ai-guide-sub">画面右下の🤖ボタンから、AIがこのレガシー画面の操作をサポートします</p>
+        </div>
+    </div>
+    <div class="ai-guide-cols">
+        <div class="ai-guide-col">
+            <h4>できること（メリット）</h4>
+            <ul>
+                <li>自然文で聞くだけで住民検索・証明書交付申請の入力が完了し、画面遷移の手間を削減</li>
+                <li>紙の申請書をOCRで読み取り、交付申請フォームへ自動反映</li>
+                <li>来庁受付の混雑状況を予測分析し、窓口配置の見落としを先に察知</li>
+            </ul>
+        </div>
+        <div class="ai-guide-col">
+            <h4>使い方（3ステップ）</h4>
+            <ol>
+                <li>右下の <strong>🤖</strong> ボタンをクリックしてパネルを開く</li>
+                <li>上部タブから「AIチャット」「AI検索」など目的の機能を選択</li>
+                <li>知りたいことをそのまま日本語で入力・送信するだけ</li>
+            </ol>
+        </div>
+    </div>
+    <a class="ai-guide-more" href="{{ bp }}/ai-panel">→ 全機能・詳しい使い方を見る</a>
+</div>
+
+<div class="summary-boxes">
+    <div class="summary-box"><div class="num">{{ summary.residents }}</div><div class="label">住民登録数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.households }}</div><div class="label">世帯数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.cert_requests }}</div><div class="label">証明書交付申請件数</div></div>
+    <div class="summary-box"><div class="num">&yen;{{ "{:,}".format(summary.fee_total) }}</div><div class="label">手数料合計</div></div>
+</div>
+
+<div class="menu-grid">
+    <a class="menu-button" href="{{ bp }}/Resident/List">住民管理</a>
+    <a class="menu-button" href="{{ bp }}/Household/List">世帯管理</a>
+    <a class="menu-button" href="{{ bp }}/FamilyRegister/List">戸籍管理</a>
+    <a class="menu-button" href="{{ bp }}/CertificateRequest/List">証明書交付申請</a>
+    <a class="menu-button" href="{{ bp }}/VisitReception/List">来庁受付（整理券）</a>
+    <a class="menu-button" href="{{ bp }}/Employee/List">職員管理</a>
+    <a class="menu-button" href="{{ bp }}/MoveHistory/List">異動履歴</a>
+</div>
+{% endblock %}

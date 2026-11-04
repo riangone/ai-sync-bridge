@@ -217,6 +217,57 @@ class OcrService:
                 "Facilities": ["設備", "facilities"],
             },
         },
+        "koseki": {
+            "Resident": {
+                "Name": ["氏名", "名前", "申請者氏名", "name"],
+                "NameKana": ["カナ", "フリガナ", "name_kana"],
+                "Gender": ["性別", "gender"],
+                "BirthDate": ["生年月日", "birth_date"],
+                "Address": ["住所", "現住所", "address"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "Relationship": ["続柄", "relationship"],
+                "Notes": ["備考", "notes", "memo"],
+            },
+            "Employee": {
+                "Name": ["氏名", "名前", "name"],
+                "Department": ["所属", "部署", "department"],
+                "Position": ["職位", "役職", "position"],
+                "Email": ["メール", "メールアドレス", "email"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "HireDate": ["採用日", "hire_date"],
+            },
+            "CertificateRequest": {
+                "CustomerName": ["申請者氏名", "氏名", "請求者", "customer_name"],
+                "Purpose": ["利用目的", "用途", "purpose"],
+                "OrderDate": ["申請日", "請求日", "order_date"],
+                "TotalAmount": ["手数料", "金額", "total_amount"],
+                "Notes": ["備考", "notes", "memo"],
+            },
+        },
+        # 2026-09-29追加: 年金相談業務版(nenkin)。PensionClaimRequestは新規登録フォーム
+        # (templates/entry_items.html)が請求者をcustomerId(被保険者のプルダウン選択=FK)で
+        # 指定する構造で、氏名等の自由入力欄を持たないため対象外(koskei版のCertificateRequest
+        # と同じ判断基準。このファイル冒頭のコメント参照)。
+        "nenkin": {
+            "Insured": {
+                "Name": ["氏名", "名前", "申請者氏名", "name"],
+                "NameKana": ["カナ", "フリガナ", "name_kana"],
+                "Gender": ["性別", "gender"],
+                "BirthDate": ["生年月日", "birth_date"],
+                "Address": ["住所", "現住所", "address"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "InsuredType": ["被保険者種別", "insured_type"],
+                "Notes": ["備考", "notes", "memo"],
+            },
+            "Staff": {
+                "Name": ["氏名", "名前", "name"],
+                "Department": ["所属", "部署", "department"],
+                "Position": ["職位", "役職", "position"],
+                "Email": ["メール", "メールアドレス", "email"],
+                "Tel": ["TEL", "電話", "電話番号", "tel"],
+                "HireDate": ["採用日", "hire_date"],
+            },
+        },
     }
 
     def __init__(self, demo_mode: bool = True, ai: AiProvider | None = None, instance: str = "erp"):

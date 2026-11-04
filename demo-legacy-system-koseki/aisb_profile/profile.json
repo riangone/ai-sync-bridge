@@ -1,0 +1,4 @@
+{
+  "system_label": "自治体窓口システム(戸籍住民課)",
+  "extra_modules": ["modules/panel-valuation.js"]
+}

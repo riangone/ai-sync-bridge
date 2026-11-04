@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y1P7PMMM6V"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-Y1P7PMMM6V');
+    </script>
+
+<meta charset="UTF-8">
+<title>{{ title }} - 年金相談業務システム(Legacy NENKIN)</title>
+{% set bp = base_path(request) %}
+<link rel="stylesheet" href="{{ bp }}/static/css/site.css">
+</head>
+<body>
+<div id="header">年金相談業務システム LEGACY-NENKIN v1.0（日本年金機構 コールセンター/年金事務所 窓口）</div>
+<div id="nav">
+    <a href="{{ bp }}/">ホーム</a>
+    <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
+    <a href="{{ bp }}/Insured/List">被保険者管理</a>
+    <a href="{{ bp }}/Employer/List">適用事業所管理</a>
+    <a href="{{ bp }}/EnrollmentRecord/List">適用記録管理</a>
+    <a href="{{ bp }}/PensionClaimRequest/List">年金請求受付</a>
+    <a href="{{ bp }}/CallReception/List">相談受付</a>
+    <a href="{{ bp }}/Staff/List">相談員管理</a>
+    <a href="{{ bp }}/ContributionHistory/List">資格異動履歴</a>
+</div>
+<div id="content">
+{% block content %}{% endblock %}
+</div>
+<div id="footer">Copyright (C) Nenkin Legacy Systems Inc. All Rights Reserved. (AIサポートなし・改変不可を想定したデモ画面)</div>
+<script src="{{ bp }}/static/js/site.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

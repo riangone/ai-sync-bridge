@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>メインメニュー</h2>
+
+<div class="ai-guide">
+    <div class="ai-guide-head">
+        <span class="ai-guide-icon">🤖</span>
+        <div>
+            <h3>AIサイドパネルのご案内</h3>
+            <p class="ai-guide-sub">画面右下の🤖ボタンから、AIがこのレガシー画面の操作をサポートします</p>
+        </div>
+    </div>
+    <div class="ai-guide-cols">
+        <div class="ai-guide-col">
+            <h4>できること（メリット）</h4>
+            <ul>
+                <li>自然文で聞くだけで被保険者検索・年金請求(裁定請求)の入力が完了し、画面遷移の手間を削減</li>
+                <li>紙の裁定請求書をOCRで読み取り、請求フォームへ自動反映</li>
+                <li>来所・電話相談受付の混雑状況を予測分析し、窓口/オペレーター配置の見落としを先に察知</li>
+            </ul>
+        </div>
+        <div class="ai-guide-col">
+            <h4>使い方（3ステップ）</h4>
+            <ol>
+                <li>右下の <strong>🤖</strong> ボタンをクリックしてパネルを開く</li>
+                <li>上部タブから「AIチャット」「AI検索」など目的の機能を選択</li>
+                <li>知りたいことをそのまま日本語で入力・送信するだけ</li>
+            </ol>
+        </div>
+    </div>
+    <a class="ai-guide-more" href="{{ bp }}/ai-panel">→ 全機能・詳しい使い方を見る</a>
+</div>
+
+<div class="summary-boxes">
+    <div class="summary-box"><div class="num">{{ summary.insureds }}</div><div class="label">被保険者登録数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.employers }}</div><div class="label">適用事業所数</div></div>
+    <div class="summary-box"><div class="num">{{ summary.claim_requests }}</div><div class="label">年金請求受付件数</div></div>
+    <div class="summary-box"><div class="num">&yen;{{ "{:,}".format(summary.fee_total) }}</div><div class="label">支給見込額合計(概算)</div></div>
+</div>
+
+<div class="menu-grid">
+    <a class="menu-button" href="{{ bp }}/Insured/List">被保険者管理</a>
+    <a class="menu-button" href="{{ bp }}/Employer/List">適用事業所管理</a>
+    <a class="menu-button" href="{{ bp }}/EnrollmentRecord/List">適用記録管理</a>
+    <a class="menu-button" href="{{ bp }}/PensionClaimRequest/List">年金請求受付（裁定請求）</a>
+    <a class="menu-button" href="{{ bp }}/CallReception/List">来所・電話相談受付</a>
+    <a class="menu-button" href="{{ bp }}/Staff/List">相談員管理</a>
+    <a class="menu-button" href="{{ bp }}/ContributionHistory/List">資格異動履歴</a>
+</div>
+{% endblock %}

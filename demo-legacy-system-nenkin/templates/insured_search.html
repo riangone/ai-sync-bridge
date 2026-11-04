@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>被保険者検索</h2>
+<form method="post" action="{{ bp }}/Insured/Search">
+<table class="form-table">
+    <tr>
+        <th>キーワード</th>
+        <td><input type="text" class="textbox" name="keyword" value="{{ keyword or '' }}" placeholder="氏名・フリガナ・住所など"></td>
+    </tr>
+</table>
+<div class="form-actions">
+    <input type="submit" class="button" value="検索">
+    <a class="button-link" href="{{ bp }}/Insured/List">戻る</a>
+</div>
+</form>
+
+{% if results is not none %}
+<h3>検索結果（{{ results|length }}件）</h3>
+<table class="grid">
+    <thead>
+    <tr><th>被保険者番号</th><th>氏名</th><th>フリガナ</th><th>住所</th><th>資格状況</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+    {% for p in results %}
+    <tr>
+        <td>{{ p.Id }}</td>
+        <td>{{ p.Name }}</td>
+        <td>{{ p.NameKana }}</td>
+        <td>{{ p.Address }}</td>
+        <td>{{ p.Status }}</td>
+        <td class="ops"><a href="{{ bp }}/Insured/Detail/{{ p.Id }}">詳細</a> <a href="{{ bp }}/Insured/Entry/{{ p.Id }}">編集</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">該当する被保険者がありません</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -84,6 +84,10 @@ class DemoDataStore:
             self._seed_dealer()
         elif instance == "realestate":
             self._seed_realestate()
+        elif instance == "koseki":
+            self._seed_koseki()
+        elif instance == "nenkin":
+            self._seed_nenkin()
         else:
             self._seed_erp()
 
@@ -298,6 +302,163 @@ class DemoDataStore:
             {"supplier": "レジデンシャル仲介ネットワーク", "amount": 13200000, "issued_at": "2026-08-05", "due_date": "2026-09-04"},
             {"supplier": "北多摩リフォーム協同組合", "amount": 2700000, "issued_at": "2026-04-01", "due_date": "2026-05-01"},
             {"supplier": "レジデンシャル仲介ネットワーク", "amount": 9000000, "issued_at": "2026-02-01", "due_date": "2026-03-03",
+             "paid": True, "paid_at": "2026-02-28"},
+        ]
+        for pay in seed_payables:
+            self.create_payable(pay)
+
+    def _seed_koseki(self) -> None:
+        """自治体窓口版(AISB_INSTANCE=koseki)向けシード。demo-legacy-system-koseki
+        (port 5040, 戸籍住民課システム)と用語・登場人物を揃えている(顧客=証明書
+        交付申請の申請者(住民)、商品=窓口で扱う証紙・帳票類の在庫、仕入先=会計課/
+        用品センター)。件数・日付構成は_seed_erp()等と意図的に揃えており、
+        予測分析(on_track/due_soon/overdue)やAR/APエイジングのデモ挙動は同一。
+        """
+        seed_customers = [
+            {"name": "山田太郎", "email": "yamada@example.com", "phone": "03-1234-5678", "company": "", "notes": "頻繁に証明書交付を申請する住民", "status": "在住"},
+            {"name": "佐藤花子", "email": "sato@example.com", "phone": "03-2345-6789", "company": "", "notes": "相続手続きのため戸籍謄本を継続申請中", "status": "在住"},
+            {"name": "鈴木一郎", "email": "suzuki@example.com", "phone": "03-3456-7890", "company": "", "notes": "", "status": "転出済"},
+        ]
+        for c in seed_customers:
+            self.create_customer(c)
+
+        # 予測分析(交付申請件数の推移)/ワークフローのデモ用に申請履歴も併せてシードする
+        # (customer_id は上記作成順の1,2,3)。_seed_erp()と同じ意図的な構成
+        # (顧客1=on_track、顧客2=due_soon、顧客3=転出済でoverdue)。
+        seed_orders = [
+            {"customer_id": 3, "item": "住民票の写し(2通)", "qty": 2, "amount": 600, "date": "2025-11-01"},
+            {"customer_id": 3, "item": "戸籍の附票の写し(1通)", "qty": 1, "amount": 300, "date": "2026-01-05"},
+            {"customer_id": 1, "item": "住民票の写し(3通)", "qty": 3, "amount": 900, "date": "2026-02-10"},
+            {"customer_id": 1, "item": "印鑑登録証明書(2通)", "qty": 2, "amount": 600, "date": "2026-03-12"},
+            {"customer_id": 1, "item": "戸籍謄本(1通)", "qty": 1, "amount": 450, "date": "2026-04-15"},
+            {"customer_id": 2, "item": "戸籍謄本(相続用・2通)", "qty": 2, "amount": 900, "date": "2026-04-01"},
+            {"customer_id": 1, "item": "住民票記載事項証明書(1通)", "qty": 1, "amount": 300, "date": "2026-05-18"},
+            {"customer_id": 2, "item": "改製原戸籍謄本(1通)", "qty": 1, "amount": 750, "date": "2026-05-05"},
+            {"customer_id": 1, "item": "身分証明書(1通)", "qty": 1, "amount": 300, "date": "2026-06-20"},
+            {"customer_id": 2, "item": "戸籍謄本(相続用・追加1通)", "qty": 1, "amount": 450, "date": "2026-06-25"},
+            {"customer_id": 1, "item": "住民票の写し(1通)", "qty": 1, "amount": 300, "date": "2026-07-20"},
+        ]
+        for o in seed_orders:
+            self.create_order(o)
+
+        # 在庫AI分析/異常検知(reorder_point割れ)のデモ用シード。「商品」は窓口で
+        # 実際に消費する収入証紙・帳票類の在庫に見立てている。人気の証紙(300円券等)を
+        # 意図的に品薄(stock < reorder_point)にしている。
+        seed_products = [
+            {"name": "収入証紙(300円券)", "sku": "STAMP-300", "stock": 40, "reorder_point": 100, "unit_cost": 300, "supplier": "会計課 窓口用品センター"},
+            {"name": "収入証紙(450円券)", "sku": "STAMP-450", "stock": 15, "reorder_point": 60, "unit_cost": 450, "supplier": "会計課 窓口用品センター"},
+            {"name": "収入証紙(750円券)", "sku": "STAMP-750", "stock": 80, "reorder_point": 20, "unit_cost": 750, "supplier": "会計課 窓口用品センター"},
+            {"name": "住民票用紙(複写式)", "sku": "FORM-JUMIN", "stock": 500, "reorder_point": 100, "unit_cost": 8, "supplier": "地方公共団体情報システム機構"},
+            {"name": "戸籍謄本用紙(複写式)", "sku": "FORM-KOSEKI", "stock": 30, "reorder_point": 80, "unit_cost": 12, "supplier": "地方公共団体情報システム機構"},
+        ]
+        for p in seed_products:
+            self.create_product(p)
+
+        seed_pos = [
+            {"product_id": 1, "supplier": "会計課 窓口用品センター", "qty": 200, "status": "received", "ordered_at": "2026-06-01", "expected_date": "2026-06-15", "received_qty": 200, "received_at": "2026-06-14"},
+            {"product_id": 2, "supplier": "会計課 窓口用品センター", "qty": 100, "status": "ordered", "ordered_at": "2026-08-01", "expected_date": "2026-08-20", "received_qty": 0},
+        ]
+        for po in seed_pos:
+            self.create_purchase_order(po)
+
+        # AR/APエイジング分析のデモ用シード。売掛金=郵送請求(着払い等)の未収手数料、
+        # 買掛金=証紙・帳票の会計課への未払い分に見立てている。
+        seed_invoices = [
+            {"customer_id": 1, "amount": 900, "issued_at": "2026-07-25", "due_date": "2026-08-24"},
+            {"customer_id": 1, "amount": 600, "issued_at": "2026-06-10", "due_date": "2026-07-10"},
+            {"customer_id": 2, "amount": 900, "issued_at": "2026-05-01", "due_date": "2026-05-31"},
+            {"customer_id": 2, "amount": 750, "issued_at": "2026-03-01", "due_date": "2026-03-31"},
+            {"customer_id": 3, "amount": 600, "issued_at": "2026-07-01", "due_date": "2026-07-31"},
+            {"customer_id": 3, "amount": 300, "issued_at": "2026-01-05", "due_date": "2026-02-04",
+             "paid": True, "paid_at": "2026-02-01"},
+        ]
+        for inv in seed_invoices:
+            self.create_invoice(inv)
+
+        seed_payables = [
+            {"supplier": "会計課 窓口用品センター", "amount": 60000, "issued_at": "2026-06-15", "due_date": "2026-07-15"},
+            {"supplier": "会計課 窓口用品センター", "amount": 45000, "issued_at": "2026-08-05", "due_date": "2026-09-04"},
+            {"supplier": "地方公共団体情報システム機構", "amount": 9600, "issued_at": "2026-04-01", "due_date": "2026-05-01"},
+            {"supplier": "会計課 窓口用品センター", "amount": 30000, "issued_at": "2026-02-01", "due_date": "2026-03-03",
+             "paid": True, "paid_at": "2026-02-28"},
+        ]
+        for pay in seed_payables:
+            self.create_payable(pay)
+
+    def _seed_nenkin(self) -> None:
+        """年金相談業務版(AISB_INSTANCE=nenkin)向けシード。demo-legacy-system-nenkin
+        (port 5050, 日本年金機構コールセンター/年金事務所窓口の照会端末)と用語・
+        登場人物を揃えている(顧客=年金請求(裁定請求)の請求者(被保険者)、商品=
+        窓口で扱う請求書類用紙・案内リーフレット類の在庫、仕入先=年金事務所会計課/
+        印刷発注先)。件数・日付構成は_seed_erp()等と意図的に揃えており、
+        予測分析(on_track/due_soon/overdue)やAR/APエイジングのデモ挙動は同一。
+        """
+        seed_customers = [
+            {"name": "山田太郎", "email": "yamada@example.com", "phone": "03-1234-5678", "company": "", "notes": "老齢基礎年金の裁定請求を継続的に相談中の被保険者", "status": "資格あり"},
+            {"name": "佐藤花子", "email": "sato@example.com", "phone": "03-2345-6789", "company": "", "notes": "遺族厚生年金の請求手続き中", "status": "資格あり"},
+            {"name": "鈴木一郎", "email": "suzuki@example.com", "phone": "03-3456-7890", "company": "", "notes": "", "status": "資格喪失"},
+        ]
+        for c in seed_customers:
+            self.create_customer(c)
+
+        # 予測分析(年金請求件数の推移)/ワークフローのデモ用に請求履歴も併せてシードする
+        # (customer_id は上記作成順の1,2,3)。_seed_erp()と同じ意図的な構成
+        # (顧客1=on_track、顧客2=due_soon、顧客3=資格喪失でoverdue)。
+        seed_orders = [
+            {"customer_id": 3, "item": "老齢基礎年金(2か月分)", "qty": 2, "amount": 130000, "date": "2025-11-01"},
+            {"customer_id": 3, "item": "未支給年金(1か月分)", "qty": 1, "amount": 65000, "date": "2026-01-05"},
+            {"customer_id": 1, "item": "老齢基礎年金(3か月分)", "qty": 3, "amount": 195000, "date": "2026-02-10"},
+            {"customer_id": 1, "item": "加給年金額(2か月分)", "qty": 2, "amount": 40000, "date": "2026-03-12"},
+            {"customer_id": 1, "item": "老齢厚生年金(1か月分)", "qty": 1, "amount": 90000, "date": "2026-04-15"},
+            {"customer_id": 2, "item": "遺族厚生年金(2か月分)", "qty": 2, "amount": 100000, "date": "2026-04-01"},
+            {"customer_id": 1, "item": "老齢基礎年金(1か月分)", "qty": 1, "amount": 65000, "date": "2026-05-18"},
+            {"customer_id": 2, "item": "遺族基礎年金(1か月分)", "qty": 1, "amount": 65000, "date": "2026-05-05"},
+            {"customer_id": 1, "item": "障害基礎年金(2級・1か月分)", "qty": 1, "amount": 65000, "date": "2026-06-20"},
+            {"customer_id": 2, "item": "遺族厚生年金(追加1か月分)", "qty": 1, "amount": 50000, "date": "2026-06-25"},
+            {"customer_id": 1, "item": "老齢基礎年金(1か月分)", "qty": 1, "amount": 65000, "date": "2026-07-20"},
+        ]
+        for o in seed_orders:
+            self.create_order(o)
+
+        # 在庫AI分析/異常検知(reorder_point割れ)のデモ用シード。「商品」は窓口で
+        # 実際に消費する裁定請求書用紙・案内リーフレット類の在庫に見立てている。
+        # 需要の多い書類(裁定請求書等)を意図的に品薄(stock < reorder_point)にしている。
+        seed_products = [
+            {"name": "裁定請求書用紙(老齢給付)", "sku": "FORM-ROREI", "stock": 40, "reorder_point": 100, "unit_cost": 15, "supplier": "年金事務所 会計課"},
+            {"name": "裁定請求書用紙(障害・遺族給付)", "sku": "FORM-SHOGAI", "stock": 15, "reorder_point": 60, "unit_cost": 15, "supplier": "年金事務所 会計課"},
+            {"name": "年金見込額試算依頼書", "sku": "FORM-MIKOMI", "stock": 80, "reorder_point": 20, "unit_cost": 10, "supplier": "年金事務所 会計課"},
+            {"name": "年金制度案内リーフレット", "sku": "LEAF-GUIDE", "stock": 500, "reorder_point": 100, "unit_cost": 8, "supplier": "日本年金機構 広報印刷センター"},
+            {"name": "年金分割請求書用紙", "sku": "FORM-BUNKATSU", "stock": 30, "reorder_point": 80, "unit_cost": 12, "supplier": "日本年金機構 広報印刷センター"},
+        ]
+        for p in seed_products:
+            self.create_product(p)
+
+        seed_pos = [
+            {"product_id": 1, "supplier": "年金事務所 会計課", "qty": 200, "status": "received", "ordered_at": "2026-06-01", "expected_date": "2026-06-15", "received_qty": 200, "received_at": "2026-06-14"},
+            {"product_id": 2, "supplier": "年金事務所 会計課", "qty": 100, "status": "ordered", "ordered_at": "2026-08-01", "expected_date": "2026-08-20", "received_qty": 0},
+        ]
+        for po in seed_pos:
+            self.create_purchase_order(po)
+
+        # AR/APエイジング分析のデモ用シード。売掛金=郵送案内(現況届の再送付等)の
+        # 未収分、買掛金=請求書類用紙・リーフレットの印刷発注先への未払いに見立てている。
+        seed_invoices = [
+            {"customer_id": 1, "amount": 195000, "issued_at": "2026-07-25", "due_date": "2026-08-24"},
+            {"customer_id": 1, "amount": 40000, "issued_at": "2026-06-10", "due_date": "2026-07-10"},
+            {"customer_id": 2, "amount": 100000, "issued_at": "2026-05-01", "due_date": "2026-05-31"},
+            {"customer_id": 2, "amount": 50000, "issued_at": "2026-03-01", "due_date": "2026-03-31"},
+            {"customer_id": 3, "amount": 130000, "issued_at": "2026-07-01", "due_date": "2026-07-31"},
+            {"customer_id": 3, "amount": 65000, "issued_at": "2026-01-05", "due_date": "2026-02-04",
+             "paid": True, "paid_at": "2026-02-01"},
+        ]
+        for inv in seed_invoices:
+            self.create_invoice(inv)
+
+        seed_payables = [
+            {"supplier": "年金事務所 会計課", "amount": 60000, "issued_at": "2026-06-15", "due_date": "2026-07-15"},
+            {"supplier": "年金事務所 会計課", "amount": 45000, "issued_at": "2026-08-05", "due_date": "2026-09-04"},
+            {"supplier": "日本年金機構 広報印刷センター", "amount": 9600, "issued_at": "2026-04-01", "due_date": "2026-05-01"},
+            {"supplier": "年金事務所 会計課", "amount": 30000, "issued_at": "2026-02-01", "due_date": "2026-03-03",
              "paid": True, "paid_at": "2026-02-28"},
         ]
         for pay in seed_payables:
