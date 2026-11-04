@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI-Sync Bridge 概要仕様書</title>
+<style>
+  :root { --ink:#1c2530; --sub:#566373; --line:#d5dbe2; --soft:#f3f5f8; --accent:#14507a; --ok:#1c6b45; --todo:#9a5b00; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9ecf0; color:var(--ink); font:15px/1.75 "Noto Sans CJK JP","Hiragino Sans","Yu Gothic",Meiryo,sans-serif; }
+  main { max-width:860px; margin:24px auto; padding:48px 56px; background:#fff; }
+  h1 { font-size:27px; line-height:1.35; margin:0 0 6px; }
+  .lead { color:var(--sub); margin:0 0 4px; }
+  .meta { color:var(--sub); font-size:13px; border-bottom:2px solid var(--accent); padding-bottom:14px; margin-bottom:26px; }
+  h2 { font-size:19px; color:var(--accent); margin:34px 0 10px; padding-bottom:4px; border-bottom:1px solid var(--line); break-after:avoid; }
+  h3 { font-size:15.5px; margin:20px 0 6px; break-after:avoid; }
+  p { margin:8px 0; }
+  ul, ol { margin:8px 0; padding-left:1.4em; }
+  li { margin:3px 0; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13.5px; break-inside:avoid; }
+  th, td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th { background:var(--soft); font-weight:600; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  code { font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace; background:var(--soft); padding:1px 4px; border-radius:3px; }
+  .note { font-size:13px; color:var(--sub); }
+  .callout { border-left:4px solid var(--accent); background:var(--soft); padding:10px 14px; margin:12px 0; break-inside:avoid; }
+  .ok { color:var(--ok); font-weight:600; white-space:nowrap; }
+  .todo { color:var(--todo); font-weight:600; white-space:nowrap; }
+  figure { margin:14px 0; break-inside:avoid; }
+  figcaption { font-size:12.5px; color:var(--sub); margin-top:4px; }
+  svg { width:100%; height:auto; display:block; }
+  svg text { font-family:"Noto Sans CJK JP","Hiragino Sans","Yu Gothic",Meiryo,sans-serif; }
+  @page { size:A4; margin:16mm 15mm; }
+  @media print { body { background:#fff; font-size:10.5pt; } main { margin:0; padding:0; max-width:none; } }
+  @media (max-width:640px) { main { padding:24px 18px; margin:0; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>AI-Sync Bridge 概要仕様書</h1>
+<p class="lead">既存の業務システムを改修せず、権限と監査を保ったまま AI 検索・AI 回答を追加する連携基盤</p>
+<p class="meta">2026年11月4日時点の実装に基づく。実測値の条件は第7章、未実装の項目は第8章に記載。</p>
+
+<h2>1. 解決する課題</h2>
+<p>基幹システムのデータを AI から使いたくても、次の理由で進まないことがあります。</p>
+<ul>
+  <li><strong>改修できない:</strong> 長年稼働している基幹システムは、改修や検証の負担が大きい。</li>
+  <li><strong>権限を守れない:</strong> 文書をまとめて検索対象にすると、本来見られないデータまで AI 経由で見えてしまう。</li>
+  <li><strong>説明できない:</strong> AI がどのデータを根拠に回答したのか、後から確認できない。</li>
+</ul>
+<p>本基盤は、既存システムからデータを<strong>読み取るだけ</strong>で取り込み、利用者の権限内のデータだけで検索・回答し、その経緯を監査ログに残します。</p>
+
+<h2>2. 全体構成</h2>
+<figure>
+<svg viewBox="0 0 800 420" role="img" aria-label="レガシーデータソースからコネクタ、同期エンジン、ストア、権限付き検索、AI回答を経て利用者画面に至る構成図">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#566373"/></marker>
+  </defs>
+  <g font-size="13" fill="#1c2530">
+    <rect x="10" y="40" width="170" height="340" rx="6" fill="#f3f5f8" stroke="#d5dbe2"/>
+    <text x="95" y="66" text-anchor="middle" font-weight="600">既存システム(無改修)</text>
+    <rect x="28" y="84" width="134" height="72" rx="4" fill="#fff" stroke="#d5dbe2"/><text x="95" y="114" text-anchor="middle">業務 Web API</text><text x="95" y="135" text-anchor="middle" font-size="11.5" fill="#566373">一覧の取得</text>
+    <rect x="28" y="172" width="134" height="72" rx="4" fill="#fff" stroke="#d5dbe2"/><text x="95" y="202" text-anchor="middle">業務 DB</text><text x="95" y="223" text-anchor="middle" font-size="11.5" fill="#566373">SELECT のみ</text>
+    <rect x="28" y="260" width="134" height="72" rx="4" fill="#fff" stroke="#d5dbe2"/><text x="95" y="290" text-anchor="middle">出力ファイル</text><text x="95" y="311" text-anchor="middle" font-size="11.5" fill="#566373">CSV / TSV / 固定長</text>
+
+    <rect x="210" y="40" width="370" height="340" rx="6" fill="none" stroke="#14507a" stroke-width="1.5"/>
+    <text x="395" y="66" text-anchor="middle" font-weight="600" fill="#14507a">AI-Sync Bridge</text>
+    <rect x="228" y="84" width="150" height="72" rx="4" fill="#f3f5f8" stroke="#d5dbe2"/><text x="303" y="114" text-anchor="middle">Connector</text><text x="303" y="135" text-anchor="middle" font-size="11.5" fill="#566373">読み取り・カーソル管理</text>
+    <rect x="228" y="172" width="150" height="72" rx="4" fill="#f3f5f8" stroke="#d5dbe2"/><text x="303" y="202" text-anchor="middle">SyncEngine</text><text x="303" y="223" text-anchor="middle" font-size="11.5" fill="#566373">行ハッシュで差分判定</text>
+    <rect x="228" y="260" width="150" height="72" rx="4" fill="#f3f5f8" stroke="#d5dbe2"/><text x="303" y="290" text-anchor="middle">BridgeStore</text><text x="303" y="311" text-anchor="middle" font-size="11.5" fill="#566373">文書・ベクトル・カーソル</text>
+    <rect x="412" y="84" width="150" height="72" rx="4" fill="#f3f5f8" stroke="#d5dbe2"/><text x="487" y="114" text-anchor="middle">GroundedAnswerer</text><text x="487" y="135" text-anchor="middle" font-size="11.5" fill="#566373">権限内の文書で回答</text>
+    <rect x="412" y="172" width="150" height="72" rx="4" fill="#f3f5f8" stroke="#d5dbe2"/><text x="487" y="202" text-anchor="middle">Retriever + ACL</text><text x="487" y="223" text-anchor="middle" font-size="11.5" fill="#566373">権限フィルタ + 検索</text>
+    <rect x="412" y="260" width="150" height="72" rx="4" fill="#f3f5f8" stroke="#d5dbe2"/><text x="487" y="290" text-anchor="middle">AuditLog</text><text x="487" y="311" text-anchor="middle" font-size="11.5" fill="#566373">ハッシュチェーン監査</text>
+
+    <rect x="610" y="84" width="180" height="72" rx="6" fill="#f3f5f8" stroke="#d5dbe2"/><text x="700" y="114" text-anchor="middle">LLM</text><text x="700" y="135" text-anchor="middle" font-size="11.5" fill="#566373">権限内の文書だけを渡す</text>
+    <rect x="610" y="172" width="180" height="72" rx="6" fill="#f3f5f8" stroke="#d5dbe2"/><text x="700" y="202" text-anchor="middle">利用者の画面</text><text x="700" y="223" text-anchor="middle" font-size="11.5" fill="#566373">サイドバー(拡張 / 組込み)</text>
+    <rect x="610" y="260" width="180" height="72" rx="6" fill="#f3f5f8" stroke="#d5dbe2"/><text x="700" y="290" text-anchor="middle">監査担当者</text><text x="700" y="311" text-anchor="middle" font-size="11.5" fill="#566373">ログ閲覧・改ざん検証</text>
+  </g>
+  <g stroke="#566373" stroke-width="1.4" fill="none" marker-end="url(#a)">
+    <path d="M162 120H226"/><path d="M162 208L226 130"/><path d="M162 296L226 145"/>
+    <path d="M303 156V170"/><path d="M303 244V258"/>
+    <path d="M378 296C396 296 396 225 410 214"/>
+    <path d="M487 172V158"/><path d="M562 120H608"/><path d="M608 208H564"/><path d="M487 244V258"/><path d="M562 296H608"/>
+  </g>
+</svg>
+<figcaption>データは左から右へ流れ、既存システムへの書き込み経路はありません。</figcaption>
+</figure>
+<h3>画面への組み込み(2方式)</h3>
+<table>
+  <tr><th style="width:22%">方式</th><th>既存システムの変更</th><th>向いている場面</th></tr>
+  <tr><td>Chrome 拡張</td><td>なし</td><td>サーバー側に手を入れられない場合</td></tr>
+  <tr><td>組込み(<code>aisb-core</code>)</td><td>FastAPI の <code>main.py</code> に2行追加</td><td>拡張機能を配布できない場合。現状は FastAPI アプリのみ対応</td></tr>
+</table>
+
+<h2>3. データ接続と差分同期</h2>
+<table>
+  <tr><th style="width:17%">Connector</th><th>接続先</th><th>差分の検出</th><th>削除の検出</th></tr>
+  <tr><td><code>http_list</code></td><td>既存の一覧 API</td><td>毎回全件を取得し、行ハッシュで比較</td><td>可</td></tr>
+  <tr><td><code>sql</code></td><td>SQLite、ODBC 経由の RDBMS</td><td>ウォーターマーク列、または全件比較</td><td>全件比較時のみ可。ウォーターマーク方式では <code>full_every</code> の設定か論理削除列が必要</td></tr>
+  <tr><td><code>file</code></td><td>CSV / TSV / 固定長(既定 cp932)</td><td>ファイルの SHA-256 → 変更時は行ハッシュで比較</td><td>可</td></tr>
+</table>
+<ul>
+  <li>行の内容ハッシュと埋め込みモデル ID が前回と同じなら、再埋め込みしません。</li>
+  <li>ベクトルと同期位置を永続化するため、再起動後の再埋め込みは発生しません(第7章で確認)。</li>
+  <li>取り込み対象・権限・接続方法は、導入先ごとの YAML プロファイルに記述します。</li>
+  <li>同期は API からの手動実行、または <code>interval_sec</code> による定期実行です。</li>
+</ul>
+
+<h2>4. 権限制御(ACL)</h2>
+<p>権限判定は検索の<strong>前</strong>に行います。閲覧できない文書は、スコア計算にも LLM へのプロンプトにも入りません。BM25 の統計も閲覧可能な文書だけで計算するため、スコアの変化から隠れた文書の存在を推測されることを防いでいます。</p>
+<table>
+  <tr><th style="width:22%">判定軸</th><th>内容</th></tr>
+  <tr><td>テナント</td><td>一致が必須</td></tr>
+  <tr><td>ロール</td><td>エンティティごとに許可ロールを宣言</td></tr>
+  <tr><td>部署</td><td>行の列値と対応付け可能(例: <code>depts: $Department</code>)</td></tr>
+  <tr><td>利用者の識別</td><td>API キー、または信頼できるプロキシからのヘッダー</td></tr>
+</table>
+<h3>ERP デモでの結果(質問:「経理部 課長」)</h3>
+<table>
+  <tr><th>利用者</th><th>見える範囲</th><th class="num">権限で除外</th></tr>
+  <tr><td>管理者</td><td>全データ</td><td class="num">0 件</td></tr>
+  <tr><td>人事</td><td>全部署の従業員</td><td class="num">98 件</td></tr>
+  <tr><td>経理課長</td><td>経理部の従業員のみ</td><td class="num">14 件</td></tr>
+  <tr><td>営業担当</td><td>人事データは見えない</td><td class="num">42 件</td></tr>
+  <tr><td>別テナント</td><td>何も見えない</td><td class="num">127 件</td></tr>
+</table>
+
+<h2>5. AI 回答(権限内 RAG)</h2>
+<ol>
+  <li>LLM に渡すのは、権限フィルタを通過した文書だけです。</li>
+  <li>閲覧できる文書が1件もなければ LLM を呼ばず、定型文を返します。</li>
+  <li>会話履歴は「テナント + 利用者 + セッション」単位で分離します。</li>
+  <li>回答中の引用番号を実際に渡した文書と照合し、一致しない番号は除去します。</li>
+  <li>回答ごとに、元の検索・使用文書・引用・回答本文を監査ログに記録します。</li>
+</ol>
+<p>LLM にはツール実行権限を与えません。文書本文はデータとして区切って渡し、文書内の命令に従わないよう指示しています。</p>
+
+<h2>6. 監査ログ</h2>
+<table>
+  <tr><th style="width:22%">種別</th><th>記録内容</th></tr>
+  <tr><td><code>sync.upsert</code> / <code>sync.delete</code></td><td>取り込み・削除した行と内容ハッシュ</td></tr>
+  <tr><td><code>sync.run</code></td><td>同期ごとの件数・所要時間・エラー</td></tr>
+  <tr><td><code>retrieval</code></td><td>利用者、検索語、渡した文書(内容ハッシュ付き)、権限で除外した件数</td></tr>
+  <tr><td><code>rag.answer</code></td><td>関連する検索、使用文書、引用、回答本文</td></tr>
+</table>
+<p>各レコードは <code>sha256(前レコードのハッシュ + 本体)</code> で連結され、途中の書き換えや削除は検証 API で検出できます。検索語と回答本文を残すかどうかは設定で変更できます。</p>
+
+<h2>7. 実測値</h2>
+<p class="note">条件: 本デモサーバー(aarch64, 2 vCPU, 12 GB RAM)、合成 CSV データ、ハイブリッド検索 ON、top_k=5、60クエリを逐次実行、全文書が閲覧可能な利用者。埋め込みは外部通信のない 64 次元 n-gram ハッシュのため、<strong>OpenAI 等の埋め込み API を使う場合、初回同期はこの値より大幅に長くなります。</strong></p>
+<table>
+  <tr><th>文書数</th><th class="num">初回同期</th><th class="num">1行変更の同期</th><th class="num">再起動時の読込</th><th class="num">検索 p50</th><th class="num">検索 p95</th><th class="num">最大メモリ</th></tr>
+  <tr><td>1,000</td><td class="num">0.19 秒</td><td class="num">0.05 秒</td><td class="num">0.05 秒</td><td class="num">16 ms</td><td class="num">17 ms</td><td class="num">73 MB</td></tr>
+  <tr><td>10,000</td><td class="num">2.0 秒</td><td class="num">0.54 秒</td><td class="num">0.62 秒</td><td class="num">146 ms</td><td class="num">160 ms</td><td class="num">183 MB</td></tr>
+  <tr><td>50,000</td><td class="num">10.9 秒</td><td class="num">2.8 秒</td><td class="num">3.5 秒</td><td class="num">767 ms</td><td class="num">846 ms</td><td class="num">673 MB</td></tr>
+</table>
+<ul>
+  <li><strong>埋め込み回数:</strong> 全規模で、変更なしの同期は 0 回、1行変更は 1 回、再起動は 0 回でした。</li>
+  <li><strong>検索時間:</strong> 文書数にほぼ比例します。BM25 が閲覧可能な全文書を走査するためで、ベクトルバックエンドを変えても 10,000 件での差はほとんどありませんでした。</li>
+  <li><strong>稼働中の ERP デモ:</strong> 同期対象は百数十件、API プロセスのメモリは約 81 MB です。</li>
+</ul>
+<div class="callout">現状で実用的に応答できる目安は<strong>1万件程度まで</strong>です。それを超える規模では、BM25 の転置インデックス化が必要です。</div>
+
+<h2>8. 実装状況と制約</h2>
+<table>
+  <tr><th style="width:39%">項目</th><th style="width:13%">状態</th><th>補足</th></tr>
+  <tr><td>差分同期、ACL、監査チェーン、権限内 RAG の処理</td><td class="ok">実装・試験済</td><td>自動テストおよび ERP デモのデータで確認。RAG の確認は模擬 LLM によるもの</td></tr>
+  <tr><td>実 LLM での AI 回答の通し確認</td><td class="todo">未確認</td><td>デモで使う LLM の無料利用枠が上限に達しており、未実施</td></tr>
+  <tr><td>ODBC 接続(SQL Server / Oracle / Access)</td><td class="todo">実機未検証</td><td>コードはあるが、試験は SQLite のみ</td></tr>
+  <tr><td>sqlite-vec 層</td><td class="todo">本サーバーで無効</td><td>導入済みパッケージのネイティブ拡張を読み込めず、ANN 層へ自動で切り替わっている</td></tr>
+  <tr><td>完全閉域での AI 回答</td><td class="todo">未実装</td><td>ローカル LLM 用プロバイダがない。検索と同期は外部通信なしで動作する</td></tr>
+  <tr><td>意味検索の精度</td><td class="todo">要実モデル</td><td>外部通信なしの構成は n-gram ハッシュのため、キーワード一致(BM25)が中心</td></tr>
+  <tr><td>SSO(SAML / OIDC)、権限の自動同期</td><td class="todo">未実装</td><td>権限の対応付けは導入時にプロファイルへ定義する</td></tr>
+  <tr><td>個人情報の自動マスキング</td><td class="todo">未実装</td><td>現状の伏せ字処理は、サーバーのパス・IP・鍵らしき文字列のみが対象</td></tr>
+  <tr><td>ブリッジ以外の API への ACL 適用</td><td class="todo">未対応</td><td>従来の検索・自然言語検索 API には ACL が効かない。本番では公開範囲を絞る必要がある</td></tr>
+  <tr><td>監査ログの外部保全</td><td class="todo">未実装</td><td>DB の書き込み権限を持つ者がチェーン全体を再計算した場合は検出できない。外部への定期保管などが必要</td></tr>
+  <tr><td>ファイルのリアルタイム監視</td><td class="todo">未実装</td><td>手動または定期実行のみ</td></tr>
+  <tr><td>プロンプトインジェクション対策</td><td class="todo">第一層のみ</td><td>区切りと指示による対策で、完全な防御ではない</td></tr>
+</table>
+
+<h2>9. PoC の進め方(目安)</h2>
+<table>
+  <tr><th style="width:16%">時期</th><th>実施内容</th><th>完了条件</th></tr>
+  <tr><td>第1週</td><td>対象データの選定、読み取り専用の接続確認、権限表の整理</td><td>取り込み対象と権限の対応が確定</td></tr>
+  <tr><td>第2週</td><td>プロファイル作成、初回同期、差分同期の確認</td><td>変更行だけが更新される</td></tr>
+  <tr><td>第3週</td><td>LLM の接続、利用者ごとの検索・回答の確認</td><td>権限外データが回答に出ない</td></tr>
+  <tr><td>第4週</td><td>現場での試用、精度と応答時間の計測、監査ログの確認</td><td>本番化の可否と追加開発の範囲を判断</td></tr>
+</table>
+<p class="note">接続先の環境やデータ規模により期間は変わります。第8章の項目が要件に含まれる場合は、別途開発期間が必要です。</p>
+
+</main>
+</body>
+</html>
