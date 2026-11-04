@@ -16,10 +16,12 @@ window.AISB.apiBase = (function () {
       outEl.innerHTML = "";
       try {
         const res = await fetch(url);
+        if (res.status === 403) throw new Error("サーバー管理者のみ利用できます");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         outEl.innerHTML = `<div class="aisb-card aisb-insight-card">${escapeHtml(data.comment)}</div>`;
       } catch (e) {
-        outEl.innerHTML = `<p>エラー: ${e}</p>`;
+        outEl.innerHTML = `<p>エラー: ${escapeHtml(e.message)}</p>`;
       } finally {
         btn.disabled = false;
         btn.textContent = prevLabel;
