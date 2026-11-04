@@ -6,16 +6,16 @@ window.AISB = window.AISB || {};
 
 window.AISB.demoScenarios = {
   search: {
-    title: "セマンティック検索を1クリックで体験",
-    doneText: "完全一致でなくても、意味が近いデータをAIが探し出しました。",
+    title: "権限付き文書検索を1クリックで体験",
+    doneText: "同じ語句でも、利用者の権限によって検索結果が変わります。",
     steps: [
-      { type: "openPanel", panel: "search", text: "AIパネルの「セマンティック検索」タブを自動で開きます…" },
-      { type: "narrate", text: "検索ボックスに条件を入力してみます(この入力は自動デモです)" },
-      { type: "setValue", selector: "#aisb-search-input", value: "配送が遅れがちな取引先" },
-      { type: "narrate", text: "「検索」を押すと、キーワードが多少あいまいでも意味で探し当てます" },
-      { type: "click", selector: "#aisb-search-run" },
-      { type: "waitFor", selector: "#aisb-search-results .aisb-badge", timeoutMs: 120000 },
-      { type: "highlight", selector: "#aisb-search-results" },
+      { type: "openPanel", panel: "bridge", text: "AIパネルの「権限検索・監査」タブを自動で開きます…" },
+      { type: "narrate", text: "検索ボックスに語句を入力してみます(この入力は自動デモです)" },
+      { type: "setValue", selector: "#aisb-bridge-q", value: "経理部 課長" },
+      { type: "narrate", text: "「比較検索」を押すと、権限の異なる利用者で同時に検索します" },
+      { type: "click", selector: "#aisb-bridge-run" },
+      { type: "waitFor", selector: "#aisb-bridge-results .aisb-card", timeoutMs: 120000 },
+      { type: "highlight", selector: "#aisb-bridge-results" },
     ],
   },
   inventory: {

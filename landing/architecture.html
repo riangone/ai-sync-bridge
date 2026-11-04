@@ -532,7 +532,7 @@
     <div class="slide-inner">
       <div class="eyebrow">02 ― どうやって画面に入り込むか</div>
       <h2><span class="step-num">1</span>拡張が対象ページを見つけて、忍び込む。</h2>
-      <p class="lead">Chrome拡張の<span class="code-chip">manifest.json</span>には「どのURLに何を注入するか」が宣言されているだけ。サーバー側の変更は一切不要です。</p>
+      <p class="lead">Chrome拡張の<span class="code-chip">manifest.json</span>には「どのURLに何を注入するか」が宣言されているだけ。既存サーバーのコード変更は不要です。別のシステムで使うときは、対象URLとプロファイルの追加が必要です。</p>
       <div class="arrowflow">
         <div class="box">対象ページを開く<small>host_permissions が許可した<br>オリジンのみ</small></div>
         <div class="arrow">→</div>
@@ -595,7 +595,7 @@
     <div class="slide-inner">
       <div class="eyebrow">05 ― AI APIサーバーとAIモデルの間</div>
       <h2><span class="step-num">4</span>プロバイダは差し替え可能。呼び出し側は違いを知らない。</h2>
-      <p class="lead"><span class="code-chip">AiProvider</span> という抽象クラス1枚を挟むことで、chat_service・search_serviceなどの呼び出し側は「今どのAIモデルと話しているか」を意識せずに済みます。環境変数 <span class="code-chip">AISB_AI_PROVIDER</span>（mock/opencode/openai/gemini）ひとつで実体を切り替えます。</p>
+      <p class="lead"><span class="code-chip">AiProvider</span> という抽象クラス1枚を挟むことで、chat_service・search_serviceなどの呼び出し側は「今どのAIモデルと話しているか」を意識せずに済みます。環境変数 <span class="code-chip">AISB_AI_PROVIDER</span>（mock/opencode/antigravity/openai/gemini）ひとつで実体を切り替えます。未設定時の既定は mock です。</p>
       <div class="grid grid-3">
         <div class="card">
           <h3>🧪 mock</h3>
@@ -606,8 +606,8 @@
           <p>OpenAI Chat Completions(gpt-4o-mini)、Gemini generateContent(gemini-1.5-flash)を<span class="code-chip">httpx</span>で直接呼び出すSaaS型API。</p>
         </div>
         <div class="card">
-          <h3>🖥 opencode（既定）</h3>
-          <p>ローカル/自前運用のOpenCode CLIサーバー(既定 http://localhost:4096)。セッション方式でモデルを呼び分ける、標準の接続先。</p>
+          <h3>🖥 opencode / antigravity</h3>
+          <p>自前運用のOpenCodeサーバー(既定 http://localhost:4096)、またはAntigravity CLIを呼び出す。公開デモは start スクリプトの設定で接続先を選ぶ。</p>
         </div>
       </div>
     </div>
@@ -619,7 +619,7 @@
     <div class="slide-inner">
       <div class="eyebrow">06 ― OpenCodeサーバーとの実通信</div>
       <h2>1回の質問が、内部では3段階のHTTPになる。</h2>
-      <p class="lead">既定プロバイダ opencode は単純な1本の<span class="code-chip">/chat</span>エンドポイントを持たない。使い捨てセッションを作って会話し、応答をparts配列から抽出する設計。</p>
+      <p class="lead">opencode プロバイダは単純な1本の<span class="code-chip">/chat</span>エンドポイントを持たない。使い捨てセッションを作って会話し、応答をparts配列から抽出する設計。</p>
       <div class="arrowflow">
         <div class="box">POST /session<small>使い捨てセッションを作成</small></div>
         <div class="arrow">→</div>
@@ -631,8 +631,8 @@
       </div>
       <div class="grid grid-2" style="margin-top:1.6em;">
         <div class="card">
-          <h3>🛡 失敗しても画面は壊れない</h3>
-          <p>タイムアウトやAPIエラーは例外を投げず、<span class="code-chip">[opencode-error-fallback] ...</span>のような文字列として返す設計。パネルは常にJSONで応答を受け取れる。</p>
+          <h3>🛡 失敗を正常応答に見せない</h3>
+          <p>タイムアウトやAPIエラーは<span class="code-chip">AIProviderError</span>として扱い、APIは502や429を返す。エラーの原文は画面に返さず、サーバーログだけに残す。</p>
         </div>
         <div class="card">
           <h3>🖼 画像入力は別モデル指定</h3>
@@ -674,9 +674,9 @@
   <!-- 9. 業務ドメインの出し分け -->
   <section class="slide" id="s9">
     <div class="slide-inner">
-      <div class="eyebrow">08 ― ERP／DMS、2つの業務を1つのコードで</div>
+      <div class="eyebrow">08 ― 5つの業務デモを1つのコードで</div>
       <h2>同じパネルが、業種ごとに語彙を切り替える。</h2>
-      <p class="lead">パネルは <span class="code-chip">ctx.INSTANCE</span>(erp / dealer)を見て、表示ラベルやAI検索の例文を出し分けます。バックエンドは完全に別プロセス・別データベースとして分離されており、互いに影響しません。</p>
+      <p class="lead">パネルは <span class="code-chip">ctx.INSTANCE</span>(erp / dealer / realestate / koseki / nenkin)を見て、表示ラベルやAI検索の例文を出し分けます。バックエンドはデモごとに別プロセス・別データベースです。</p>
       <div class="diagram">
         <div class="node">
           <h5>ERPインスタンス</h5>
@@ -690,7 +690,7 @@
         <div class="conn">⇔</div>
         <div class="node">
           <h5>DMSインスタンス</h5>
-          <p>車両在庫・整備/車検・仕入先など<br>自動車販売向けの語彙・データ</p>
+          <p>車両在庫・整備/車検・仕入先など<br>自動車販売向けの語彙・データ<br>(ほかに不動産仲介・自治体窓口・年金相談)</p>
         </div>
       </div>
     </div>

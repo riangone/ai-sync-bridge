@@ -7,6 +7,7 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
+      gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'});
 
       gtag('config', 'G-Y1P7PMMM6V');
     </script>
@@ -395,7 +396,7 @@
       <div class="eyebrow" style="justify-content:center;">Chrome拡張機能 ご提案資料</div>
       <h1>レガシーは、捨てなくていい。<br><span class="accent">知性を、宿せばいい。</span></h1>
       <p class="lead" style="max-width:52ch; text-align:center;">
-        既存の業務システムを一切書き換えずに、Chrome拡張機能だけでAIの力を注ぎ込む。
+        既存の業務システムを書き換えずに、Chrome拡張機能とAI APIサーバーでAI機能を追加する。
         それが <b class="accent-b">AI-Sync Bridge</b> というアプローチです。
       </p>
       <div class="cta">
@@ -432,7 +433,7 @@
         </div>
         <div class="card">
           <h3><span class="num">06</span>今、できること</h3>
-          <p>拡張機能を入れるだけ。今日から始められます。</p>
+          <p>デモで試してから、対象を絞って導入を検討できます。</p>
         </div>
       </div>
     </div>
@@ -505,7 +506,7 @@
       <div class="grid grid-3" style="margin-top:1.8em;">
         <div class="card">
           <h3>💰 高コスト</h3>
-          <p>基幹システムの全面刷新は、数千万円規模の投資になりがち。稟議は通らず、話は毎年先送りになる。</p>
+          <p>基幹システムの全面刷新は投資が大きくなりがち。稟議が通らず、話が先送りになることもある。</p>
         </div>
         <div class="card">
           <h3>⚠️ 高リスク</h3>
@@ -529,13 +530,13 @@
       <div class="eyebrow" style="justify-content:center;">発想の転換</div>
       <h2 style="max-width:20ch; margin:0 auto .4em;">システムを<span class="accent">変えない</span>。<br>AIを<span class="accent">重ねる</span>。</h2>
       <p class="lead" style="max-width:56ch; margin:1em auto 0; text-align:center;">
-        AI-Sync Bridgeは、既存のレガシーシステムのコードを一行も触りません。
+        AI-Sync Bridgeは、既存のレガシーシステムのコードを変更しません。
         Chrome拡張機能がブラウザ上にAIサイドバーを重ねて表示し、裏側でAI APIサーバーが
-        検索・分析・自動化を担う。<b class="accent-b">導入も撤去も、拡張機能のオン／オフだけ。</b>
+        検索・分析を担う。<b class="accent-b">拡張機能をオフにすれば、業務画面は元の状態に戻ります。</b>
       </p>
       <div class="bignum-row" style="justify-content:center; margin-top:2.2em;">
-        <div class="bignum"><div class="v">改修 0件</div><div class="l">レガシー側のコード変更</div></div>
-        <div class="bignum"><div class="v">拡張機能 1つ</div><div class="l">Chromeにインストールするだけ</div></div>
+        <div class="bignum"><div class="v">改修 なし</div><div class="l">レガシー側のコード変更</div></div>
+        <div class="bignum"><div class="v">拡張機能 + API</div><div class="l">対象システム用の設定とサーバーを用意</div></div>
         <div class="bignum"><div class="v">画面 そのまま</div><div class="l">操作の慣れを失わない</div></div>
       </div>
     </div>
@@ -554,16 +555,16 @@
         <div class="conn">⇄</div>
         <div class="node core">
           <h5>② Chrome拡張機能</h5>
-          <p>Shadow DOMでAIサイドバーを画面に注入。<br>チャット・OCR・在庫・発注・分析など<br><b>19のパネル</b>で機能を提供。</p>
+          <p>Shadow DOMでAIサイドバーを画面に注入。<br>チャット・OCR・在庫・発注・分析など<br>機能ごとの<b>パネル</b>で提供。</p>
         </div>
         <div class="conn">⇄</div>
         <div class="node">
           <h5>③ AI APIサーバー</h5>
-          <p>検索・予測・ワークフロー・生成AIを統括。<br>OpenAI/Gemini等、複数のAIプロバイダに対応。</p>
+          <p>検索・予測・ワークフロー・生成AIを統括。<br>接続するAIプロバイダは設定で切り替え。</p>
         </div>
       </div>
       <p class="lead" style="margin-top:1.8em;">
-        現場の目には、「使い慣れた画面に、頼れる相棒が増えた」としか映りません。
+        既存の画面はそのままで、その横にAIの窓口が増えます。
       </p>
     </div>
   </section>
@@ -572,17 +573,17 @@
   <section class="slide" id="s8">
     <div class="slide-inner">
       <div class="eyebrow">機能 01 ― 入力</div>
-      <h2>話すだけ、撮るだけで、<span class="accent">フォームが埋まる</span></h2>
+      <h2>話す・撮るで、<span class="accent">入力を下書きする</span></h2>
       <div class="grid grid-2" style="margin-top:1.6em;">
         <div class="card">
           <span class="tag fix">自然言語入力</span>
           <h3>会話するように、業務を進める</h3>
-          <p>「山田様、ポンプA-100を3台」と伝えるだけで、顧客・商品・数量をAIが認識し、必要な項目へ自動的に振り分ける。</p>
+          <p>「山田様、ポンプA-100を3台」と伝えるだけで、顧客・商品・数量をAIが読み取り、入力項目に対応づける。内容を確認し、ボタン操作で登録画面に入力する（自動送信はしない）。</p>
         </div>
         <div class="card">
-          <span class="tag fix">OCR自動化</span>
-          <h3>紙の帳票を、読ませるだけ</h3>
-          <p>納品書や請求書をスキャンすれば、AIが項目を抽出。ワークフローと連携し、確認だけで入力が完了する。</p>
+          <span class="tag fix">OCR取込</span>
+          <h3>紙の帳票を読み取る</h3>
+          <p>納品書や請求書の画像からAIが項目を抽出する。内容を確認し、ボタン操作で入力画面に反映する。画像に対応したAIプロバイダが必要。</p>
         </div>
       </div>
       <div class="arrowflow">
@@ -590,7 +591,7 @@
         <div class="arrow">→</div>
         <div class="box">AIが認識<small>OCR・自然言語解析</small></div>
         <div class="arrow">→</div>
-        <div class="box">項目に自動反映<small>確認するだけ</small></div>
+        <div class="box">項目に反映<small>人が確認して保存</small></div>
       </div>
     </div>
   </section>
@@ -599,22 +600,22 @@
   <section class="slide" id="s9">
     <div class="slide-inner">
       <div class="eyebrow">機能 02 ― 在庫・発注</div>
-      <h2>欠品も過剰在庫も、<span class="accent">AIが先に気づく</span></h2>
+      <h2>欠品も過剰在庫も、<span class="accent">一覧で確認する</span></h2>
       <div class="grid grid-3" style="margin-top:1.6em;">
         <div class="card">
           <span class="tag fix">異常検知</span>
-          <h3>発注点割れを自動検知</h3>
-          <p>在庫データを常時監視し、発注点を下回った商品を即座にリストアップ。「気づいたら欠品」を過去にする。</p>
+          <h3>発注点割れを洗い出す</h3>
+          <p>ボタン操作で在庫を確認し、発注点を下回った商品を不足数の大きい順に一覧表示する。</p>
         </div>
         <div class="card">
-          <span class="tag fix">AI発注提案</span>
-          <h3>発注量まで、AIが提案</h3>
-          <p>過去の出荷実績や在庫水準から、適正な発注量を自動算出。判断の初速を上げる。</p>
+          <span class="tag fix">発注提案</span>
+          <h3>発注数の案を計算</h3>
+          <p>発注点を下回った商品について、発注点の2倍まで補充する数量を計算する（ルールベース）。</p>
         </div>
         <div class="card">
           <span class="tag fix">仕入先評価</span>
           <h3>納期遵守率を可視化</h3>
-          <p>仕入先ごとの納期実績を自動集計。感覚ではなく数字で、取引先を評価できる。</p>
+          <p>仕入先ごとの納期遵守率を集計し、数字で確認できる。</p>
         </div>
       </div>
     </div>
@@ -626,15 +627,15 @@
       <div class="eyebrow">機能 03 ― 資金繰り</div>
       <h2>滞留は、<span class="accent">膨らむ前に見つける</span></h2>
       <p class="lead">
-        売掛金・買掛金を経過日数ごとに自動で色分け（当月内 / 1〜30日 / 31〜60日 / 61〜90日 / 90日超）。
-        危険水準に達した取引先は、リスク評価とともに即座にアラートされます。
+        売掛金・買掛金を経過日数ごとに自動で色分け（期日前 / 1〜30日 / 31〜60日 / 61〜90日 / 90日超）。
+        取引先ごとのリスクをルールで判定し、一覧で確認できます。
       </p>
       <div class="arrowflow" style="margin-top:1.8em;">
-        <div class="box" style="border-color:rgba(126,224,195,.4);">当月内〜30日<small>正常</small></div>
+        <div class="box" style="border-color:rgba(126,224,195,.4);">60日超の滞留なし<small>低</small></div>
         <div class="arrow">→</div>
-        <div class="box" style="border-color:rgba(255,138,101,.5);">31〜90日<small>要注意</small></div>
+        <div class="box" style="border-color:rgba(255,138,101,.5);">61日超の滞留あり<small>中</small></div>
         <div class="arrow">→</div>
-        <div class="box" style="border-color:rgba(255,107,129,.6);">90日超<small>高リスク・即通知</small></div>
+        <div class="box" style="border-color:rgba(255,107,129,.6);">90日超が全体の30%以上<small>高</small></div>
       </div>
     </div>
   </section>
@@ -643,24 +644,24 @@
   <section class="slide" id="s11">
     <div class="slide-inner">
       <div class="eyebrow">機能 04 ― 自動化</div>
-      <h2>「トリガー」と「アクション」で、<span class="accent">業務が自走する</span></h2>
-      <p class="lead">条件を組み合わせるだけで、定型業務を自動化するワークフローエンジンを搭載。</p>
+      <h2>定型処理を、<span class="accent">手順として定義する</span></h2>
+      <p class="lead">定型処理を手順として定義して実行するワークフローエンジンを搭載。定期実行は未実装で、パネルからの手動実行またはAPI呼び出しで動かします。</p>
       <div class="grid grid-2" style="margin-top:1.6em;">
         <div class="card">
           <h3>📦 在庫アラート通知</h3>
-          <p>在庫レポート → 条件判定 → 通知。発注点割れを検知したら即座に担当者へプッシュ。</p>
+          <p>在庫レポート → 条件判定 → 通知のサンプル定義。通知はパネルの通知一覧に出る。</p>
         </div>
         <div class="card">
           <h3>🧾 帳票OCR → 自動入力</h3>
-          <p>OCR抽出 → フィールド反映 → 通知。紙の帳票が届いた瞬間から自動で処理が進む。</p>
+          <p>OCR抽出 → 入力内容の生成 → 通知のサンプル定義。画面への入力はパネル側で行う。</p>
         </div>
         <div class="card">
           <h3>💳 与信超過チェック</h3>
-          <p>取引先の請求データをレガシーシステムからリアルタイムに取得し、与信超過を自動判定。</p>
+          <p>与信リスク分析 → 判定 → 警告通知のサンプル定義。実行時点のデータで判定する。</p>
         </div>
         <div class="card">
           <h3>📊 日次業務レポート</h3>
-          <p>複数のレポートを自動生成し、AIが要約。毎朝、経営判断に必要な情報が届く。</p>
+          <p>複数のレポートを作成してAIが要約するサンプル定義。毎朝の自動実行には外部のスケジューラが必要。</p>
         </div>
       </div>
     </div>
@@ -680,12 +681,12 @@
         <div class="card">
           <span class="tag note">類似レコード推薦</span>
           <h3>「これに似た案件」を即表示</h3>
-          <p>顧客・受注・商品を横断して類似度を計算。ベテランの勘を、誰でも使える機能に変える。</p>
+          <p>顧客・受注・商品の中から、文字の類似度が高いレコードを表示する。</p>
         </div>
         <div class="card">
           <span class="tag note">クロス分析</span>
           <h3>問いを投げれば、分析が返る</h3>
-          <p>「今月の粗利率が低い商品は？」と聞くだけで、複数テーブルを横断した分析結果を生成。</p>
+          <p>「延滞している請求を顧客の業種別に合計」のように聞くと、2つのデータを結合・集計して表示する。</p>
         </div>
       </div>
     </div>
@@ -695,7 +696,7 @@
   <section class="slide" id="s13">
     <div class="slide-inner">
       <div class="eyebrow">導入前 / 導入後</div>
-      <h2>同じシステム。<span class="accent">まったく違う働き方。</span></h2>
+      <h2>同じシステム。<span class="accent">手間を減らす働き方。</span></h2>
       <div class="compare">
         <div class="col before">
           <h4>😓 Before</h4>
@@ -710,11 +711,11 @@
         <div class="col after">
           <h4>✨ After</h4>
           <ul>
-            <li><span class="dot-c">✓</span>会話とOCRで自動入力</li>
-            <li><span class="dot-c">✓</span>帳票はスキャンするだけ</li>
-            <li><span class="dot-c">✓</span>発注点割れをAIが先に検知</li>
-            <li><span class="dot-c">✓</span>滞留はエイジング分析で先回り</li>
-            <li><span class="dot-c">✓</span>AIが根拠つきで分析・提案</li>
+            <li><span class="dot-c">✓</span>会話とOCRで入力内容を下書き</li>
+            <li><span class="dot-c">✓</span>帳票は読み取り結果を確認して反映</li>
+            <li><span class="dot-c">✓</span>発注点割れを一覧で確認</li>
+            <li><span class="dot-c">✓</span>滞留はエイジング分析で確認</li>
+            <li><span class="dot-c">✓</span>集計結果にAIが解説を付ける</li>
           </ul>
         </div>
       </div>
@@ -729,15 +730,15 @@
       <div class="grid grid-3" style="margin-top:1.6em;">
         <div class="card">
           <h3>👤 現場担当者</h3>
-          <p>入力・転記・検索の手間が減り、判断とお客様対応に時間を使えるようになる。</p>
+          <p>入力・転記・検索の手間を減らし、判断とお客様対応に時間を回すことを目指す。</p>
         </div>
         <div class="card">
           <h3>🧑‍💼 管理職・マネージャー</h3>
-          <p>属人化していたノウハウが仕組みとして共有され、新人教育の負荷が下がる。</p>
+          <p>定型の確認手順をパネルにまとめ、担当者による確認のばらつきを減らすことを目指す。</p>
         </div>
         <div class="card">
           <h3>🏢 経営層</h3>
-          <p>資金繰り・在庫リスクを先回りで把握でき、大規模投資なしにDXの一歩を踏み出せる。</p>
+          <p>資金繰り・在庫のリスクを一覧で確認でき、基幹システムを刷新せずに試せる。</p>
         </div>
       </div>
     </div>
@@ -747,17 +748,17 @@
   <section class="slide" id="s15">
     <div class="slide-inner">
       <div class="eyebrow">始め方</div>
-      <h2>今日から、<span class="accent">はじめられます</span></h2>
+      <h2>小さく、<span class="accent">はじめられます</span></h2>
       <div class="arrowflow">
-        <div class="box">① Chrome拡張機能を導入<small>数分で完了</small></div>
+        <div class="box">① 対象システムの設定を作成<small>対象URL・画面・権限</small></div>
         <div class="arrow">→</div>
-        <div class="box">② 既存システムを開く<small>コード変更なし</small></div>
+        <div class="box">② AI APIサーバーとLLMを用意<small>既存コードの変更なし</small></div>
         <div class="arrow">→</div>
-        <div class="box">③ AIサイドバーが起動<small>そのまま使える</small></div>
+        <div class="box">③ 拡張機能を配布<small>まず一部の利用者で試す</small></div>
       </div>
       <p class="lead" style="margin-top:1.8em;">
         大規模なシステム刷新プロジェクトを、待つ必要はありません。
-        まずは一部の業務・一部のチームから、<b class="accent-b">小さく、確実に</b>始められます。
+        まずは一部の業務・一部のチームから<b class="accent-b">小さく</b>始め、効果を計測して判断します。<br>在庫・発注・OCR登録などの業務パネルは現在デモ向けの実装で、実データへの接続には個別開発が必要です。
       </p>
     </div>
   </section>

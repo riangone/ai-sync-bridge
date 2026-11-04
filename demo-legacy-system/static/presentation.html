@@ -7,6 +7,7 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
+      gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'});
 
       gtag('config', 'G-Y1P7PMMM6V');
     </script>
@@ -159,11 +160,11 @@
 <!-- 1. Cover -->
 <section class="slide cover" id="s1">
   <div class="logo"><div class="mark">AI</div><div class="kicker" style="margin:0;">ai-sync-bridge</div></div>
-  <h1>既存の業務システムに、<br>後付けでAIを繋ぐ拡張機能</h1>
-  <p class="subtitle">レガシーな基幹システム（顧客・受注・請求・在庫…）を<b>一切改修せずに</b>、
-  Chrome拡張のサイドパネルで自然文検索・AIレポート自動生成・チャットを追加します。</p>
+  <h1>既存の業務システムに、<br>後付けでAIを繋ぐサイドパネル</h1>
+  <p class="subtitle">レガシーな基幹システム（顧客・受注・請求・在庫…）を<b>改修せずに</b>、
+  サイドパネルで自然文検索・AIレポート自動生成・チャットを追加します。</p>
   <div class="badge-row">
-    <span class="badge">🎯 最終提供形態：Chrome拡張</span>
+    <span class="badge">🎯 提供形態：Chrome拡張 / サーバー組込み</span>
     <span class="badge">🛡️ AIは構造化パラメータのみ生成（安全設計）</span>
   </div>
   <div class="scrolldown">スクロールして見る <span class="chevron">↓</span></div>
@@ -172,14 +173,14 @@
 <!-- 2. Feature overview -->
 <section class="slide" id="s2">
   <div class="kicker">機能特点</div>
-  <h2>サイドパネル1つに詰め込まれた6つのAI機能</h2>
+  <h2>サイドパネルの主な6機能</h2>
   <div class="grid cols-3">
     <div class="card"><span class="tag ai">chat</span><h3>💬 AIチャット</h3><p>業務データの文脈を踏まえた自由対話。質問・相談の入口。</p></div>
     <div class="card"><span class="tag ai">nlsql</span><h3>🔎 AI検索</h3><p>自然文を条件に変換し単一エンティティを検索。疑似SQLも表示。</p></div>
     <div class="card"><span class="tag ai">report</span><h3>📊 AIレポート自動生成</h3><p>2エンティティ結合＋集計（sum/count/avg等）まで自然文から自動生成。</p></div>
     <div class="card"><span class="tag ai">ocr</span><h3>🧾 OCR取込</h3><p>紙の書類・画像から構造化データを取り込む。</p></div>
-    <div class="card"><span class="tag ai">search</span><h3>🧭 セマンティック検索</h3><p>キーワード一致でなく意味ベースでの類似検索。</p></div>
-    <div class="card"><span class="tag ai">analytics</span><h3>📈 予測分析</h3><p>与信・在庫・滞留債権などの傾向を予測的に分析。</p></div>
+    <div class="card"><span class="tag ai">bridge</span><h3>🔐 権限付き文書検索</h3><p>取り込み済みの文書を語句の一致を中心に検索し、結果を利用者の権限ごとに比べる。公開デモは簡易ベクトルのため、意味の近さは判定しない。</p></div>
+    <div class="card"><span class="tag ai">analytics</span><h3>📈 予測分析</h3><p>売上の線形トレンドと、顧客ごとの発注間隔から先行きを推定する。</p></div>
   </div>
 </section>
 
@@ -224,23 +225,23 @@
   <h2>AIには「実行可能なコード」を一切生成させない</h2>
   <div class="grid cols-2">
     <div class="card"><span class="tag safe">構造化のみ</span><h3>AIの役割はパラメータ選びだけ</h3><p>AIが返すのはJSON（対象・条件・集計方法）のみ。生SQLも <code>eval</code> も使わず、返り値はホワイトリスト検証を経てからPythonロジックが実行する。</p></div>
-    <div class="card"><span class="tag safe">結合キー固定</span><h3>JOIN_GRAPHホワイトリスト</h3><p>AIが選べるのは「どのデータ同士か」という名前だけ。実際の結合キーはコード側の固定辞書から決定し、誤結合は原理的に発生しない。</p></div>
+    <div class="card"><span class="tag safe">結合キー固定</span><h3>JOIN_GRAPHホワイトリスト</h3><p>AIが選べるのは「どのデータ同士か」という名前だけ。実際の結合キーはコード側の固定辞書から決定する。</p></div>
   </div>
 </section>
 
 <!-- 6. Try it & access -->
 <section class="slide" id="s6">
   <div class="kicker">今すぐ試す</div>
-  <h2>検証環境（demo-legacy-system）ですぐ動かせる</h2>
+  <h2>公開デモで試せる</h2>
   <ol class="steps-num">
     <li>右サイドパネルの「AI検索」タブを開き、サブタブから「AIレポート生成」を選ぶ。</li>
     <li>質問例チップをクリック、または「延滞している請求を顧客の業種別に合計」のように自由入力。</li>
     <li>生成された条件・疑似SQL・チャート・明細・AI解釈がその場に表示される。</li>
   </ol>
-  <div class="link-box">🔗 <a href="http://localhost:5010/" target="_blank" rel="noopener">http://localhost:5010/</a></div>
+  <div class="link-box">🔗 <a href="https://aisync.0101.click/erp/" target="_blank" rel="noopener">https://aisync.0101.click/erp/</a></div>
   <div class="callout safe">
     <div class="ico">🧩</div>
-    <div><b>本命はChrome拡張：</b>同じサイドパネルUIはChrome拡張としてもインストール可能で、実際の既存システムのページにそのままサイドパネルを注入する。対象システム側のコード変更は不要。この検証環境はあくまで開発中の確認用スタンドイン。</div>
+    <div><b>Chrome拡張でも使える：</b>同じサイドパネルUIを、既存システムのページに拡張機能で注入できる。対象システムのコード変更は不要だが、拡張の対象URLとプロファイルの設定、AI APIサーバーの用意は必要。このデモのデータは検証用のサンプル。</div>
   </div>
   <footer class="pageinfo">ai-sync-bridge</footer>
 </section>
