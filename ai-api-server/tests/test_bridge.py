@@ -317,6 +317,49 @@ def test_grounded_answer_acl_history_citations_audit():
         assert TestClient(app).post("/api/bridge/ask", json={"question": "x"}).status_code == 503
 
 
+def test_profile_change_rereads_unchanged_source():
+    """ACL や本文の設定を変えたら、ファイルが未変更でも文書に反映される(古い権限を残さない)。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        profile = make_env(tmp)
+        rt = build(profile)
+        run(rt.sync("admin"))
+        assert all(e["source_unchanged"] for e in run(rt.sync("admin"))["entities"] if e["source"] == "files")
+
+        item = next(e for e in profile["sources"][0]["entities"] if e["name"] == "Item")
+        item["acl"] = {"tenant": "t1", "roles": ["hr"]}
+        item["label"] = "品目"
+        rt2 = build(profile)
+        res = run(rt2.sync("admin", source="files"))
+        by_entity = {e["entity"]: e for e in res["entities"]}
+        assert by_entity["Item"]["upserted"] == 2 and by_entity["Ship"]["upserted"] == 0, res
+        docs = [d for d in rt2.store.all_docs() if d.entity == "Item"]
+        assert all(d.acl.roles == ("hr",) and d.body.startswith("Type:品目 ") for d in docs)
+        # 匿名(以前は public で見えていた)からはもう見えない
+        assert run(rt2.search(Principal("anonymous"), "ベアリング"))["results"] == []
+        # 設定が同じならまた読み飛ばす
+        again = run(rt2.sync("admin", source="files"))
+        assert all(e["source_unchanged"] for e in again["entities"]), again
+
+
+def test_entity_label_is_searchable_and_pseudo_embedding_is_downweighted():
+    """業務での呼び方(label)で検索でき、擬似埋め込みの順位が BM25 の一致を押しのけない。"""
+    from app.bridge.runtime import _default_vector_weight
+
+    assert _default_vector_weight("ngram-hash-64") < 1.0
+    assert _default_vector_weight("openai:text-embedding-3-small") == 1.0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        profile = make_env(tmp)
+        emp = profile["sources"][1]["entities"][0]
+        emp["label"] = "従業員"
+        rt = BridgeRuntime(profile, embed=counting_embed, embedder_id="ngram-hash-64",
+                           default_store_path=profile["store"]["path"])
+        run(rt.sync("admin"))
+        admin = Principal("admin", "t1", ("sales", "hr", "dept:*"))
+        res = run(rt.search(admin, "経理部の従業員", top_k=2))
+        assert {r["pk"] for r in res["results"]} == {"E2", "E3"}, res
+
+
 def _demo_client(rt):
     from app import deps
     from app.routers import bridge as bridge_router

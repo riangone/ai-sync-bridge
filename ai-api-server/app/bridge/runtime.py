@@ -20,6 +20,7 @@ BridgeRuntime (Singleton): プロファイル(YAML)から Connector/EntitySpec/�
           - name: Customer
             pk: Id
             title: Name
+            label: 顧客 取引先                   # 利用者の呼び方(検索とAIの文脈に使う)
             text: [Name, Industry, Notes]
             acl: {tenant: acme, depts: $Department, roles: [sales]}
             options: {...}                       # コネクタ固有
@@ -45,6 +46,9 @@ from app.bridge.retriever import Retriever
 from app.bridge.store import BridgeStore
 from app.bridge.sync_engine import EntitySyncStats, SyncEngine
 
+PSEUDO_EMBEDDER_PREFIX = "ngram-hash"
+PSEUDO_EMBEDDING_VECTOR_WEIGHT = 0.1
+
 _ENV_PAT = re.compile(r"\$\{([A-Z0-9_]+)(?::-([^}]*))?\}")
 
 
@@ -64,6 +68,12 @@ class Source:
     entities: list[EntitySpec]
 
 
+def _default_vector_weight(embedder_id: str) -> float:
+    # n-gram ハッシュの順位はほぼノイズなので、BM25 と同じ重みで融合すると無関係な文書が
+    # 上位に入る(ERP デモの再現率: 重み 1.0 で 8/17、0.1 で 12/17)。実モデルでは対等に扱う。
+    return PSEUDO_EMBEDDING_VECTOR_WEIGHT if embedder_id.startswith(PSEUDO_EMBEDDER_PREFIX) else 1.0
+
+
 def _entity_from_cfg(e: dict) -> EntitySpec:
     text = e.get("text") or []
     if isinstance(text, str):
@@ -72,7 +82,7 @@ def _entity_from_cfg(e: dict) -> EntitySpec:
         raise ValueError(f"entity 定義には name/pk/text が必須です: {e}")
     return EntitySpec(
         name=e["name"], pk=e["pk"], text_fields=tuple(text), title_field=e.get("title"),
-        acl=dict(e.get("acl") or {}), options=dict(e.get("options") or {}),
+        acl=dict(e.get("acl") or {}), options=dict(e.get("options") or {}), label=e.get("label"),
     )
 
 
@@ -102,7 +112,7 @@ class BridgeRuntime:
         self.retriever = Retriever(
             vector_backend,
             hybrid=bool(rcfg.get("hybrid", True)),
-            vector_weight=float(rcfg.get("vector_weight", 1.0)),
+            vector_weight=float(rcfg.get("vector_weight", _default_vector_weight(embedder_id))),
             lexical_weight=float(rcfg.get("lexical_weight", 1.0)),
         )
         self.sources: dict[str, Source] = {}

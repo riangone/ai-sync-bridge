@@ -50,6 +50,7 @@ class EntitySpec:
     title_field: str | None = None
     acl: dict = field(default_factory=dict)          # {tenant, roles, depts}: 定数 or "$Field"
     options: dict = field(default_factory=dict)      # コネクタ固有(table/query/watermark/path...)
+    label: str | None = None                         # 利用者の呼び方(例: "従業員 社員")。検索とAIの文脈に使う
 
     def pk_of(self, row: dict) -> str:
         v = row.get(self.pk)
@@ -58,7 +59,15 @@ class EntitySpec:
         return str(v)
 
     def render_text(self, row: dict) -> str:
-        return " ".join(f"{f}:{row[f]}" for f in self.text_fields if row.get(f) not in (None, ""))
+        fields = " ".join(f"{f}:{row[f]}" for f in self.text_fields if row.get(f) not in (None, ""))
+        return f"Type:{self.label} {fields}" if self.label else fields
+
+    def fingerprint(self) -> str:
+        """文書の中身と権限を決める設定のハッシュ。変わったら全行を読み直す必要がある。"""
+        payload = json.dumps({"pk": self.pk, "text": self.text_fields, "title": self.title_field,
+                              "label": self.label, "acl": self.acl},
+                             ensure_ascii=False, sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def title_of(self, row: dict) -> str:
         if self.title_field and row.get(self.title_field) not in (None, ""):

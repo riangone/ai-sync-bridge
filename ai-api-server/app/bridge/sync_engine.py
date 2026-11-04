@@ -41,6 +41,9 @@ class EntitySyncStats:
         return d
 
 
+SPEC_CURSOR_KEY = "_spec"
+
+
 class SyncEngine:
     def __init__(self, store: BridgeStore, audit: AuditLog, embed, embedder_id: str):
         self.store = store
@@ -53,6 +56,10 @@ class SyncEngine:
         t0 = time.monotonic()
         try:
             cursor = self.store.get_cursor(conn.name, spec.name)
+            # ACL や本文の設定を変えたら、ソースが未変更でも読み直す(古い権限を残さない)
+            spec_fp = spec.fingerprint()
+            if cursor and cursor.get(SPEC_CURSOR_KEY) != spec_fp:
+                cursor = None
             result = await conn.fetch(spec, cursor)
             st.fetched = len(result.rows)
             if result.unchanged:
@@ -101,7 +108,7 @@ class SyncEngine:
                     st.deleted_doc_ids.append(doc_id)
                     self.audit.append("sync.delete", actor, source=conn.name, entity=spec.name, ref=pk,
                                       detail={"doc_id": doc_id, "last_hash": h})
-                self.store.set_cursor(conn.name, spec.name, result.cursor)
+                self.store.set_cursor(conn.name, spec.name, {**(result.cursor or {}), SPEC_CURSOR_KEY: spec_fp})
             st.upserted = len(st.upserted_doc_ids)
             st.deleted = len(st.deleted_doc_ids)
         except Exception as e:  # 1エンティティの失敗で他エンティティの同期を止めない

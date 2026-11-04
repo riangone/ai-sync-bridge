@@ -59,6 +59,9 @@ audit:
   store_query_text: false
   store_answer_text: false
 
+answer:
+  top_k: 10         # 部署の全員のような一覧の質問に答えられる件数
+
 sync:
   interval_sec: 0   # >0 で定期差分同期。デモはパネルの差分同期ボタンで手動実行
 
@@ -72,26 +75,31 @@ sources:
       - name: Customer
         pk: Id
         title: Name
+        label: 顧客 取引先
         text: [Name, NameKana, Industry, Address, Representative, Notes]
         acl: {tenant: acme, roles: [sales, accounting]}
       - name: Order
         pk: Id
         title: Id
+        label: 受注 注文
         text: [CustomerName, OrderDate, DeliveryDate, TotalAmount, Status, Notes]
         acl: {tenant: acme, roles: [sales, accounting]}
       - name: Invoice
         pk: Id
         title: Id
+        label: 請求 請求書
         text: [CustomerName, InvoiceDate, DueDate, TotalAmount, Status, Notes]
         acl: {tenant: acme, roles: [accounting]}
       - name: Supplier
         pk: Id
         title: Name
+        label: 仕入先 取引先
         text: [Name, Category, ContactPerson, PaymentTerms, Notes]
         acl: {tenant: acme, roles: [purchasing, accounting]}
       - name: Product
         pk: Id
         title: Name
+        label: 商品 製品
         text: [Name, Category, UnitPrice, Stock]
         acl: {tenant: acme}            # 社内なら誰でも可
 
@@ -104,6 +112,7 @@ sources:
       - name: Employee
         pk: Id
         title: Name
+        label: 従業員 社員 職員
         text: [Name, Department, Position, HireDate]
         # 人事データ: hr または manager ロールのみ。さらに部署単位で制限(dept:* は全部署)
         acl: {tenant: acme, roles: [hr, manager], depts: $Department}
@@ -125,6 +134,7 @@ sources:
       - name: Shipment
         pk: ShipNo
         title: ShipNo
+        label: 出荷
         text: [ShipDate, CustomerName, ItemName, Qty, Dept]
         acl: {tenant: acme, roles: [sales], depts: $Dept}
         options:
