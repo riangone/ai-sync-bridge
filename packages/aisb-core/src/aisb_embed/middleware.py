@@ -17,6 +17,8 @@ Caddyのstrip_prefix経由サブパス(例: aisync.0101.click/dealer/…)の両�
 Caddyが付与する X-Forwarded-Prefix ヘッダーから都度組み立てる(ヘッダー無し=""
 なら従来と完全に同一の出力になる)。
 """
+import json
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -69,17 +71,23 @@ def script_files(profile: EmbedProfile) -> list[str]:
     return files
 
 
-def _build_injection(prefix: str, files: list[str]) -> str:
+def _build_injection(prefix: str, files: list[str], ai_notice: dict[str, str] | None = None) -> str:
     script_tags = "\n".join(f'<script src="{prefix}/aisb-embed/static/{f}" defer></script>' for f in files)
     # config-base.js側(LEGACY_ORIGIN組み立て)・ui-base.js側(sidebar.css読み込み)が
     # 参照する、このページが公開されている外部パスプレフィックス。
-    return f'<script>window.AISB_BASE_PATH = {prefix!r};</script>\n{script_tags}'
+    # 文字列中の </script> でタグが閉じないよう "<" をエスケープする。
+    notice_json = json.dumps(ai_notice, ensure_ascii=False).replace("<", "\\u003c")
+    return (
+        f'<script>window.AISB_BASE_PATH = {prefix!r};window.AISB_AI_NOTICE = {notice_json};</script>\n'
+        f'{script_tags}'
+    )
 
 
 class AisbEmbedMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, profile: EmbedProfile):
         super().__init__(app)
         self._files = script_files(profile)
+        self._ai_notice = profile.ai_notice
 
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -109,7 +117,7 @@ class AisbEmbedMiddleware(BaseHTTPMiddleware):
 
         if "</body>" in html:
             prefix = request.headers.get("x-forwarded-prefix", "")
-            html = html.replace("</body>", f"{_build_injection(prefix, self._files)}\n</body>", 1)
+            html = html.replace("</body>", f"{_build_injection(prefix, self._files, self._ai_notice)}\n</body>", 1)
 
         new_body = html.encode("utf-8")
         headers = dict(response.headers)

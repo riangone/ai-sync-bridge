@@ -1,4 +1,11 @@
 {
   "system_label": "不動産仲介基幹システム",
-  "extra_modules": ["modules/panel-valuation.js"]
+  "extra_modules": [
+    "modules/panel-valuation.js"
+  ],
+  "ai_notice": {
+    "text": "デモ環境です。実在の個人情報や機密情報は入力しないでください。入力内容は外部の AI サービスに送信されます。",
+    "link_label": "プライバシーポリシー",
+    "link_url": "https://0101.click/privacy.html"
+  }
 }
