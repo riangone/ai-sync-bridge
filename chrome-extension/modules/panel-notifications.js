@@ -21,10 +21,10 @@ window.AISB.panels.notifications = function renderNotificationsPanel(el, ctx) {
         listEl.innerHTML =
           items
             .map(
-              (n) => `<div class="aisb-card aisb-risk-${n.level === "critical" ? "overdue" : n.level === "warning" ? "due_soon" : "on_track"}${n.read ? "" : " aisb-notif-unread"}" data-id="${n.id}">
-            <b>${n.title}</b><span class="aisb-risk-tag">${levelLabel[n.level] || n.level}</span><br>
-            ${n.message}<br>
-            <span class="aisb-event-time">${new Date(n.created_at).toLocaleString()} / ${n.source}</span>
+              (n) => `<div class="aisb-card aisb-risk-${n.level === "critical" ? "overdue" : n.level === "warning" ? "due_soon" : "on_track"}${n.read ? "" : " aisb-notif-unread"}" data-id="${window.AISB.domBase.escapeHtml(n.id)}">
+            <b>${window.AISB.domBase.escapeHtml(n.title)}</b><span class="aisb-risk-tag">${window.AISB.domBase.escapeHtml(levelLabel[n.level] || n.level)}</span><br>
+            ${window.AISB.domBase.escapeHtml(n.message)}<br>
+            <span class="aisb-event-time">${new Date(n.created_at).toLocaleString()} / ${window.AISB.domBase.escapeHtml(n.source)}</span>
             ${n.read ? "" : '<button class="aisb-notif-read-btn">既読にする</button>'}
           </div>`
             )
@@ -41,7 +41,7 @@ window.AISB.panels.notifications = function renderNotificationsPanel(el, ctx) {
           });
         });
       })
-      .catch((e) => (listEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (listEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   }
 
   el.querySelector("#aisb-notif-refresh").addEventListener("click", load);

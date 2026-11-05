@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import get_inventory_service
 from app.models.schemas import InventoryAnomalyResponse, Product, ProductCreate, ProductUpdate
+from app.operator_auth import require_operator
 from app.services.inventory_service import InventoryService
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
@@ -27,12 +28,12 @@ def get_product(product_id: int, svc: InventoryService = Depends(get_inventory_s
     return p
 
 
-@router.post("", response_model=Product, status_code=201)
+@router.post("", response_model=Product, status_code=201, dependencies=[Depends(require_operator)])
 def create_product(payload: ProductCreate, svc: InventoryService = Depends(get_inventory_service)):
     return svc.create(payload.model_dump())
 
 
-@router.put("/{product_id}", response_model=Product)
+@router.put("/{product_id}", response_model=Product, dependencies=[Depends(require_operator)])
 def update_product(product_id: int, payload: ProductUpdate, svc: InventoryService = Depends(get_inventory_service)):
     p = svc.update(product_id, payload.model_dump(exclude_unset=True))
     if not p:

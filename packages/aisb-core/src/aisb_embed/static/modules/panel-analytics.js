@@ -39,7 +39,7 @@ window.AISB.panels.analytics = function renderAnalyticsPanel(el, ctx) {
       chartEl.innerHTML =
         `<div class="aisb-legend">
            <span><span class="aisb-legend-dot" style="background:#2a78d6"></span>実績</span>
-           <span><span class="aisb-legend-dot" style="background:#9ec5f4"></span>予測(${data.method})</span>
+           <span><span class="aisb-legend-dot" style="background:#9ec5f4"></span>予測(${window.AISB.domBase.escapeHtml(data.method)})</span>
          </div>
          <div class="aisb-chart">` +
         points
@@ -47,15 +47,15 @@ window.AISB.panels.analytics = function renderAnalyticsPanel(el, ctx) {
             const isForecast = p.actual === null || p.actual === undefined;
             const value = isForecast ? p.predicted : p.actual;
             const h = Math.max(4, Math.round((value / max) * 100));
-            return `<div class="aisb-bar-col" title="${p.month}: ${Math.round(value).toLocaleString()}円">
-              <div class="aisb-bar${isForecast ? " aisb-bar-forecast" : ""}" style="height:${h}%"></div>
-              <div class="aisb-bar-label">${p.month.slice(2)}</div>
+            return `<div class="aisb-bar-col" title="${window.AISB.domBase.escapeHtml(p.month)}: ${Math.round(value).toLocaleString()}円">
+              <div class="aisb-bar${isForecast ? " aisb-bar-forecast" : ""}" style="height:${window.AISB.domBase.escapeHtml(h)}%"></div>
+              <div class="aisb-bar-label">${window.AISB.domBase.escapeHtml(p.month.slice(2))}</div>
             </div>`;
           })
           .join("") +
         `</div>`;
     })
-    .catch((e) => (chartEl.innerHTML = `<p>エラー: ${e}</p>`));
+    .catch((e) => (chartEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
 
   fetch(`${ctx.API_BASE}/api/analytics/reorder-predictions`)
     .then((r) => r.json())
@@ -64,13 +64,13 @@ window.AISB.panels.analytics = function renderAnalyticsPanel(el, ctx) {
       reorderEl.innerHTML =
         preds
           .map(
-            (p) => `<div class="aisb-card aisb-risk-${p.risk}">
-          <b>${p.customer_name}</b><span class="aisb-risk-tag">${riskLabel[p.risk] || p.risk}</span><br>
-          前回受注: ${p.last_order_date} / 平均間隔: ${p.avg_interval_days}日<br>
-          次回予測: ${p.expected_next_date} (${p.days_until_expected >= 0 ? `あと${p.days_until_expected}日` : `${-p.days_until_expected}日超過`})
+            (p) => `<div class="aisb-card aisb-risk-${window.AISB.domBase.escapeHtml(p.risk)}">
+          <b>${window.AISB.domBase.escapeHtml(p.customer_name)}</b><span class="aisb-risk-tag">${window.AISB.domBase.escapeHtml(riskLabel[p.risk] || p.risk)}</span><br>
+          前回受注: ${window.AISB.domBase.escapeHtml(p.last_order_date)} / 平均間隔: ${window.AISB.domBase.escapeHtml(p.avg_interval_days)}日<br>
+          次回予測: ${window.AISB.domBase.escapeHtml(p.expected_next_date)} (${p.days_until_expected >= 0 ? `あと${window.AISB.domBase.escapeHtml(p.days_until_expected)}日` : `${window.AISB.domBase.escapeHtml(-p.days_until_expected)}日超過`})
         </div>`
           )
           .join("") || "<p>予測対象の受注履歴がありません</p>";
     })
-    .catch((e) => (reorderEl.innerHTML = `<p>エラー: ${e}</p>`));
+    .catch((e) => (reorderEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
 };

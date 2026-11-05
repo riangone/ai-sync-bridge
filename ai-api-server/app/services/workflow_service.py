@@ -63,6 +63,9 @@ def resolve_template(value: Any, context: dict) -> Any:
     return value
 
 
+MAX_EXECUTION_HISTORY = 500  # 匿名で実行できるので古いものから捨てる
+
+
 class WorkflowEngine:
     def __init__(self) -> None:
         self._lock = Lock()
@@ -301,19 +304,22 @@ class WorkflowEngine:
             }
             self._next_execution_id += 1
             self.execution_history.append(execution)
+            del self.execution_history[: max(0, len(self.execution_history) - MAX_EXECUTION_HISTORY)]
         return execution
 
     def get_execution_history(self, limit: int = 50) -> list[dict]:
         return list(reversed(self.execution_history))[:limit]
 
     def reset(self) -> None:
-        """Admin: デモデータリセットに追従して実行履歴のみ初期化する。
-        (ワークフロー定義自体は保持する。定義はエンティティIDを直接参照しないため、
-        顧客/受注データが再シードされても定義を壊す要因にはならない。)
+        """Admin: デモデータリセットに追従して定義と実行履歴を初期状態へ戻す。
+        有効/無効の切替は公開デモから操作できるので、定義も毎回シードから作り直す。
         """
         with self._lock:
             self.execution_history.clear()
             self._next_execution_id = 1
+            self.workflows.clear()
+            self._next_workflow_seq = 1
+            self._seed_default_workflows()
 
 
 class WorkflowStepRunnerProtocol:

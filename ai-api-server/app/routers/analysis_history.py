@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends
 
 from app.deps import get_analysis_history_service
 from app.models.schemas import AnalysisHistoryCreate, AnalysisHistoryEntry
+from app.operator_auth import require_operator
 from app.services.analysis_history_service import AnalysisHistoryService
 
-router = APIRouter(prefix="/api/analysis-history", tags=["analysis-history"])
+# フロントから使っておらず、他の訪問者の質問が読めてしまうので読み書きとも運用者限定
+router = APIRouter(prefix="/api/analysis-history", tags=["analysis-history"], dependencies=[Depends(require_operator)])
 
 
 @router.get("", response_model=list[AnalysisHistoryEntry])

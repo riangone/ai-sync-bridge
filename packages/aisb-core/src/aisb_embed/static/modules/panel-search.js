@@ -28,8 +28,8 @@ window.AISB.panels.search = function renderSearchPanel(el, ctx) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       resultsEl.innerHTML =
-        `<div class="aisb-badge">backend: ${data.backend}</div>` +
-        data.results.map((r) => `<div class="aisb-card"><b>${r.title}</b> (score ${r.score})<br>${r.snippet}</div>`).join("");
+        `<div class="aisb-badge">backend: ${window.AISB.domBase.escapeHtml(data.backend)}</div>` +
+        data.results.map((r) => `<div class="aisb-card"><b>${window.AISB.domBase.escapeHtml(r.title)}</b> (score ${window.AISB.domBase.escapeHtml(r.score)})<br>${window.AISB.domBase.escapeHtml(r.snippet)}</div>`).join("");
     } catch (e) {
       resultsEl.textContent = `エラー: ${e}`;
     }

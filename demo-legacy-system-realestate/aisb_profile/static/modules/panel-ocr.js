@@ -251,7 +251,7 @@ window.AISB.panels.ocr = function renderOcrPanel(el, ctx) {
   el.innerHTML = `
     <div class="aisb-inline-row">
       <select id="aisb-ocr-entity">
-        ${entityKeys.map((k) => `<option value="${k}">${samples[k].label}</option>`).join("")}
+        ${entityKeys.map((k) => `<option value="${window.AISB.domBase.escapeHtml(k)}">${window.AISB.domBase.escapeHtml(samples[k].label)}</option>`).join("")}
       </select>
       <button id="aisb-ocr-sample-download">📥 テスト用画像をダウンロード</button>
     </div>

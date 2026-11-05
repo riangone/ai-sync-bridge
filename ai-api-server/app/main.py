@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.public_errors import AI_RATE_LIMITED, AI_UNAVAILABLE, log_upstream
 from app.services.ai_client import AIProviderError, AIRateLimitError
 from app.services.rate_limit import ClientContextMiddleware
+from app.services.request_limits import BodySizeLimitMiddleware
 from app.domains import register_routers
 
 settings = get_settings()
@@ -17,13 +18,16 @@ settings = get_settings()
 docs_kwargs = {} if settings.expose_api_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title=settings.app_name, version="1.0.0", **docs_kwargs)
 
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(ClientContextMiddleware)
 
+# API は Cookie を使わないので credentials は不要。ブラウザ以外(curl 等)は CORS では止まらない。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origin_regex=settings.cors_origin_regex,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 

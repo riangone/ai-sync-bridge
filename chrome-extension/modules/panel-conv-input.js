@@ -24,10 +24,10 @@ window.AISB.panels.convinput = function renderConvInputPanel(el, ctx) {
   el.innerHTML = `
     <div class="aisb-inline-row">
       <select id="aisb-ci-screen">
-        ${screens.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}
+        ${screens.map((s) => `<option value="${window.AISB.domBase.escapeHtml(s.id)}">${window.AISB.domBase.escapeHtml(s.label)}</option>`).join("")}
       </select>
     </div>
-    <textarea id="aisb-ci-msg" placeholder="${examplePlaceholder}" style="width:100%;min-height:56px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;margin-bottom:6px"></textarea>
+    <textarea id="aisb-ci-msg" placeholder="${window.AISB.domBase.escapeHtml(examplePlaceholder)}" style="width:100%;min-height:56px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;margin-bottom:6px"></textarea>
     <div class="aisb-btn-row">
       <button id="aisb-ci-run">解析</button>
     </div>
@@ -74,7 +74,7 @@ window.AISB.panels.convinput = function renderConvInputPanel(el, ctx) {
         }
       `;
     } catch (e) {
-      resultEl.innerHTML = `<p>エラー: ${e}</p>`;
+      resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`;
     }
   });
 };

@@ -11,6 +11,7 @@ from datetime import datetime
 from threading import Lock
 
 _LEVELS = {"info", "warning", "critical"}
+MAX_NOTIFICATIONS = 500  # 匿名のワークフロー実行でも増えるので古いものから捨てる
 
 
 class NotificationCenter:
@@ -45,7 +46,13 @@ class NotificationCenter:
             }
             self._next_id += 1
             self.notifications.append(record)
+            del self.notifications[: max(0, len(self.notifications) - MAX_NOTIFICATIONS)]
             return record
+
+    def reset(self) -> None:
+        with self._lock:
+            self.notifications.clear()
+            self._next_id = 1
 
     def list(self, unread_only: bool = False, limit: int = 100) -> list[dict]:
         items = [n for n in reversed(self.notifications) if not unread_only or not n["read"]]

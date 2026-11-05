@@ -9,8 +9,8 @@ window.AISB.panels.customers = function renderCustomersPanel(el, ctx) {
     .then((r) => r.json())
     .then((rows) => {
       list.innerHTML = rows
-        .map((c) => `<div class="aisb-card"><b>${c.name}</b><br>${c.company || ""}<br>${c.email || ""}</div>`)
+        .map((c) => `<div class="aisb-card"><b>${window.AISB.domBase.escapeHtml(c.name)}</b><br>${window.AISB.domBase.escapeHtml(c.company || "")}<br>${window.AISB.domBase.escapeHtml(c.email || "")}</div>`)
         .join("") || "<p>顧客データがありません</p>";
     })
-    .catch((e) => (list.innerHTML = `<p>エラー: ${e}</p>`));
+    .catch((e) => (list.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
 };

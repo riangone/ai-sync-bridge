@@ -71,13 +71,13 @@ window.AISB.panels.recommend = function renderRecommendPanel(el, ctx) {
           results
             .map(
               (r) => `<div class="aisb-card">
-            <b>ID:${r.id}</b><span class="aisb-badge">類似度 ${Math.round(r.score * 100)}%</span><br>
+            <b>ID:${window.AISB.domBase.escapeHtml(r.id)}</b><span class="aisb-badge">類似度 ${Math.round(r.score * 100)}%</span><br>
             ${ctx.escapeHtml(r.text)}
             ${r.explanation ? `<div class="aisb-summary-card" style="margin-top:6px;padding:6px 8px;border-radius:4px">${ctx.escapeHtml(r.explanation)}</div>` : ""}
           </div>`
             )
             .join("") || "<p>類似レコードが見つかりませんでした</p>";
       })
-      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   });
 };

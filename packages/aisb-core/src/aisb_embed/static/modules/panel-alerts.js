@@ -60,18 +60,18 @@ window.AISB.panels.alerts = function renderAlertsPanel(el, ctx) {
       .then((data) => {
         const alerts = data.alerts || [];
         resultEl.innerHTML =
-          `<div class="aisb-badge">重要:${data.high_count}件 / 注意:${data.medium_count}件(全${data.total_alerts}件)</div>` +
+          `<div class="aisb-badge">重要:${window.AISB.domBase.escapeHtml(data.high_count)}件 / 注意:${window.AISB.domBase.escapeHtml(data.medium_count)}件(全${window.AISB.domBase.escapeHtml(data.total_alerts)}件)</div>` +
           (data.summary ? `<div class="aisb-card aisb-summary-card">${ctx.escapeHtml(data.summary)}</div>` : "") +
           (alerts
             .map(
-              (a) => `<div class="aisb-card aisb-risk-${severityClass[a.severity] || "on_track"}">
-            <b>${ctx.escapeHtml(a.title)}</b><span class="aisb-risk-tag">${severityLabel[a.severity] || a.severity}</span><br>
+              (a) => `<div class="aisb-card aisb-risk-${window.AISB.domBase.escapeHtml(severityClass[a.severity] || "on_track")}">
+            <b>${ctx.escapeHtml(a.title)}</b><span class="aisb-risk-tag">${window.AISB.domBase.escapeHtml(severityLabel[a.severity] || a.severity)}</span><br>
             ${ctx.escapeHtml(a.message)}
           </div>`
             )
             .join("") || "<p>現在アラートはありません</p>");
       })
-      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${e}</p>`))
+      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 

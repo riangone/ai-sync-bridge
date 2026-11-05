@@ -33,12 +33,12 @@ window.AISB.panels.websearch = function renderWebSearchPanel(el, ctx) {
 
   el.innerHTML = `
     <div class="aisb-subtabs">
-      <button class="aisb-subtab active" data-sub="company">${companyLabel}</button>
+      <button class="aisb-subtab active" data-sub="company">${window.AISB.domBase.escapeHtml(companyLabel)}</button>
       ${isDealer ? "" : `<button class="aisb-subtab" data-sub="property">物件検索</button>`}
     </div>
     <div class="aisb-subpanel active" data-sub="company">
       <div class="aisb-inline-row">
-        <input type="text" id="aisb-ws-company-kw" placeholder="${companyPlaceholder}" />
+        <input type="text" id="aisb-ws-company-kw" placeholder="${window.AISB.domBase.escapeHtml(companyPlaceholder)}" />
         <button id="aisb-ws-company-run">検索</button>
       </div>
       <div id="aisb-ws-company-result"></div>
@@ -135,7 +135,7 @@ window.AISB.panels.websearch = function renderWebSearchPanel(el, ctx) {
               .map(
                 (r, i) => `<div class="aisb-card" data-idx="${i}">
               <b>${ctx.escapeHtml(r.name)}</b>${r.industry ? ` <span class="aisb-badge">${ctx.escapeHtml(r.industry)}</span>` : ""}<br>
-              ${contactLabel}: ${ctx.escapeHtml(r.representative || "-")} / TEL: ${ctx.escapeHtml(r.tel || "-")}<br>
+              ${window.AISB.domBase.escapeHtml(contactLabel)}: ${ctx.escapeHtml(r.representative || "-")} / TEL: ${ctx.escapeHtml(r.tel || "-")}<br>
               住所: ${ctx.escapeHtml(r.address || "-")}<br>
               ${renderRegisterBtn()}
             </div>`
@@ -157,7 +157,7 @@ window.AISB.panels.websearch = function renderWebSearchPanel(el, ctx) {
             });
           });
         })
-        .catch((e) => (resultEl.innerHTML = `<p>エラー: ${e}</p>`));
+        .catch((e) => (resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
     });
   }
 
@@ -178,7 +178,7 @@ window.AISB.panels.websearch = function renderWebSearchPanel(el, ctx) {
                 (r, i) => `<div class="aisb-card" data-idx="${i}">
               <b>${ctx.escapeHtml(r.name)}</b><br>
               住所: ${ctx.escapeHtml(r.address || "-")} / 築年: ${ctx.escapeHtml(r.built_date || "-")}<br>
-              価格: ${r.price != null ? `${r.price.toLocaleString()}円` : "-"} / 賃料: ${r.monthly_rent != null ? `${r.monthly_rent.toLocaleString()}円/月` : "-"}<br>
+              価格: ${r.price != null ? `${window.AISB.domBase.escapeHtml(r.price.toLocaleString())}円` : "-"} / 賃料: ${r.monthly_rent != null ? `${window.AISB.domBase.escapeHtml(r.monthly_rent.toLocaleString())}円/月` : "-"}<br>
               ${renderRegisterBtn()}
             </div>`
               )
@@ -197,7 +197,7 @@ window.AISB.panels.websearch = function renderWebSearchPanel(el, ctx) {
             });
           });
         })
-        .catch((e) => (resultEl.innerHTML = `<p>エラー: ${e}</p>`));
+        .catch((e) => (resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
     });
   }
 

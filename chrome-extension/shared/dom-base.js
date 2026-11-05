@@ -888,8 +888,8 @@ window.AISB.domBase = (function () {
           const stateClass = ratio >= 1 ? "aisb-hbar-over" : ratio >= 0.8 ? "aisb-hbar-warn" : "";
           return `<div class="aisb-hbar-row">
             <div class="aisb-hbar-label" title="${escapeHtml(cat)}">${escapeHtml(cat)}</div>
-            <div class="aisb-hbar-track ${stateClass}"><div class="aisb-hbar-fill" style="width:${pct}%"></div></div>
-            <div class="aisb-hbar-value">${Math.round(actual).toLocaleString()} / ${Math.round(limit).toLocaleString()}${unit}</div>
+            <div class="aisb-hbar-track ${window.AISB.domBase.escapeHtml(stateClass)}"><div class="aisb-hbar-fill" style="width:${window.AISB.domBase.escapeHtml(pct)}%"></div></div>
+            <div class="aisb-hbar-value">${Math.round(actual).toLocaleString()} / ${Math.round(limit).toLocaleString()}${window.AISB.domBase.escapeHtml(unit)}</div>
           </div>`;
         })
         .join("");
@@ -905,8 +905,8 @@ window.AISB.domBase = (function () {
         const display = v == null ? "-" : `${Math.round(Number(v)).toLocaleString()}${unit}`;
         return `<div class="aisb-hbar-row">
           <div class="aisb-hbar-label" title="${escapeHtml(cat)}">${escapeHtml(cat)}</div>
-          <div class="aisb-hbar-track"><div class="aisb-hbar-fill" style="width:${pct}%"></div></div>
-          <div class="aisb-hbar-value">${display}</div>
+          <div class="aisb-hbar-track"><div class="aisb-hbar-fill" style="width:${window.AISB.domBase.escapeHtml(pct)}%"></div></div>
+          <div class="aisb-hbar-value">${window.AISB.domBase.escapeHtml(display)}</div>
         </div>`;
       })
       .join("");
@@ -940,7 +940,7 @@ window.AISB.domBase = (function () {
     const dots = pts
       .map(([x, y], i) => {
         const r = i === pts.length - 1 ? 4 : 2.5;
-        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" class="aisb-trend-dot"/>`;
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${window.AISB.domBase.escapeHtml(r)}" class="aisb-trend-dot"/>`;
       })
       .join("");
     const lastLabel = `${Math.round(nums[nums.length - 1]).toLocaleString()}${unit}`;
@@ -951,7 +951,7 @@ window.AISB.domBase = (function () {
         <path d="${areaPath}" class="aisb-trend-area"></path>
         <path d="${linePath}" class="aisb-trend-line"></path>
         ${dots}
-        <text x="${last[0].toFixed(1)}" y="${Math.max(10, last[1] - 8).toFixed(1)}" text-anchor="${labelAnchor}" class="aisb-trend-endlabel">${escapeHtml(lastLabel)}</text>
+        <text x="${last[0].toFixed(1)}" y="${Math.max(10, last[1] - 8).toFixed(1)}" text-anchor="${window.AISB.domBase.escapeHtml(labelAnchor)}" class="aisb-trend-endlabel">${escapeHtml(lastLabel)}</text>
       </svg>
       <div class="aisb-trend-xlabels"><span>${escapeHtml(categories[0])}</span><span>${escapeHtml(categories[categories.length - 1])}</span></div>
     `;
@@ -973,14 +973,14 @@ window.AISB.domBase = (function () {
       .map((s) => {
         const pct = (s.count / total) * 100;
         const color = STATUS_COLOR[s.status] || "#82888f";
-        return `<div class="aisb-dist-seg" style="width:${pct.toFixed(2)}%;background:${color}" title="${escapeHtml(s.label)}: ${s.count}件(${Math.round(pct)}%)"></div>`;
+        return `<div class="aisb-dist-seg" style="width:${pct.toFixed(2)}%;background:${window.AISB.domBase.escapeHtml(color)}" title="${escapeHtml(s.label)}: ${window.AISB.domBase.escapeHtml(s.count)}件(${Math.round(pct)}%)"></div>`;
       })
       .join("");
     const legend = slices
       .map((s) => {
         const color = STATUS_COLOR[s.status] || "#82888f";
         const pct = Math.round((s.count / total) * 100);
-        return `<span class="aisb-dist-legend-item"><span class="aisb-legend-dot" style="background:${color}"></span>${escapeHtml(s.label)} ${s.count}件(${pct}%)</span>`;
+        return `<span class="aisb-dist-legend-item"><span class="aisb-legend-dot" style="background:${window.AISB.domBase.escapeHtml(color)}"></span>${escapeHtml(s.label)} ${window.AISB.domBase.escapeHtml(s.count)}件(${window.AISB.domBase.escapeHtml(pct)}%)</span>`;
       })
       .join("");
     return `

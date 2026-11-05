@@ -9,6 +9,7 @@ from app.models.schemas import (
     PushSubscriptionCreate,
     PushUnsubscribeRequest,
 )
+from app.operator_auth import require_operator
 from app.services import insight_service
 from app.services.ai_client import AiProvider
 from app.services.push_service import PushService
@@ -52,6 +53,6 @@ def unsubscribe(payload: PushUnsubscribeRequest, svc: PushService = Depends(get_
     return {"success": True}
 
 
-@router.get("/subscriptions", response_model=list[PushSubscription])
+@router.get("/subscriptions", response_model=list[PushSubscription], dependencies=[Depends(require_operator)])
 def list_subscriptions(svc: PushService = Depends(get_push_service)):
     return svc.list_subscriptions()
