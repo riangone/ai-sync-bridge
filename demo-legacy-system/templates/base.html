@@ -19,23 +19,23 @@
 </head>
 <body>
 <div id="header">基幹業務システム LEGACY-ERP v3.2</div>
+{% set role = demo_role(request) %}
+{% if role %}<script>window.AISB_DEMO_ROLE = {{ role | tojson }};</script>{% endif %}
+{% block nav %}
+{% if role %}
+<div id="role-bar">
+    ロール: <b>{{ role.label }}</b>（{{ role.note }}）
+    <a href="{{ bp }}/role?next={{ request.url.path | urlencode }}">切り替える</a>
+    <span class="role-bar-note">デモ用の切り替えで、認証ではありません。{% if "*" not in role.panels %}権限制御に未対応の AI 機能は管理者ロールでのみ表示します。{% endif %}</span>
+</div>
+{% endif %}
 <div id="nav">
     <a href="{{ bp }}/">ホーム</a>
     <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
-    <a href="{{ bp }}/Customer/List">顧客管理</a>
-    <a href="{{ bp }}/Order/List">受注管理</a>
-    <a href="{{ bp }}/Estimate/List">見積管理</a>
-    <a href="{{ bp }}/Invoice/List">請求管理</a>
-    <a href="{{ bp }}/PurchaseOrder/List">発注管理</a>
-    <a href="{{ bp }}/Supplier/List">仕入先管理</a>
-    <a href="{{ bp }}/Employee/List">従業員管理</a>
-    <a href="{{ bp }}/Product/Inquiry">商品在庫照会</a>
-    <a href="{{ bp }}/InventoryTransaction/List">在庫トランザクション</a>
-    <a href="{{ bp }}/GoodsReceipt/List">入荷管理</a>
-    <a href="{{ bp }}/Property/List">物件管理</a>
-    <a href="{{ bp }}/ArAp/List">売掛買掛</a>
-    <a href="{{ bp }}/Profit/List">利益管理</a>
+    {% for path, label, entity in nav_items(request) %}<a href="{{ bp }}{{ path }}">{{ label }}</a>
+    {% endfor %}
 </div>
+{% endblock %}
 <div id="content">
 {% block content %}{% endblock %}
 </div>

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+{% set bp = base_path(request) %}
+<h2>権限がありません</h2>
+<p>
+    現在のロール（{{ demo_role(request).label }}）では、この{% if is_write %}登録・編集{% else %}画面{% endif %}は利用できません。
+    AI パネルの「権限検索・監査」でも同じ範囲の権限が適用されます。
+</p>
+<div class="form-actions">
+    <a class="button-link" href="{{ bp }}/">メインメニューへ</a>
+    <a class="button-link" href="{{ bp }}/role">ロールを切り替える</a>
+</div>
+{% endblock %}

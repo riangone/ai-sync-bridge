@@ -88,6 +88,7 @@ class AisbEmbedMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._files = script_files(profile)
         self._ai_notice = profile.ai_notice
+        self._exclude_paths = frozenset(profile.embed_exclude_paths)
 
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -97,7 +98,7 @@ class AisbEmbedMiddleware(BaseHTTPMiddleware):
         # 自分自身の管理画面/静的ファイル/APIには注入しない(無限ループや二重注入を防ぐ)。
         # Caddyがstrip_prefixした後にこのプロセスへ届くパスなので、プレフィックスは
         # 含まれず従来通りの判定でよい。
-        if request.url.path.startswith("/aisb-embed"):
+        if request.url.path.startswith("/aisb-embed") or request.url.path in self._exclude_paths:
             return response
         content_type = response.headers.get("content-type", "")
         if "text/html" not in content_type:

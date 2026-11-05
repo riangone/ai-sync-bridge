@@ -20,16 +20,32 @@ demo:
   ask_per_ip_per_hour: 40       # 比較1回で5回分消費する
   read_per_ip_per_minute: 60
   sync_cooldown_sec: 60
+  # 以下は ERP 画面の権限(demo_roles.py)が使う。取り込み対象の権限は sources の acl をそのまま使う
+  screens:                      # 取り込み対象ではない画面
+    Estimate: {tenant: acme, roles: [sales, accounting]}
+    PurchaseOrder: {tenant: acme, roles: [purchasing, accounting]}
+    InventoryTransaction: {tenant: acme, roles: [purchasing, accounting]}
+    GoodsReceipt: {tenant: acme, roles: [purchasing, accounting]}
+    Property: {tenant: acme, roles: [sales]}
+    ArAp: {tenant: acme, roles: [accounting]}
+    Profit: {tenant: acme, roles: [accounting]}
+  screen_write_roles:           # 閲覧より狭くする登録・編集
+    Employee: [hr]              # 経理課長は自部署の閲覧のみ
+  # panels: 表示する AI パネル。権限制御に未対応のパネルは、全ロールを持つ管理者にだけ出す
   personas:
     - id: admin
       label: 管理者
       note: 全ロール
+      description: すべての業務画面と、すべての AI 機能を確認できます
+      panels: ["*"]
       user_id: demo_admin
       tenant: acme
       roles: [sales, accounting, purchasing, hr, "dept:*"]
     - id: sales
       label: 営業担当
       note: 営業部
+      description: 顧客・受注・見積を扱います。請求と従業員情報は見えません
+      panels: [bridge]
       user_id: sales01          # 顧客・受注・出荷は見えるが人事データは見えない
       tenant: acme
       roles: [sales]
@@ -37,6 +53,8 @@ demo:
     - id: manager
       label: 経理課長
       note: 経理部
+      description: 請求や売掛買掛を扱います。従業員情報は自部署の閲覧のみです
+      panels: [bridge]
       user_id: keiri_kacho      # 請求と「自部署の」従業員情報のみ
       tenant: acme
       roles: [accounting, manager]
@@ -44,12 +62,16 @@ demo:
     - id: hr
       label: 人事
       note: 全部署
+      description: 全部署の従業員情報を扱います。顧客や請求は見えません
+      panels: [bridge]
       user_id: hr01             # 全部署の従業員情報
       tenant: acme
       roles: [hr, "dept:*"]
     - id: other
       label: 別テナント
       note: 越境不可
+      selectable: false         # 何も見えないため入口には出さず、権限比較でだけ使う
+      panels: [bridge]
       user_id: guest_other      # 何も見えないこと(テナント越境なし)の確認用
       tenant: other-co
       roles: [sales, hr, "dept:*"]

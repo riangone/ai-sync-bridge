@@ -52,6 +52,8 @@ ERP デモだけを動かす場合:
 (cd ai-api-server && ./start-erp.sh) &
 ```
 
+公開経路(リバースプロキシ経由)の ERP デモは、最初にロールを選んで入ります。パスワードはなく、認証ではありません。画面と JSON API の権限は `demo-legacy-system/demo_roles.py` が `aisb_profile/bridge.yaml` の定義に従って判定します。権限制御に未対応の AI パネルは管理者ロールにだけ表示します(表示の制御のみで、API 側は制限していません)。ロール選択と権限制御があるのは ERP デモだけです。
+
 全デモは pm2 で起動します。先に各デモの仮想環境を用意してください。
 
 ```bash
@@ -67,6 +69,8 @@ cd ai-api-server
 .venv/bin/python tests/test_bridge.py
 .venv/bin/python tests/test_ai_guard.py
 .venv/bin/python scripts/bench_bridge.py --docs 10000
+cd ../demo-legacy-system
+.venv/bin/python tests/test_demo_roles.py
 ```
 
 ## 実装状況

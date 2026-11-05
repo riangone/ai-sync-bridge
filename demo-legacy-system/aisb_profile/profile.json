@@ -1,6 +1,7 @@
 {
   "system_label": "レガシーERP",
   "extra_modules": [],
+  "embed_exclude_paths": ["/role"],
   "ai_notice": {
     "text": "デモ環境です。実在の個人情報や機密情報は入力しないでください。入力内容は外部の AI サービスに送信されます。",
     "link_label": "プライバシーポリシー",
