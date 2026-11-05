@@ -32,13 +32,13 @@ window.AISB.panels.admin = function renderAdminPanel(el, ctx) {
       .then((s) => {
         statsEl.innerHTML = `
           <div class="aisb-card">
-            モード: ${s.demo_mode ? "デモ" : "本番"} / AI: ${s.ai_provider} / 検索: ${s.vector_backend}<br>
-            顧客数: ${s.customer_count} / 受注数: ${s.order_count}<br>
-            ワークフロー: 定義${s.workflow_count}件 / 実行${s.workflow_execution_count}件<br>
-            未読通知: ${s.unread_notification_count}件
+            モード: ${s.demo_mode ? "デモ" : "本番"} / AI: ${window.AISB.domBase.escapeHtml(s.ai_provider)} / 検索: ${window.AISB.domBase.escapeHtml(s.vector_backend)}<br>
+            顧客数: ${window.AISB.domBase.escapeHtml(s.customer_count)} / 受注数: ${window.AISB.domBase.escapeHtml(s.order_count)}<br>
+            ワークフロー: 定義${window.AISB.domBase.escapeHtml(s.workflow_count)}件 / 実行${window.AISB.domBase.escapeHtml(s.workflow_execution_count)}件<br>
+            未読通知: ${window.AISB.domBase.escapeHtml(s.unread_notification_count)}件
           </div>`;
       })
-      .catch((e) => (statsEl.innerHTML = `<p>エラー: ${e.message}</p>`));
+      .catch((e) => (statsEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e.message)}</p>`));
   }
 
   function loadAudit() {
@@ -48,13 +48,13 @@ window.AISB.panels.admin = function renderAdminPanel(el, ctx) {
           entries
             .map(
               (a) => `<div class="aisb-event-card">
-            [${a.action}] ${a.detail}
-            <span class="aisb-event-time">${new Date(a.at).toLocaleString()} (${a.actor})</span>
+            [${window.AISB.domBase.escapeHtml(a.action)}] ${window.AISB.domBase.escapeHtml(a.detail)}
+            <span class="aisb-event-time">${new Date(a.at).toLocaleString()} (${window.AISB.domBase.escapeHtml(a.actor)})</span>
           </div>`
             )
             .join("") || "<p>監査ログはまだありません</p>";
       })
-      .catch((e) => (auditEl.innerHTML = `<p>エラー: ${e.message}</p>`));
+      .catch((e) => (auditEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e.message)}</p>`));
   }
 
   el.querySelector("#aisb-admin-reset").addEventListener("click", () => {

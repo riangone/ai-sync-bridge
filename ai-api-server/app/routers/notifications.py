@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import get_notification_center
 from app.models.schemas import Notification, NotificationCreate, NotificationMarkResult
+from app.operator_auth import require_operator
 from app.services.notification_service import NotificationCenter
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -21,7 +22,7 @@ def unread_count(center: NotificationCenter = Depends(get_notification_center)):
     return {"unread_count": center.unread_count()}
 
 
-@router.post("", response_model=Notification, status_code=201)
+@router.post("", response_model=Notification, status_code=201, dependencies=[Depends(require_operator)])
 def create_notification(
     payload: NotificationCreate,
     center: NotificationCenter = Depends(get_notification_center),

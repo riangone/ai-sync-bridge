@@ -13,12 +13,18 @@ DIライフサイクル注意点: このクラスは Singleton。Scoped サー�
 "dealer")ごとに既定で別ファイルになるため、env設定を忘れても物理的に分離される。
 """
 import os
+from collections import OrderedDict
 from datetime import datetime
 from functools import lru_cache
 from threading import Lock
 
 from app.config import get_settings
 from app.services import sqlite_store
+from app.services.rate_limit import current_client
+
+MAX_CHAT_SESSIONS = 500
+MAX_HISTORY_MESSAGES = 40  # 1セッションあたり。assistant_service の 20 ターンと同じ
+MAX_PUSH_SUBSCRIPTIONS = 1000
 
 
 class DemoDataStore:
@@ -40,7 +46,9 @@ class DemoDataStore:
         # 中途半端に持たせると「たまに消える」壊れた永続化に見える方が害が大きい。
         # WorkflowEngine/NotificationCenter/AuditLog(deps.py参照)と同様、会話の
         # 生存状態はプロセス内メモリのSingletonのままでよい設計判断。
-        self.chat_histories: dict[str, list[dict]] = {}
+        # キーは (送信元, session_id)。公開デモでは session_id をクライアントが決めるので、
+        # 同じ ID を送っても他の訪問者の履歴が読めないよう送信元でも分ける。
+        self.chat_histories: OrderedDict[tuple[str, str], list[dict]] = OrderedDict()
         # Phase4: 在庫/発注(README 9章 Phase4「PurchaseOrderController + InventoryController」)
         self.products: dict[int, dict] = table("products")
         self.purchase_orders: dict[int, dict] = table("purchase_orders")
@@ -605,6 +613,9 @@ class DemoDataStore:
                     record.update({k: v for k, v in data.items() if v is not None})
                     self.push_subscriptions[sid] = record  # SQLite永続化(インプレース変更は再代入が必要)
                     return record
+            # 匿名で増やせるので上限を超えたら古いものから捨てる
+            while len(self.push_subscriptions) >= MAX_PUSH_SUBSCRIPTIONS:
+                del self.push_subscriptions[min(self.push_subscriptions)]
             sid = self._next_subscription_id
             self._next_subscription_id += 1
             record = {**data, "id": sid, "created_at": datetime.utcnow()}
@@ -636,10 +647,18 @@ class DemoDataStore:
 
     # ---- Chat history (per session) ----
     def get_history(self, session_id: str) -> list[dict]:
-        return self.chat_histories.setdefault(session_id, [])
+        key = (current_client.get() or "local", session_id)
+        with self._lock:
+            history = self.chat_histories.setdefault(key, [])
+            self.chat_histories.move_to_end(key)
+            while len(self.chat_histories) > MAX_CHAT_SESSIONS:
+                self.chat_histories.popitem(last=False)
+            return history
 
     def append_history(self, session_id: str, role: str, content: str) -> None:
-        self.get_history(session_id).append({"role": role, "content": content})
+        history = self.get_history(session_id)
+        history.append({"role": role, "content": content})
+        del history[: max(0, len(history) - MAX_HISTORY_MESSAGES)]
 
     # ---- Admin: デモデータ初期化 (Phase4) ----
     def reset(self) -> None:

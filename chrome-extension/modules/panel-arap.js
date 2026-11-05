@@ -39,10 +39,10 @@ window.AISB.panels.arap = function renderArApPanel(el, ctx) {
           ${
             rows
               .map(
-                (r) => `<div class="aisb-card aisb-risk-${riskClass[r.risk] || "on_track"}">
+                (r) => `<div class="aisb-card aisb-risk-${window.AISB.domBase.escapeHtml(riskClass[r.risk] || "on_track")}">
               <b>${ctx.escapeHtml(r.entity_name)}</b>
-              <span class="aisb-badge">${typeLabel[r.entity_type] || r.entity_type}</span>
-              <span class="aisb-risk-tag">リスク:${riskLabel[r.risk] || r.risk}</span><br>
+              <span class="aisb-badge">${window.AISB.domBase.escapeHtml(typeLabel[r.entity_type] || r.entity_type)}</span>
+              <span class="aisb-risk-tag">リスク:${window.AISB.domBase.escapeHtml(riskLabel[r.risk] || r.risk)}</span><br>
               期日前:${Math.round(r.current).toLocaleString()} / 1-30日:${Math.round(r.bucket_1_30).toLocaleString()} /
               31-60日:${Math.round(r.bucket_31_60).toLocaleString()} / 61-90日:${Math.round(r.bucket_61_90).toLocaleString()} /
               91日以上:${Math.round(r.bucket_90_plus).toLocaleString()}<br>
@@ -52,7 +52,7 @@ window.AISB.panels.arap = function renderArApPanel(el, ctx) {
               .join("") || "<p>対象データがありません</p>"
           }`;
       })
-      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${e}</p>`))
+      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 };

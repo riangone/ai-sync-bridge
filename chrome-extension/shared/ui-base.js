@@ -42,7 +42,7 @@ window.AISB.uiBase = (function () {
           </div>
         </div>
         <div id="aisb-tabs">
-          ${panelDefs.map((p, i) => `<button class="aisb-tab${i === 0 ? " active" : ""}" data-panel="${p.id}">${p.label}</button>`).join("")}
+          ${panelDefs.map((p, i) => `<button class="aisb-tab${i === 0 ? " active" : ""}" data-panel="${window.AISB.domBase.escapeHtml(p.id)}">${window.AISB.domBase.escapeHtml(p.label)}</button>`).join("")}
         </div>
         <div id="aisb-body"></div>
       </div>

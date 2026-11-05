@@ -107,7 +107,18 @@ class Settings(BaseModel):
     domains: str = os.getenv("AISB_DOMAINS", "all")
 
     # CORS: Chrome拡張(content script)からのアクセスを許可
-    cors_origins: list[str] = ["*"]
+    # 公開デモの画面とローカル開発の画面だけ。導入先では AISB_CORS_ORIGINS(カンマ区切り)で差し替える。
+    cors_origins: list[str] = [
+        o.strip()
+        for o in os.getenv(
+            "AISB_CORS_ORIGINS",
+            "https://aisync.0101.click,http://localhost:5010,http://localhost:5020,"
+            "http://localhost:5030,http://localhost:5040,http://localhost:5050",
+        ).split(",")
+        if o.strip()
+    ]
+    # 拡張機能の ID は配布方法で変わるので形式で許可する
+    cors_origin_regex: str = os.getenv("AISB_CORS_ORIGIN_REGEX", r"^chrome-extension://[a-p]{32}$")
 
 
 @lru_cache

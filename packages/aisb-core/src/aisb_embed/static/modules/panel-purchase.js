@@ -42,10 +42,10 @@ window.AISB.panels.purchase = function renderPurchasePanel(el, ctx) {
         listEl.innerHTML =
           pos
             .map(
-              (po) => `<div class="aisb-card" data-id="${po.id}">
-            #${po.id} <b>${ctx.escapeHtml(po.supplier)}</b> / 商品ID:${po.product_id} / 数量:${po.qty}
-            <span class="aisb-badge">${statusLabel[po.status] || po.status}</span><br>
-            発注日:${po.ordered_at} 納期:${po.expected_date || "-"} 入荷済数量:${po.received_qty}
+              (po) => `<div class="aisb-card" data-id="${window.AISB.domBase.escapeHtml(po.id)}">
+            #${window.AISB.domBase.escapeHtml(po.id)} <b>${ctx.escapeHtml(po.supplier)}</b> / 商品ID:${window.AISB.domBase.escapeHtml(po.product_id)} / 数量:${window.AISB.domBase.escapeHtml(po.qty)}
+            <span class="aisb-badge">${window.AISB.domBase.escapeHtml(statusLabel[po.status] || po.status)}</span><br>
+            発注日:${window.AISB.domBase.escapeHtml(po.ordered_at)} 納期:${window.AISB.domBase.escapeHtml(po.expected_date || "-")} 入荷済数量:${window.AISB.domBase.escapeHtml(po.received_qty)}
             ${
               po.status === "ordered"
                 ? `<div class="aisb-btn-row"><button class="aisb-po-receive-btn aisb-btn-secondary">入荷登録</button></div>`
@@ -70,7 +70,7 @@ window.AISB.panels.purchase = function renderPurchasePanel(el, ctx) {
           });
         });
       })
-      .catch((e) => (listEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (listEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   }
 
   el.querySelector("#aisb-po-create").addEventListener("click", () => {
@@ -110,14 +110,14 @@ window.AISB.panels.purchase = function renderPurchasePanel(el, ctx) {
           (data.proposals || [])
             .map(
               (p) => `<div class="aisb-card">
-            <b>${ctx.escapeHtml(p.product_name)}</b>(現在庫:${p.current_stock} / 発注点:${p.reorder_point})<br>
-            推奨発注数: <b>${p.suggested_qty}</b> / 仕入先: ${ctx.escapeHtml(p.supplier)}<br>
+            <b>${ctx.escapeHtml(p.product_name)}</b>(現在庫:${window.AISB.domBase.escapeHtml(p.current_stock)} / 発注点:${window.AISB.domBase.escapeHtml(p.reorder_point)})<br>
+            推奨発注数: <b>${window.AISB.domBase.escapeHtml(p.suggested_qty)}</b> / 仕入先: ${ctx.escapeHtml(p.supplier)}<br>
             ${ctx.escapeHtml(p.reason)}
           </div>`
             )
             .join("") || "<p>提案対象はありません</p>";
       })
-      .catch((e) => (proposeEl.innerHTML = `<p>エラー: ${e}</p>`))
+      .catch((e) => (proposeEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 
@@ -133,14 +133,14 @@ window.AISB.panels.purchase = function renderPurchasePanel(el, ctx) {
         evalEl.innerHTML =
           (data.evaluations || [])
             .map(
-              (v) => `<div class="aisb-card aisb-risk-${ratingClass[v.rating] || "due_soon"}">
-            <b>${ctx.escapeHtml(v.supplier)}</b><span class="aisb-risk-tag">${ratingLabel[v.rating] || v.rating}</span><br>
-            発注件数:${v.order_count} / 累計数量:${v.total_qty} / 納期遵守率:${Math.round(v.on_time_rate * 100)}%
+              (v) => `<div class="aisb-card aisb-risk-${window.AISB.domBase.escapeHtml(ratingClass[v.rating] || "due_soon")}">
+            <b>${ctx.escapeHtml(v.supplier)}</b><span class="aisb-risk-tag">${window.AISB.domBase.escapeHtml(ratingLabel[v.rating] || v.rating)}</span><br>
+            発注件数:${window.AISB.domBase.escapeHtml(v.order_count)} / 累計数量:${window.AISB.domBase.escapeHtml(v.total_qty)} / 納期遵守率:${Math.round(v.on_time_rate * 100)}%
           </div>`
             )
             .join("") || "<p>評価対象はありません</p>";
       })
-      .catch((e) => (evalEl.innerHTML = `<p>エラー: ${e}</p>`))
+      .catch((e) => (evalEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 

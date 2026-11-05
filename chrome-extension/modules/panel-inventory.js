@@ -30,14 +30,14 @@ window.AISB.panels.inventory = function renderInventoryPanel(el, ctx) {
             .map(
               (p) => `<tr${p.stock <= p.reorder_point ? ' class="aisb-notif-unread"' : ""}>
                 <td>${ctx.escapeHtml(p.name)}</td><td>${ctx.escapeHtml(p.sku)}</td>
-                <td>${p.stock}</td><td>${p.reorder_point}</td>
+                <td>${window.AISB.domBase.escapeHtml(p.stock)}</td><td>${window.AISB.domBase.escapeHtml(p.reorder_point)}</td>
                 <td>${Math.round(p.unit_cost).toLocaleString()}円</td><td>${ctx.escapeHtml(p.supplier)}</td>
               </tr>`
             )
             .join("")}</tbody>
         </table>`;
       })
-      .catch((e) => (listEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (listEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   }
 
   el.querySelector("#aisb-inv-anomaly-btn").addEventListener("click", (e) => {
@@ -53,12 +53,12 @@ window.AISB.panels.inventory = function renderInventoryPanel(el, ctx) {
             .map(
               (a) => `<div class="aisb-card aisb-risk-${a.severity === "critical" ? "overdue" : "due_soon"}">
             <b>${ctx.escapeHtml(a.product_name)}</b><span class="aisb-risk-tag">${a.severity === "critical" ? "在庫切れ" : "発注点割れ"}</span><br>
-            在庫 ${a.stock} / 発注点 ${a.reorder_point}(不足 ${a.shortage})
+            在庫 ${window.AISB.domBase.escapeHtml(a.stock)} / 発注点 ${window.AISB.domBase.escapeHtml(a.reorder_point)}(不足 ${window.AISB.domBase.escapeHtml(a.shortage)})
           </div>`
             )
             .join("") || "<p>異常はありません</p>";
       })
-      .catch((e) => (anomalyEl.innerHTML = `<p>エラー: ${e}</p>`))
+      .catch((e) => (anomalyEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 

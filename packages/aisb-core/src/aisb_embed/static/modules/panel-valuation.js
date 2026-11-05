@@ -97,21 +97,21 @@ window.AISB.panels.valuation = function renderValuationPanel(el, ctx) {
           ${
             data.comparable_count
               ? `<div class="aisb-badge">想定成約価格帯: ${Math.round(data.suggested_price_low).toLocaleString()}円 〜 ${Math.round(data.suggested_price_high).toLocaleString()}円</div>
-                 <div class="aisb-badge">㎡単価 中央値: ${data.unit_price_median.toLocaleString()}円/㎡(比較対象${data.comparable_count}件)</div>
+                 <div class="aisb-badge">㎡単価 中央値: ${window.AISB.domBase.escapeHtml(data.unit_price_median.toLocaleString())}円/㎡(比較対象${window.AISB.domBase.escapeHtml(data.comparable_count)}件)</div>
                  ${data.warnings.map((w) => `<div class="aisb-card aisb-risk-due_soon">${ctx.escapeHtml(w)}</div>`).join("")}
                  ${data.comparables
                    .map(
                      (c) => `<div class="aisb-card">
                        <b>${ctx.escapeHtml(c.name || "")}</b> <span class="aisb-badge">${ctx.escapeHtml(c.status || "")}</span><br>
                        ${ctx.escapeHtml(c.address || "")}<br>
-                       価格 ${Math.round(c.price).toLocaleString()}円(㎡単価 ${c.unit_price.toLocaleString()}円/㎡)
+                       価格 ${Math.round(c.price).toLocaleString()}円(㎡単価 ${window.AISB.domBase.escapeHtml(c.unit_price.toLocaleString())}円/㎡)
                      </div>`
                    )
                    .join("")}`
               : ""
           }`;
       })
-      .catch((err) => (valResultEl.innerHTML = `<p>エラー: ${err}</p>`))
+      .catch((err) => (valResultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(err)}</p>`))
       .finally(() => (btn.disabled = false));
   });
   el.querySelector("#aisb-val-insight-btn").addEventListener("click", (e) => {
@@ -143,7 +143,7 @@ window.AISB.panels.valuation = function renderValuationPanel(el, ctx) {
           <div class="aisb-badge">上限(税込): ${Math.round(data.legal_cap_incl_tax).toLocaleString()}円</div>
           <div class="aisb-badge">請求予定額: ${Math.round(data.requested_amount).toLocaleString()}円</div>`;
       })
-      .catch((err) => (comResultEl.innerHTML = `<p>エラー: ${err}</p>`))
+      .catch((err) => (comResultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(err)}</p>`))
       .finally(() => (btn.disabled = false));
   });
   el.querySelector("#aisb-com-insight-btn").addEventListener("click", (e) => {
@@ -174,13 +174,13 @@ window.AISB.panels.valuation = function renderValuationPanel(el, ctx) {
           (items
             .map(
               (c) => `<div class="aisb-card ${c.severity === "high" ? "aisb-risk-overdue" : "aisb-risk-due_soon"}">
-                <span class="aisb-risk-tag">${conflictTypeLabel[c.type] || c.type}</span> ${ctx.escapeHtml(c.date)}<br>
+                <span class="aisb-risk-tag">${window.AISB.domBase.escapeHtml(conflictTypeLabel[c.type] || c.type)}</span> ${ctx.escapeHtml(c.date)}<br>
                 ${ctx.escapeHtml(c.message)}
               </div>`
             )
             .join("") || "");
       })
-      .catch((err) => (confResultEl.innerHTML = `<p>エラー: ${err}</p>`))
+      .catch((err) => (confResultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(err)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 };

@@ -1,4 +1,5 @@
 """Pydantic スキーマ定義（言語非依存仕様の Models 層）"""
+import json
 from datetime import datetime
 from typing import Any
 from pydantic import BaseModel, Field
@@ -7,6 +8,25 @@ from pydantic import AfterValidator
 from app.public_errors import public_provider
 
 PublicProvider = Annotated[str, AfterValidator(public_provider)]
+
+# 匿名で呼べる入力の上限。値が長いほど LLM のプロンプトと保存データが膨らむ。
+# リクエスト全体の上限は app/services/request_limits.py。
+MAX_ID = 100
+MAX_KEYWORD = 500
+MAX_URL = 2048
+MAX_QUESTION = 2000
+MAX_CHAT_MESSAGE = 8000  # 「AIで要約する」がレコードの JSON を本文に入れるので質問より大きい
+MAX_QTY = 1_000_000
+MAX_JSON_CHARS = 16000
+
+
+def _bounded_json(value: dict) -> dict:
+    if len(json.dumps(value, ensure_ascii=False, default=str)) > MAX_JSON_CHARS:
+        raise ValueError(f"too large (max {MAX_JSON_CHARS} chars)")
+    return value
+
+
+BoundedDict = Annotated[dict, AfterValidator(_bounded_json)]
 
 
 # ---------- Customer ----------
@@ -62,8 +82,8 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    session_id: str = Field(default="default")
-    message: str
+    session_id: str = Field(default="default", max_length=MAX_ID)
+    message: str = Field(min_length=1, max_length=MAX_CHAT_MESSAGE)
     # True: 業務データ(ブリッジ)を根拠に、呼び出し主体の権限内だけで回答する(/api/bridge/ask と同じ経路)
     grounded: bool = False
 
@@ -88,8 +108,8 @@ class OcrResult(BaseModel):
 
 
 class OcrRegisterRequest(BaseModel):
-    fields: dict  # OcrResult.fields をそのまま渡す想定
-    entity: str  # "Customer" | "Supplier" | "Employee" | "Property"(erpのみ)
+    fields: BoundedDict  # OcrResult.fields をそのまま渡す想定
+    entity: str = Field(max_length=MAX_ID)  # "Customer" | "Supplier" | "Employee" | "Property"(erpのみ)
 
 
 class OcrRegisterResponse(BaseModel):
@@ -163,8 +183,8 @@ class InsightResponse(BaseModel):
 # インジェクション/誤操作のリスクを本質的に断つため、AIには構造化フィルタ(JSON)のみを
 # 生成させ、ホワイトリスト検証を通過した条件だけをコード側で評価する(evalも生SQLも使わない)。
 class NLSQLQueryRequest(BaseModel):
-    entity: str
-    question: str
+    entity: str = Field(max_length=MAX_ID)
+    question: str = Field(max_length=MAX_QUESTION)
 
 
 class NLSQLCondition(BaseModel):
@@ -249,7 +269,7 @@ class CrossAnalysisResponse(BaseModel):
 # 構造化パラメータ(JSON)として生成し、JOIN_GRAPH(dynamic_analysis_service.py)で
 # 固定された安全な結合キーのみを使って実行する汎用版。生SQL/evalは使わない。
 class DynamicAnalysisRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=MAX_QUESTION)
 
 
 class DynamicAnalysisFieldRef(BaseModel):
@@ -338,8 +358,8 @@ class WorkflowToggleResult(BaseModel):
 
 
 class WorkflowTriggerEvalRequest(BaseModel):
-    current_screen_type: str | None = None
-    changed_table: str | None = None
+    current_screen_type: str | None = Field(default=None, max_length=MAX_ID)
+    changed_table: str | None = Field(default=None, max_length=MAX_ID)
 
 
 class WorkflowTriggerEvalResult(BaseModel):
@@ -347,7 +367,7 @@ class WorkflowTriggerEvalResult(BaseModel):
 
 
 class WorkflowExecuteRequest(BaseModel):
-    context: dict = {}
+    context: BoundedDict = {}
 
 
 class WorkflowStepResult(BaseModel):
@@ -451,9 +471,9 @@ class PurchaseOrderBase(BaseModel):
 
 class PurchaseOrderCreate(BaseModel):
     product_id: int
-    supplier: str
-    qty: int
-    expected_date: str | None = None
+    supplier: str = Field(max_length=MAX_KEYWORD)
+    qty: int = Field(ge=1, le=MAX_QTY)
+    expected_date: str | None = Field(default=None, max_length=MAX_ID)
 
 
 class PurchaseOrder(PurchaseOrderBase):
@@ -477,7 +497,7 @@ class PurchaseOrderProposalResponse(BaseModel):
 
 class GoodsReceiptRequest(BaseModel):
     purchase_order_id: int
-    received_qty: int
+    received_qty: int = Field(ge=0, le=MAX_QTY)
 
 
 class SupplierEvaluation(BaseModel):
@@ -563,14 +583,14 @@ class AuditLogEntry(BaseModel):
 
 # ---------- Push Notification (Phase4: README 9章「PushController + AlertCheckService」) ----------
 class PushSubscriptionCreate(BaseModel):
-    endpoint: str
-    p256dh: str | None = None
-    auth: str | None = None
-    device_name: str | None = None
+    endpoint: str = Field(max_length=MAX_URL)
+    p256dh: str | None = Field(default=None, max_length=MAX_KEYWORD)
+    auth: str | None = Field(default=None, max_length=MAX_KEYWORD)
+    device_name: str | None = Field(default=None, max_length=MAX_KEYWORD)
 
 
 class PushUnsubscribeRequest(BaseModel):
-    endpoint: str
+    endpoint: str = Field(max_length=MAX_URL)
 
 
 class PushSubscription(BaseModel):
@@ -621,7 +641,7 @@ class AnalysisHistoryEntry(BaseModel):
 
 # ---------- Web Search: Company / Property (Phase2: README 5.3節「外部データ検索系」) ----------
 class CompanySearchRequest(BaseModel):
-    keyword: str
+    keyword: str = Field(max_length=MAX_KEYWORD)
 
 
 class CompanySearchResult(BaseModel):
@@ -643,7 +663,7 @@ class CompanySearchResponse(BaseModel):
 
 
 class CompanyRegisterRequest(BaseModel):
-    company_data: dict
+    company_data: BoundedDict
 
 
 class CompanyRegisterResponse(BaseModel):
@@ -655,7 +675,7 @@ class CompanyRegisterResponse(BaseModel):
 
 
 class PropertySearchRequest(BaseModel):
-    keyword: str
+    keyword: str = Field(max_length=MAX_KEYWORD)
 
 
 class PropertySearchResult(BaseModel):
@@ -679,7 +699,7 @@ class PropertySearchResponse(BaseModel):
 
 
 class PropertyRegisterRequest(BaseModel):
-    property_data: dict
+    property_data: BoundedDict
 
 
 class PropertyRegisterResponse(BaseModel):
@@ -689,9 +709,9 @@ class PropertyRegisterResponse(BaseModel):
 
 # ---------- Recommend (Phase2: README 5.3節「レコメンド系」) ----------
 class RecommendRequest(BaseModel):
-    table_name: str  # customers | orders | products
+    table_name: str = Field(max_length=MAX_ID)  # customers | orders | products
     id: int
-    max_results: int = 5
+    max_results: int = Field(default=5, ge=1, le=50)
     include_explanation: bool = False  # ルールベースの一致理由文を付与するか(AIではない)
 
 
@@ -710,9 +730,9 @@ class RecommendResponse(BaseModel):
 
 # ---------- Local AI Assist (Phase3: README 5.4.2「ビジネスアシスタント」) ----------
 class AssistRequest(BaseModel):
-    message: str
-    screen_context: dict | None = None
-    conversation_id: str | None = None
+    message: str = Field(min_length=1, max_length=MAX_CHAT_MESSAGE)
+    screen_context: BoundedDict | None = None
+    conversation_id: str | None = Field(default=None, max_length=MAX_ID)
 
 
 class AssistResponse(BaseModel):
@@ -724,10 +744,10 @@ class AssistResponse(BaseModel):
 
 # ---------- Conversational Input (Phase3: README 5.4.7「自然言語→フォームデータ変換」) ----------
 class ConversationalInputRequest(BaseModel):
-    message: str
-    target_screen: str
-    screen_context: dict | None = None
-    conversation_id: str | None = None
+    message: str = Field(min_length=1, max_length=MAX_CHAT_MESSAGE)
+    target_screen: str = Field(max_length=MAX_ID)
+    screen_context: BoundedDict | None = None
+    conversation_id: str | None = Field(default=None, max_length=MAX_ID)
 
 
 class InputMapping(BaseModel):
@@ -747,8 +767,8 @@ class ConversationalInputResponse(BaseModel):
 
 # 2026-09-01: OCR(OcrRegisterRequest/Response)と同じ「登録用データを作る」導線用。
 class ConversationalInputRegisterRequest(BaseModel):
-    fields: dict  # input_mappingsを{field: value}に組み直したものをそのまま渡す想定
-    target_screen: str  # "order-input" | "customer-register" | "estimate-mgmt" | "invoice-mgmt" | "supplier-mgmt"
+    fields: BoundedDict  # input_mappingsを{field: value}に組み直したものをそのまま渡す想定
+    target_screen: str = Field(max_length=MAX_ID)  # "order-input" | "customer-register" | "estimate-mgmt" | "invoice-mgmt" | "supplier-mgmt"
 
 
 class ConversationalInputRegisterResponse(BaseModel):
@@ -761,10 +781,10 @@ class ConversationalInputRegisterResponse(BaseModel):
 # 査定AI/内見重複検知/宅建業法手数料上限チェック。他2 demo にはProperty/Viewing
 # エンティティ自体が存在しないため、instance!="realestate" では 404 になる) ----------
 class ValuationRequest(BaseModel):
-    property_type: str | None = None  # マンション/戸建て/土地/一棟収益 (db.PROPERTY_TYPES)
+    property_type: str | None = Field(default=None, max_length=MAX_ID)  # マンション/戸建て/土地/一棟収益 (db.PROPERTY_TYPES)
     building_area: float | None = None  # ㎡
     land_area: float | None = None  # ㎡
-    address_keyword: str | None = None  # 住所の部分一致で類似物件を絞り込む(例: "渋谷")
+    address_keyword: str | None = Field(default=None, max_length=MAX_KEYWORD)  # 住所の部分一致で類似物件を絞り込む(例: "渋谷")
 
 
 class ValuationComparable(BaseModel):

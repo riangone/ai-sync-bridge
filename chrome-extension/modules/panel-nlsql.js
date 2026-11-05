@@ -130,7 +130,7 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
 
   el.innerHTML = `
     <div class="aisb-subtabs">
-      ${SUBTABS.map((t, i) => `<button type="button" class="aisb-subtab${i === 0 ? " active" : ""}" data-subtab="${t.id}">${t.label}</button>`).join("")}
+      ${SUBTABS.map((t, i) => `<button type="button" class="aisb-subtab${i === 0 ? " active" : ""}" data-subtab="${window.AISB.domBase.escapeHtml(t.id)}">${window.AISB.domBase.escapeHtml(t.label)}</button>`).join("")}
     </div>
 
     <div class="aisb-subpanel active" data-subpanel="xa">
@@ -153,7 +153,7 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
     <div class="aisb-subpanel" data-subpanel="nlsql">
       <div class="aisb-inline-row">
         <select id="aisb-nlsql-entity">
-          ${LEGACY_ENTITIES.map((e) => `<option value="${e.id}">${e.label}</option>`).join("")}
+          ${LEGACY_ENTITIES.map((e) => `<option value="${window.AISB.domBase.escapeHtml(e.id)}">${window.AISB.domBase.escapeHtml(e.label)}</option>`).join("")}
         </select>
       </div>
       <div id="aisb-nlsql-presets" class="aisb-chip-row"></div>
@@ -238,7 +238,7 @@ window.AISB.panels.nlsql = function renderNlsqlPanel(el, ctx) {
         .join("");
       const filterHtml = `<div class="aisb-filter-summary">${escapeHtml(renderFilterSummary(data.applied_filter))}</div>`;
       const sqlHtml = renderSqlPreviewHtml(escapeHtml, data.sql_preview);
-      const badgeHtml = `<div class="aisb-badge">${data.count}件 / 全${data.total_scanned}件中 (AI: ${escapeHtml(data.provider)})</div>`;
+      const badgeHtml = `<div class="aisb-badge">${window.AISB.domBase.escapeHtml(data.count)}件 / 全${window.AISB.domBase.escapeHtml(data.total_scanned)}件中 (AI: ${escapeHtml(data.provider)})</div>`;
 
       if (!data.rows.length) {
         resultEl.innerHTML = `${filterHtml}${sqlHtml}${warningsHtml}${badgeHtml}<p>該当データがありません</p>`;
@@ -307,7 +307,7 @@ function initCrossAnalysis(el, ctx) {
     .then((r) => r.json())
     .then((reports) => {
       buttonsEl.innerHTML = reports
-        .map((r) => `<button type="button" class="aisb-btn-secondary" data-report="${r.id}">${escapeHtml(r.label)}</button>`)
+        .map((r) => `<button type="button" class="aisb-btn-secondary" data-report="${window.AISB.domBase.escapeHtml(r.id)}">${escapeHtml(r.label)}</button>`)
         .join("");
       buttonsEl.querySelectorAll("button").forEach((btn) => {
         btn.addEventListener("click", () => runCrossAnalysis(btn.dataset.report, btn));

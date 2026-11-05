@@ -13,7 +13,7 @@ async def run_ocr(
     # doc_type="floorplan": instance=="realestate"専用。物件の間取り図/図面/現況写真を
     # 専用プロンプトで読み取る(ocr_service.OcrService.extract参照)。他instanceでは無視され
     # 従来通りの帳票OCRになる。省略時は従来通り"document"(帳票)。
-    doc_type: str = Form("document"),
+    doc_type: str = Form("document", max_length=20),
     svc: OcrService = Depends(get_ocr_service),
 ):
     content = await file.read()

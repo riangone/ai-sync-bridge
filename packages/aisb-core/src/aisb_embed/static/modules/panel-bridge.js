@@ -100,7 +100,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
           ? d.results.map((r) => `<li>${refLabel(r)}</li>`).join("")
           : `<li style="color:#888">閲覧できる範囲に該当なし</li>`;
         return `<div class="aisb-card">${head}
-          <div style="font-size:11px;color:#666">表示 ${d.results.length} 件 / 権限で除外 ${d.acl_filtered} 件 · ${esc(d.strategy)} · 監査ID ${esc(String(d.audit_id).slice(0, 8))}</div>
+          <div style="font-size:11px;color:#666">表示 ${d.results.length} 件 / 権限で除外 ${window.AISB.domBase.escapeHtml(d.acl_filtered)} 件 · ${esc(d.strategy)} · 監査ID ${esc(String(d.audit_id).slice(0, 8))}</div>
           <ul style="margin:4px 0 0 16px;padding:0">${items}</ul></div>`;
       })
       .join("");
@@ -130,10 +130,10 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
       try {
         const d = await call("POST", "/ask", { persona: p.id, question: q });
         const cites = d.citations.length
-          ? d.citations.map((c) => `<li>[${c.n}] ${refLabel(c)}</li>`).join("")
+          ? d.citations.map((c) => `<li>[${window.AISB.domBase.escapeHtml(c.n)}] ${refLabel(c)}</li>`).join("")
           : `<li style="color:#888">${d.llm_called ? "根拠文書の引用なし" : "閲覧できる範囲に関係する文書がないため AI は呼び出していません"}</li>`;
         html = `<div style="white-space:pre-wrap;font-size:12px;margin:4px 0">${esc(d.answer)}</div>
-          <div style="font-size:11px;color:#666">根拠(閲覧可能な文書のみ): 渡した ${d.context_count} 件 / 権限で除外 ${d.acl_filtered} 件 · 監査ID ${esc(String(d.audit_id).slice(0, 8))}</div>
+          <div style="font-size:11px;color:#666">根拠(閲覧可能な文書のみ): 渡した ${window.AISB.domBase.escapeHtml(d.context_count)} 件 / 権限で除外 ${window.AISB.domBase.escapeHtml(d.acl_filtered)} 件 · 監査ID ${esc(String(d.audit_id).slice(0, 8))}</div>
           <ul style="margin:2px 0 0 16px;padding:0;font-size:11px">${cites}</ul>`;
       } catch (e) {
         html = `<span style="color:#d03b3b">${esc(e.message)}</span>`;
@@ -150,10 +150,10 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
     try {
       const d = await call("POST", "/sync");
       const rows = d.entities
-        .map((e) => `<tr><td>${esc(e.source)}</td><td>${esc(e.entity)}</td><td>${e.source_unchanged ? '<span title="ファイル/ソースのハッシュが前回と同一のため読み込み自体を省略">未変更</span>' : e.fetched}</td><td><b>${e.upserted}</b></td><td>${e.unchanged}</td><td>${e.deleted}</td><td style="color:#d03b3b">${e.failed ? "失敗" : ""}</td></tr>`)
+        .map((e) => `<tr><td>${esc(e.source)}</td><td>${esc(e.entity)}</td><td>${window.AISB.domBase.escapeHtml(e.source_unchanged ? '<span title="ファイル/ソースのハッシュが前回と同一のため読み込み自体を省略">未変更</span>' : esc(e.fetched))}</td><td><b>${window.AISB.domBase.escapeHtml(e.upserted)}</b></td><td>${window.AISB.domBase.escapeHtml(e.unchanged)}</td><td>${window.AISB.domBase.escapeHtml(e.deleted)}</td><td style="color:#d03b3b">${e.failed ? "失敗" : ""}</td></tr>`)
         .join("");
       out.innerHTML = `<div class="aisb-card">
-        <b>差分同期</b> ${d.cached ? "(直前の結果を表示)" : `${d.elapsed_ms}ms`} — 再ベクトル化 ${d.upserted} 件 / 変更なし ${d.unchanged} 件 / 削除 ${d.deleted} 件
+        <b>差分同期</b> ${d.cached ? "(直前の結果を表示)" : `${window.AISB.domBase.escapeHtml(d.elapsed_ms)}ms`} — 再ベクトル化 ${window.AISB.domBase.escapeHtml(d.upserted)} 件 / 変更なし ${window.AISB.domBase.escapeHtml(d.unchanged)} 件 / 削除 ${window.AISB.domBase.escapeHtml(d.deleted)} 件
         <table style="width:100%;font-size:11px;margin-top:4px;border-collapse:collapse">
           <tr style="color:#666"><th align=left>接続元</th><th align=left>対象</th><th>取得</th><th>更新</th><th>不変</th><th>削除</th><th></th></tr>${rows}
         </table></div>`;
@@ -177,7 +177,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
       const d = await call("GET", "/audit");
       out.innerHTML = `<div class="aisb-card"><b>監査ログ(新しい順)</b>${d.items
         .map((it) => `<div style="font-size:11px;border-top:1px solid #eee;padding:3px 0">
-            #${it.seq} ${new Date(it.ts * 1000).toLocaleTimeString("ja-JP")} <span class="aisb-badge">${esc(it.kind)}</span>
+            #${window.AISB.domBase.escapeHtml(it.seq)} ${new Date(it.ts * 1000).toLocaleTimeString("ja-JP")} <span class="aisb-badge">${esc(it.kind)}</span>
             ${esc(it.actor || "")} — ${auditSummary(it)}
             <span style="color:#aaa;font-family:monospace">${esc(it.hash.slice(0, 10))}</span></div>`)
         .join("")}</div>`;
@@ -191,7 +191,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
     try {
       const d = await call("GET", "/audit/verify");
       out.innerHTML = d.ok
-        ? `<div class="aisb-card" style="color:#0ca30c">✔ ハッシュチェーン整合: ${d.checked} 件を検証(先頭 ${esc(String(d.head).slice(0, 10))})</div>`
+        ? `<div class="aisb-card" style="color:#0ca30c">✔ ハッシュチェーン整合: ${window.AISB.domBase.escapeHtml(d.checked)} 件を検証(先頭 ${esc(String(d.head).slice(0, 10))})</div>`
         : `<div class="aisb-card" style="color:#d03b3b">✘ 改ざん/欠落を検出: ${esc(JSON.stringify(d))}</div>`;
     } catch (e) {
       out.textContent = `エラー: ${e.message}`;

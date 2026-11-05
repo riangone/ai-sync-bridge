@@ -23,7 +23,8 @@ import threading
 from collections import OrderedDict
 from typing import Awaitable, Callable
 
-from app.bridge.acl import Principal
+from app.bridge.acl import ANONYMOUS, Principal
+from app.services.rate_limit import current_client
 
 CompleteFn = Callable[..., Awaitable[str]]
 
@@ -60,7 +61,9 @@ class _HistoryStore:
 
     @staticmethod
     def key(p: Principal, session_id: str) -> tuple:
-        return (p.tenant or "", p.user_id, session_id)
+        # 匿名は全員同じ主体なので、送信元でも分けて他の訪問者の履歴と混ざらないようにする
+        client = current_client.get() if p.user_id == ANONYMOUS.user_id else None
+        return (p.tenant or "", p.user_id, session_id, client)
 
     def get(self, k: tuple) -> list[dict]:
         with self._lock:

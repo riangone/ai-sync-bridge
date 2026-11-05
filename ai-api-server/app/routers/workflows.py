@@ -17,6 +17,7 @@ from app.models.schemas import (
     WorkflowTriggerEvalRequest,
     WorkflowTriggerEvalResult,
 )
+from app.operator_auth import require_operator
 from app.services import insight_service
 from app.services.admin_service import AdminService
 from app.services.ai_client import AiProvider
@@ -35,7 +36,7 @@ def list_workflows(engine: WorkflowEngine = Depends(get_workflow_engine)):
     return engine.list_workflows()
 
 
-@router.post("", response_model=WorkflowDefinition, status_code=201)
+@router.post("", response_model=WorkflowDefinition, status_code=201, dependencies=[Depends(require_operator)])
 def create_workflow(
     payload: WorkflowDefinitionCreate,
     engine: WorkflowEngine = Depends(get_workflow_engine),
@@ -54,7 +55,7 @@ def get_workflow(workflow_id: str, engine: WorkflowEngine = Depends(get_workflow
     return wf
 
 
-@router.put("/{workflow_id}", response_model=WorkflowDefinition)
+@router.put("/{workflow_id}", response_model=WorkflowDefinition, dependencies=[Depends(require_operator)])
 def update_workflow(
     workflow_id: str,
     payload: WorkflowDefinitionUpdate,
@@ -68,7 +69,7 @@ def update_workflow(
     return wf
 
 
-@router.delete("/{workflow_id}", status_code=204)
+@router.delete("/{workflow_id}", status_code=204, dependencies=[Depends(require_operator)])
 def delete_workflow(
     workflow_id: str,
     engine: WorkflowEngine = Depends(get_workflow_engine),

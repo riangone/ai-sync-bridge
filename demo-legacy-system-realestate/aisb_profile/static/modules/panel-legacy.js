@@ -11,7 +11,7 @@ window.AISB.panels.legacy = function renderLegacyDataPanel(el, ctx) {
     <div id="aisb-legacy-context"></div>
     <div class="aisb-inline-row">
       <select id="aisb-legacy-entity">
-        ${LEGACY_ENTITIES.map((e) => `<option value="${e.id}">${e.label}</option>`).join("")}
+        ${LEGACY_ENTITIES.map((e) => `<option value="${window.AISB.domBase.escapeHtml(e.id)}">${window.AISB.domBase.escapeHtml(e.label)}</option>`).join("")}
       </select>
     </div>
     <div class="aisb-inline-row">
@@ -45,15 +45,15 @@ window.AISB.panels.legacy = function renderLegacyDataPanel(el, ctx) {
           return;
         }
         listEl.innerHTML = `
-          <div class="aisb-badge">${data.count}件${q ? `（"${escapeHtml(q)}"で絞込）` : ""}</div>
+          <div class="aisb-badge">${window.AISB.domBase.escapeHtml(data.count)}件${q ? `（"${escapeHtml(q)}"で絞込）` : ""}</div>
           <table class="aisb-table">
-            <thead><tr>${meta.cols.map((c) => `<th>${c}</th>`).join("")}${meta.hasDetail ? "<th></th>" : ""}</tr></thead>
+            <thead><tr>${meta.cols.map((c) => `<th>${window.AISB.domBase.escapeHtml(c)}</th>`).join("")}${meta.hasDetail ? "<th></th>" : ""}</tr></thead>
             <tbody>
               ${rows
                 .map(
                   (row) => `<tr>
                     ${meta.cols.map((c) => `<td>${escapeHtml(row[c])}</td>`).join("")}
-                    ${meta.hasDetail && row.Id ? `<td><a class="aisb-link-btn" href="${LEGACY_ORIGIN}/${meta.id}/Detail/${encodeURIComponent(row.Id)}" target="_blank" rel="noopener">開く</a></td>` : meta.hasDetail ? "<td></td>" : ""}
+                    ${meta.hasDetail && row.Id ? `<td><a class="aisb-link-btn" href="${window.AISB.domBase.escapeHtml(LEGACY_ORIGIN)}/${window.AISB.domBase.escapeHtml(meta.id)}/Detail/${encodeURIComponent(row.Id)}" target="_blank" rel="noopener">開く</a></td>` : meta.hasDetail ? "<td></td>" : ""}
                   </tr>`
                 )
                 .join("")}
@@ -61,7 +61,7 @@ window.AISB.panels.legacy = function renderLegacyDataPanel(el, ctx) {
           </table>
         `;
       })
-      .catch((e) => (listEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (listEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   }
 
   // AIチャットAPIへレコードのJSONを渡して要約させる。他パネル(chat)のセッションとは
@@ -85,7 +85,7 @@ window.AISB.panels.legacy = function renderLegacyDataPanel(el, ctx) {
       const data = await res.json();
       outEl.innerHTML = `<div class="aisb-card">${escapeHtml(data.reply)}</div>`;
     } catch (e) {
-      outEl.innerHTML = `<p>エラー: ${e}</p>`;
+      outEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`;
     } finally {
       btn.disabled = false;
       btn.textContent = "AIで要約する";
@@ -101,7 +101,7 @@ window.AISB.panels.legacy = function renderLegacyDataPanel(el, ctx) {
     const actionLabel = { List: "一覧", Entry: "登録/編集", Detail: "詳細", Search: "検索", Inquiry: "照会", Register: "登録" }[ctxInfo.action] || ctxInfo.action;
     contextEl.innerHTML = `
       <div class="aisb-context-banner">
-        現在の画面: <b>${meta.label}${actionLabel}</b>${ctxInfo.id ? `（ID: ${escapeHtml(ctxInfo.id)}）` : ""}
+        現在の画面: <b>${window.AISB.domBase.escapeHtml(meta.label)}${window.AISB.domBase.escapeHtml(actionLabel)}</b>${ctxInfo.id ? `（ID: ${escapeHtml(ctxInfo.id)}）` : ""}
         ${meta.hasDetail && ctxInfo.action === "Detail" && ctxInfo.id ? `<br><button class="aisb-summarize-btn">AIで要約する</button><div id="aisb-legacy-summary"></div>` : ""}
       </div>
     `;
@@ -115,7 +115,7 @@ window.AISB.panels.legacy = function renderLegacyDataPanel(el, ctx) {
           const data = await res.json();
           await summarizeRecord(meta, data.record, data.items, summarizeBtn, outEl);
         } catch (e) {
-          outEl.innerHTML = `<p>エラー: ${e}</p>`;
+          outEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`;
         }
       });
     }

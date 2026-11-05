@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import get_order_service
 from app.models.schemas import Order, OrderCreate
+from app.operator_auth import require_operator
 from app.services.order_service import OrderService
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
@@ -20,7 +21,7 @@ def get_order(order_id: int, svc: OrderService = Depends(get_order_service)):
     return o
 
 
-@router.post("", response_model=Order, status_code=201)
+@router.post("", response_model=Order, status_code=201, dependencies=[Depends(require_operator)])
 def create_order(payload: OrderCreate, svc: OrderService = Depends(get_order_service)):
     return svc.create(payload.model_dump())
 

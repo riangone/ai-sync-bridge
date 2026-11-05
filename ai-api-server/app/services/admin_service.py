@@ -75,14 +75,8 @@ class AdminService:
         if not self.settings.demo_mode:
             raise NotImplementedError("demo_mode=false では提供しない管理操作です")
         self.store.reset()
-        # ワークフロー定義自体はエンティティIDを参照しないため保持したまま、
-        # 実行履歴だけを初期状態に戻す(NotificationCenterの既読状態と同種の設計)。
         self.workflow_engine.reset()
-        self.audit_log.record(actor, "reset_demo_data", "デモデータ(顧客/受注/会話履歴)を初期状態にリセットしました")
-        self.notifications.push(
-            source="admin",
-            level="warning",
-            title="デモデータをリセットしました",
-            message="顧客/受注データと会話履歴が初期シード状態に戻されました",
-        )
+        # 毎日のリセットで通知が積み上がらないよう、完了通知は出さず監査ログにだけ残す
+        self.notifications.reset()
+        self.audit_log.record(actor, "reset_demo_data", "デモデータ(顧客/受注/会話履歴/ワークフロー/通知)を初期状態にリセットしました")
         return self.stats()

@@ -62,7 +62,7 @@ window.AISB.panels.convinput = function renderConvInputPanel(el, ctx) {
   el.innerHTML = `
     <div class="aisb-inline-row">
       <select id="aisb-ci-screen">
-        ${CI_SCREENS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}
+        ${CI_SCREENS.map((s) => `<option value="${window.AISB.domBase.escapeHtml(s.id)}">${window.AISB.domBase.escapeHtml(s.label)}</option>`).join("")}
       </select>
     </div>
     <div id="aisb-ci-presets" class="aisb-chip-row"></div>
@@ -187,7 +187,7 @@ window.AISB.panels.convinput = function renderConvInputPanel(el, ctx) {
         });
       }
     } catch (e) {
-      resultEl.innerHTML = `<p>エラー: ${e}</p>`;
+      resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`;
     }
   }
 

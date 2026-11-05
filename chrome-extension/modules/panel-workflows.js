@@ -28,10 +28,10 @@ window.AISB.panels.workflows = function renderWorkflowsPanel(el, ctx) {
         listEl.innerHTML =
           workflows
             .map(
-              (wf) => `<div class="aisb-card" data-id="${wf.id}">
-            <b>${wf.name}</b>${wf.enabled ? "" : ' <span class="aisb-badge">無効</span>'}<br>
-            ${wf.description || ""}<br>
-            トリガー: ${triggerLabel[wf.trigger.type] || wf.trigger.type} / ステップ数: ${wf.steps.length}
+              (wf) => `<div class="aisb-card" data-id="${window.AISB.domBase.escapeHtml(wf.id)}">
+            <b>${window.AISB.domBase.escapeHtml(wf.name)}</b>${wf.enabled ? "" : ' <span class="aisb-badge">無効</span>'}<br>
+            ${window.AISB.domBase.escapeHtml(wf.description || "")}<br>
+            トリガー: ${window.AISB.domBase.escapeHtml(triggerLabel[wf.trigger.type] || wf.trigger.type)} / ステップ数: ${wf.steps.length}
             <div class="aisb-btn-row">
               <button class="aisb-wf-exec-btn">実行</button>
               <button class="aisb-wf-toggle-btn aisb-btn-secondary">${wf.enabled ? "無効化" : "有効化"}</button>
@@ -54,7 +54,7 @@ window.AISB.panels.workflows = function renderWorkflowsPanel(el, ctx) {
             })
               .then((r) => r.json())
               .then((run) => {
-                resultEl.innerHTML = `<span class="aisb-badge">結果: ${run.status}(${
+                resultEl.innerHTML = `<span class="aisb-badge">結果: ${window.AISB.domBase.escapeHtml(run.status)}(${
                   run.steps.filter((s) => s.status === "success").length
                 }/${run.steps.length}ステップ成功)</span>`;
                 loadHistory();
@@ -72,7 +72,7 @@ window.AISB.panels.workflows = function renderWorkflowsPanel(el, ctx) {
           });
         });
       })
-      .catch((e) => (listEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (listEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   }
 
   function loadHistory() {
@@ -83,7 +83,7 @@ window.AISB.panels.workflows = function renderWorkflowsPanel(el, ctx) {
           executions
             .map(
               (ex) => `<div class="aisb-event-card">
-            <b>${ex.workflow_name}</b>: ${ex.status}(${ex.steps.filter((s) => s.status === "success").length}/${
+            <b>${window.AISB.domBase.escapeHtml(ex.workflow_name)}</b>: ${window.AISB.domBase.escapeHtml(ex.status)}(${ex.steps.filter((s) => s.status === "success").length}/${
                 ex.steps.length
               }ステップ成功)
             <span class="aisb-event-time">${new Date(ex.finished_at).toLocaleString()}</span>
@@ -91,7 +91,7 @@ window.AISB.panels.workflows = function renderWorkflowsPanel(el, ctx) {
             )
             .join("") || "<p>実行履歴はまだありません</p>";
       })
-      .catch((e) => (historyEl.innerHTML = `<p>エラー: ${e}</p>`));
+      .catch((e) => (historyEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`));
   }
 
   loadWorkflows();

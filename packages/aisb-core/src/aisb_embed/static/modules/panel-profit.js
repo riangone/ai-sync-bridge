@@ -43,7 +43,7 @@ window.AISB.panels.profit = function renderProfitPanel(el, ctx) {
               .map(
                 (d) => `<tr>
                   <td>${ctx.escapeHtml(d.product_name)}${d.cost_known ? "" : ' <span class="aisb-badge">原価未登録</span>'}</td>
-                  <td>${d.qty}</td>
+                  <td>${window.AISB.domBase.escapeHtml(d.qty)}</td>
                   <td>${Math.round(d.revenue).toLocaleString()}円</td>
                   <td>${Math.round(d.cost).toLocaleString()}円</td>
                   <td>${Math.round(d.profit).toLocaleString()}円</td>
@@ -53,7 +53,7 @@ window.AISB.panels.profit = function renderProfitPanel(el, ctx) {
               .join("")}</tbody>
           </table>` || "<p>対象データがありません</p>";
       })
-      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${e}</p>`))
+      .catch((e) => (resultEl.innerHTML = `<p>エラー: ${window.AISB.domBase.escapeHtml(e)}</p>`))
       .finally(() => (btn.disabled = false));
   });
 };
