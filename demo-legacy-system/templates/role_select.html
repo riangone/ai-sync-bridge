@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block nav %}{% endblock %}
+{% block content %}
+{% set current = demo_role(request) %}
+<h2>ロールを選んでデモに入る</h2>
+<p class="role-lead">
+    選んだロールに応じて、メニュー・画面のデータ・AI パネルの検索結果が変わります。あとから画面上部でいつでも切り替えられます。
+</p>
+<p class="role-lead role-caution">
+    デモ用のロール切り替えです。パスワードは不要で、認証ではありません。実在の ID やパスワードは入力しないでください。
+</p>
+<form method="post" action="{{ base_path(request) }}/role" class="role-cards">
+    <input type="hidden" name="next" value="{{ next }}">
+    {% for card in cards %}
+    <button type="submit" name="persona" value="{{ card.persona.id }}" class="role-card{% if current and current.id == card.persona.id %} role-card-current{% endif %}">
+        <span class="role-card-title">{{ card.persona.label }}{% if current and current.id == card.persona.id %}（選択中）{% endif %}</span>
+        <span class="role-card-note">{{ card.persona.note }}</span>
+        <span class="role-card-desc">{{ card.persona.description }}</span>
+        <span class="role-card-screens"><b>画面</b> {{ card.screens | join("・") }}</span>
+        <span class="role-card-screens"><b>AI パネル</b> {% if card.all_panels %}全機能{% else %}権限検索・監査{% endif %}</span>
+    </button>
+    {% endfor %}
+</form>
+<p class="role-lead">
+    ロールごとの結果を並べて比べたいときは、入った後に AI パネルの「権限検索・監査」タブを開いてください。
+</p>
+{% endblock %}

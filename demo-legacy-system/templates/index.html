@@ -33,25 +33,14 @@
 </div>
 
 <div class="summary-boxes">
-    <div class="summary-box"><div class="num">{{ summary.customers }}</div><div class="label">顧客数</div></div>
-    <div class="summary-box"><div class="num">{{ summary.orders }}</div><div class="label">受注件数</div></div>
-    <div class="summary-box"><div class="num">{{ summary.products }}</div><div class="label">商品点数</div></div>
-    <div class="summary-box"><div class="num">&yen;{{ "{:,}".format(summary.sales_total) }}</div><div class="label">受注合計金額</div></div>
+    {% if can_view(request, "Customer") %}<div class="summary-box"><div class="num">{{ summary.customers }}</div><div class="label">顧客数</div></div>{% endif %}
+    {% if can_view(request, "Order") %}<div class="summary-box"><div class="num">{{ summary.orders }}</div><div class="label">受注件数</div></div>{% endif %}
+    {% if can_view(request, "Product") %}<div class="summary-box"><div class="num">{{ summary.products }}</div><div class="label">商品点数</div></div>{% endif %}
+    {% if can_view(request, "Order") %}<div class="summary-box"><div class="num">&yen;{{ "{:,}".format(summary.sales_total) }}</div><div class="label">受注合計金額</div></div>{% endif %}
 </div>
 
 <div class="menu-grid">
-    <a class="menu-button" href="{{ bp }}/Customer/List">顧客管理</a>
-    <a class="menu-button" href="{{ bp }}/Order/List">受注管理</a>
-    <a class="menu-button" href="{{ bp }}/Product/Inquiry">商品在庫照会</a>
-    <a class="menu-button" href="{{ bp }}/Supplier/List">仕入先管理</a>
-    <a class="menu-button" href="{{ bp }}/Employee/List">従業員管理</a>
-    <a class="menu-button" href="{{ bp }}/Estimate/List">見積管理</a>
-    <a class="menu-button" href="{{ bp }}/Invoice/List">請求管理</a>
-    <a class="menu-button" href="{{ bp }}/PurchaseOrder/List">発注管理</a>
-    <a class="menu-button" href="{{ bp }}/InventoryTransaction/List">在庫トランザクション</a>
-    <a class="menu-button" href="{{ bp }}/GoodsReceipt/List">入荷管理</a>
-    <a class="menu-button" href="{{ bp }}/Property/List">物件管理</a>
-    <a class="menu-button" href="{{ bp }}/ArAp/List">売掛買掛</a>
-    <a class="menu-button" href="{{ bp }}/Profit/List">利益管理</a>
+    {% for path, label, entity in nav_items(request) %}<a class="menu-button" href="{{ bp }}{{ path }}">{{ label }}</a>
+    {% endfor %}
 </div>
 {% endblock %}

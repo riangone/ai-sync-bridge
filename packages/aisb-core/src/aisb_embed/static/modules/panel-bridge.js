@@ -8,23 +8,40 @@
 //
 // 主体の切り替えはサーバー側で行う(/api/bridge/demo/*)。ブラウザに API キーは置かない。
 // 主体の一覧は導入先 bridge.yaml の demo.personas から取得する。
+// ロールを選んで入る導入先(window.AISB_DEMO_ROLE あり)では、現在のロールでの検索を主操作にし、
+// 全主体の比較は別ボタンとして残す。ロールなしの導入先では従来どおり比較だけを出す。
 window.AISB = window.AISB || {};
 window.AISB.panels = window.AISB.panels || {};
 
 window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
   const esc = ctx.escapeHtml;
   const SAMPLE_QUERIES = window.AISB.configBase.BRIDGE_SAMPLE_QUERIES || ["経理部の従業員を教えて", "経理部 課長", "営業部 出荷", "未払い 請求"];
+  const ME = window.AISB_DEMO_ROLE || null;
+  const AUDIT_NOTE = "すべての検索は監査ログに記録されます(公開デモのため、入力内容そのものは保存しません)。";
 
   el.innerHTML = `
     <div class="aisb-bridge-intro" style="font-size:12px;color:#555;line-height:1.6;margin-bottom:8px">
-      同じ質問を<b>権限の異なる利用者</b>で同時に検索・AI回答させます。レガシー側の権限(テナント/ロール/部署)が
-      検索結果にそのまま反映され、すべての検索は監査ログに記録されます(公開デモのため、入力内容そのものは保存しません)。
+      ${ME
+        ? `<b>${esc(ME.label)}</b>(${esc(ME.note)})の権限で検索・AI回答します。業務画面と同じ権限が適用され、${AUDIT_NOTE}`
+        : `同じ質問を<b>権限の異なる利用者</b>で同時に検索・AI回答させます。レガシー側の権限(テナント/ロール/部署)が検索結果にそのまま反映され、${AUDIT_NOTE}`}
     </div>
     <div id="aisb-search-row">
       <input id="aisb-bridge-q" type="text" value="${esc(SAMPLE_QUERIES[0] || "")}" placeholder="例: 経理部 課長" />
-      <button id="aisb-bridge-run">比較検索</button>
-      <button id="aisb-bridge-ask" title="同じ質問を各利用者の権限でAIに回答させる">AI回答を比較</button>
+      ${ME
+        ? `<button id="aisb-bridge-self-run">検索</button>
+           <button id="aisb-bridge-self-ask" title="現在のロールの権限でAIに回答させる">AI回答</button>`
+        : ""}
+      ${ME ? "" : `<button id="aisb-bridge-run">比較検索</button>
+      <button id="aisb-bridge-ask" title="同じ質問を各利用者の権限でAIに回答させる">AI回答を比較</button>`}
     </div>
+    ${ME
+      ? `<div style="font-size:11px;color:#666;margin:4px 0">
+           権限比較:
+           <button id="aisb-bridge-run">比較検索</button>
+           <button id="aisb-bridge-ask" title="同じ質問を各利用者の権限でAIに回答させる">AI回答を比較</button>
+           (AI回答の比較は利用者の人数分の回数を消費します)
+         </div>`
+      : ""}
     <div style="margin:4px 0 6px">${SAMPLE_QUERIES.map((q) => `<button class="aisb-bridge-chip" data-q="${esc(q)}" style="font-size:11px;padding:2px 8px;margin:0 4px 4px 0">${esc(q)}</button>`).join("")}</div>
     <div id="aisb-bridge-results"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
@@ -48,6 +65,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
   }
 
   const personasReady = call("GET", "/personas").then((d) => d.personas);
+  const selfOnly = (all) => all.filter((p) => p.id === ME.id);
 
   function refLabel(r) {
     return `<span class="aisb-badge">${esc(r.entity)}</span> ${esc(r.title || r.pk)}`;
@@ -56,7 +74,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
   // 比較検索とAI回答比較は同じ結果欄を使うため、共通の世代番号で「後から始めた方」だけを描画する
   let resultsSeq = 0;
 
-  async function compare() {
+  async function compare(pick) {
     const q = $("#aisb-bridge-q").value.trim();
     const out = $("#aisb-bridge-results");
     if (!q) return;
@@ -69,6 +87,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
       out.textContent = `エラー: ${e.message}`;
       return;
     }
+    if (pick) PRINCIPALS = pick(PRINCIPALS);
     const settled = await Promise.allSettled(PRINCIPALS.map((p) => call("POST", "/search", { persona: p.id, query: q })));
     if (seq !== resultsSeq) return;
     out.innerHTML = settled
@@ -88,7 +107,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
   }
 
   // AI回答の比較: LLM 呼び出しは数秒〜数十秒かかるため、返ってきた主体から順に描画する
-  async function askCompare() {
+  async function askCompare(pick) {
     const q = $("#aisb-bridge-q").value.trim();
     const out = $("#aisb-bridge-results");
     if (!q) return;
@@ -101,6 +120,7 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
       return;
     }
     if (seq !== resultsSeq) return;
+    if (pick) PRINCIPALS = pick(PRINCIPALS);
     out.innerHTML = PRINCIPALS.map(
       (p, i) => `<div class="aisb-card" id="aisb-ask-${i}"><b>${esc(p.label)}</b> <span style="color:#888">(${esc(p.note)})</span>
         <div style="color:#888;font-size:12px">AIが回答を作成中...</div></div>`,
@@ -178,15 +198,20 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
     }
   }
 
-  $("#aisb-bridge-run").addEventListener("click", compare);
-  $("#aisb-bridge-ask").addEventListener("click", askCompare);
+  const primarySearch = () => compare(ME ? selfOnly : null);
+  $("#aisb-bridge-run").addEventListener("click", () => compare());
+  $("#aisb-bridge-ask").addEventListener("click", () => askCompare());
+  if (ME) {
+    $("#aisb-bridge-self-run").addEventListener("click", primarySearch);
+    $("#aisb-bridge-self-ask").addEventListener("click", () => askCompare(selfOnly));
+  }
   el.querySelectorAll(".aisb-bridge-chip").forEach((b) =>
     b.addEventListener("click", () => {
       $("#aisb-bridge-q").value = b.dataset.q;
-      compare();
+      primarySearch();
     }),
   );
-  $("#aisb-bridge-q").addEventListener("keydown", (e) => e.key === "Enter" && compare());
+  $("#aisb-bridge-q").addEventListener("keydown", (e) => e.key === "Enter" && primarySearch());
   $("#aisb-bridge-sync").addEventListener("click", sync);
   $("#aisb-bridge-audit").addEventListener("click", audit);
   $("#aisb-bridge-verify").addEventListener("click", verify);

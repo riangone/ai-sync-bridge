@@ -112,7 +112,7 @@
                     <span class="ai-intro-demo-btn" role="button" tabindex="0" data-demo="search">▶ 自動デモを見る</span>
                     <span class="ai-intro-card-detail">
                         <span class="ai-intro-detail-row"><b>できること</b>取り込み済みの社員・取引先・請求などの文書を、語句の一致を中心に検索。権限の異なる利用者で同時に検索し、結果と権限で除外された件数を比べられる。検索は監査ログに記録される。この公開デモは簡易ベクトルのため、意味の近さは判定しない。</span>
-                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「権限検索・監査」タブ → 語句を入力 →「比較検索」</span>
+                        <span class="ai-intro-detail-row"><b>使い方</b>🤖ボタン →「権限検索・監査」タブ → 語句を入力 →「検索」で現在のロールの結果、「比較検索」で全利用者の比較</span>
                         <span class="ai-intro-detail-row"><b>入力例</b>「経理部 課長」「未払い 請求」</span>
                     </span>
                 </button>
@@ -283,6 +283,13 @@
       var scenario = window.AISB && window.AISB.demoScenarios && window.AISB.demoScenarios[id];
       if (!window.AISB || !window.AISB.demoEngine || !scenario) {
         window.alert("デモ機能の読み込みが完了していません。少し待ってからもう一度お試しください。");
+        return;
+      }
+      // このロールに表示されないパネルは、シナリオからも開かない
+      var role = window.AISB_DEMO_ROLE;
+      var opener = scenario.steps.find(function (s) { return s.type === "openPanel"; });
+      if (role && role.panels.indexOf("*") < 0 && opener && role.panels.indexOf(opener.panel) < 0) {
+        window.alert("この機能は権限制御に未対応のため、管理者ロールでのみ表示しています。画面上部の「切り替える」からお試しください。");
         return;
       }
       window.AISB.demoEngine.run(scenario);

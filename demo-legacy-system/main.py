@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import data as db
+import demo_roles
 import aisb_embed  # AIサイドバー埋め込み(任意・トグル可能)。詳細は aisb_embed/__init__.py 参照。
                     # レガシー側コードへの依存はこの2行のみ(ルート/テンプレートは無改造)。
 
@@ -34,6 +35,8 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 # プレフィックスを補う。ヘッダーが無ければ従来通り""(=完全無改変の挙動)。
 templates.env.globals["base_path"] = lambda request: request.headers.get("x-forwarded-prefix", "")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+# ロールの入口は埋め込みより内側に置く(権限エラーの画面にも AI パネルを出すため)
+roles = demo_roles.install(app, templates, BASE_DIR / "aisb_profile" / "bridge.yaml")
 aisb_embed.mount(app, profile_dir=Path(__file__).parent / "aisb_profile")
 
 
@@ -85,6 +88,7 @@ def paginate(request: Request, rows: list):
 def render_list(request, *, title, heading, entity_path, columns, rows, id_field="Id",
                  show_entry=True, show_detail=True, show_search=False, new_label=None,
                  money_fields=None, rate_fields=None, paged=True):
+    show_entry = show_entry and roles.can_write(request, entity_path)
     page_info = None
     if paged:
         rows, page_info = paginate(request, rows)
@@ -106,6 +110,7 @@ def render_entry(request, *, title, heading, entity_path, fields, values, is_edi
 
 def render_detail(request, *, title, heading, entity_path, fields, values, record_id,
                    show_entry=True, items=None, money_fields=None):
+    show_entry = show_entry and roles.can_write(request, entity_path)
     return templates.TemplateResponse(request, "detail.html", {
         "title": title, "heading": heading, "entity_path": entity_path,
         "fields": fields, "values": values, "record_id": record_id,
@@ -286,16 +291,17 @@ _ENTITY_ITEMS = {
 
 
 @app.get("/api/entities")
-def api_entities():
+def api_entities(request: Request):
     """拡張のパネルが動的にエンティティ一覧を組み立てられるようにするメタ情報。"""
-    return [{"entity": k, "label": v, "hasDetail": k in _ENTITY_STORE} for k, v in ENTITY_LABELS.items()]
+    return [{"entity": k, "label": v, "hasDetail": k in _ENTITY_STORE} for k, v in ENTITY_LABELS.items()
+            if roles.can_view(request, k)]
 
 
 @app.get("/api/{entity}/list")
-def api_entity_list(entity: str, q: str = "", limit: int = 100):
+def api_entity_list(request: Request, entity: str, q: str = "", limit: int = 100):
     if entity not in ENTITY_LABELS:
         raise HTTPException(404, f"unknown entity: {entity}")
-    rows = _ENTITY_ROWS[entity]()
+    rows = roles.filter_rows(request, entity, _ENTITY_ROWS[entity]())
     if q:
         ql = q.lower()
         rows = [r for r in rows if any(ql in str(v).lower() for v in r.values())]
@@ -303,12 +309,12 @@ def api_entity_list(entity: str, q: str = "", limit: int = 100):
 
 
 @app.get("/api/{entity}/detail/{rid}")
-def api_entity_detail(entity: str, rid: str):
+def api_entity_detail(request: Request, entity: str, rid: str):
     store = _ENTITY_STORE.get(entity)
     if store is None:
         raise HTTPException(404, f"no detail endpoint for entity: {entity}")
     record = store.get(rid)
-    if not record:
+    if not record or not roles.row_visible(request, entity, record):
         raise HTTPException(404, "record not found")
     result = {"entity": entity, "label": ENTITY_LABELS[entity], "record": record}
     if entity in _ENTITY_ITEMS:
@@ -855,7 +861,8 @@ def supplier_detail(request: Request, sid: str):
 @app.get("/Employee/List")
 def employee_list(request: Request):
     return render_list(request, title="従業員一覧", heading="従業員一覧", entity_path="Employee",
-                        columns=EMPLOYEE_LIST_COLUMNS, rows=list(db.employees.values()),
+                        columns=EMPLOYEE_LIST_COLUMNS,
+                        rows=roles.filter_rows(request, "Employee", list(db.employees.values())),
                         new_label="従業員新規登録")
 
 
@@ -898,7 +905,7 @@ async def employee_update(request: Request, eid: str):
 @app.get("/Employee/Detail/{eid}")
 def employee_detail(request: Request, eid: str):
     e = db.employees.get(eid)
-    if not e:
+    if not e or not roles.row_visible(request, "Employee", e):
         return redirect_to(request, "/Employee/List")
     return render_detail(request, title="従業員詳細", heading="従業員詳細", entity_path="Employee",
                           fields=EMPLOYEE_FIELDS, values=e, record_id=eid)

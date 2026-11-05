@@ -92,6 +92,14 @@ window.AISB.configBase = (function () {
     { id: "Profit", label: "利益", hasDetail: false, cols: ["ProductName", "Sales", "Cost", "Gross", "GrossRate"] },
   ];
 
+  // ロールの入口を持つ導入先では、サーバーが window.AISB_DEMO_ROLE で表示できるパネルを渡す。
+  // 表示の制御であり、API 側の権限制御ではない。
+  function panelsForRole(panels) {
+    const allowed = window.AISB_DEMO_ROLE && window.AISB_DEMO_ROLE.panels;
+    if (!allowed || allowed.includes("*")) return panels;
+    return panels.map((p) => ({ ...p, enabled: p.enabled && allowed.includes(p.id) }));
+  }
+
   // chrome.storage.local.get() 相当。埋め込み版はコンテキスト無効化という概念が
   // 存在しない(ページと運命を共にする通常のスクリプト)ため、常に値を返す。
   async function loadContext() {
@@ -100,7 +108,7 @@ window.AISB.configBase = (function () {
     // コード管理の設定なので、保存済みプロファイルの他のフィールド(sidebarWidthPx等)は
     // 保持しつつ panels だけは常にDEFAULT_PROFILE側を優先する(chrome-extension版の
     // shared/config-base.js と同じ理由)。
-    const profile = { ...DEFAULT_PROFILE, ...(stored || {}), panels: DEFAULT_PROFILE.panels };
+    const profile = { ...DEFAULT_PROFILE, ...(stored || {}), panels: panelsForRole(DEFAULT_PROFILE.panels) };
     const sidebarOpen = loadJSON(STORAGE_KEY_OPEN, true);
     const API_BASE = ORIGIN_API_MAP[location.origin] || profile.apiBaseUrl;
     // サブパス公開時にmiddleware.pyが埋め込むwindow.AISB_BASE_PATHを補う

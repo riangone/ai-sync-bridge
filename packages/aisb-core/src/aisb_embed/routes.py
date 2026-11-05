@@ -36,7 +36,7 @@ class ToggleBody(BaseModel):
     enabled: bool
 
 
-def _is_local_direct(request: Request) -> bool:
+def is_local_direct(request: Request) -> bool:
     if any(h in request.headers for h in _PROXY_HEADERS):
         return False
     try:
@@ -62,7 +62,7 @@ def status():
 
 @router.post("/toggle")
 def toggle(body: ToggleBody, request: Request):
-    if not (_is_local_direct(request) or _has_admin_key(request)):
+    if not (is_local_direct(request) or _has_admin_key(request)):
         raise HTTPException(status_code=403, detail="forbidden")
     config.set_enabled(body.enabled)
     return status()
@@ -75,7 +75,7 @@ def admin_page(request: Request):
     # 常にX-Forwarded-Prefixを踏まえた絶対パスで自分自身を叩く。
     prefix = request.headers.get("x-forwarded-prefix", "")
     # ブラウザのボタンはキーを送れないので、キーの有無にかかわらず表示するのはサーバー自身からのアクセスだけ
-    can_toggle = _is_local_direct(request)
+    can_toggle = is_local_direct(request)
     locked = config.env_override() is not None
     enabled = config.is_enabled()
     lock_notice = (

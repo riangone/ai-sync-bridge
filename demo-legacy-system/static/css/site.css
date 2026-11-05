@@ -752,3 +752,40 @@ button, input[type=submit] {
     text-align: center;
     padding: 8px;
 }
+
+/* ロール選択とロール表示 */
+#role-bar {
+    background: #fff8e1;
+    border-bottom: 1px solid #d9c98a;
+    padding: 4px 16px;
+    font-size: 12px;
+}
+#role-bar a { color: #17497e; margin-left: 8px; }
+.role-bar-note { color: #6b6250; margin-left: 12px; }
+.role-lead { font-size: 13px; line-height: 1.6; }
+.role-caution { color: #8a4b00; }
+.role-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+.role-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+    padding: 12px;
+    background: #f5f7fa;
+    border: 1px solid #99a3b0;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+}
+.role-card:hover, .role-card:focus-visible { background: #e6effa; border-color: #2a78d6; }
+.role-card-current { border: 2px solid #2a78d6; }
+.role-card-title { font-size: 15px; font-weight: bold; color: #17497e; }
+.role-card-note { font-size: 12px; color: #555; }
+.role-card-desc { font-size: 13px; line-height: 1.5; }
+.role-card-screens { font-size: 12px; color: #444; line-height: 1.5; }
