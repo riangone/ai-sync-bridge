@@ -674,23 +674,23 @@
   <!-- 9. 業務ドメインの出し分け -->
   <section class="slide" id="s9">
     <div class="slide-inner">
-      <div class="eyebrow">08 ― 5つの業務デモを1つのコードで</div>
-      <h2>同じパネルが、業種ごとに語彙を切り替える。</h2>
-      <p class="lead">パネルは <span class="code-chip">ctx.INSTANCE</span>(erp / dealer / realestate / koseki / nenkin)を見て、表示ラベルやAI検索の例文を出し分けます。バックエンドはデモごとに別プロセス・別データベースです。</p>
+      <div class="eyebrow">08 ― 業種ごとに差し替わる部分</div>
+      <h2>業務の語彙だけを差し替え、本体は1本のまま。</h2>
+      <p class="lead">パネル本体・検索・権限判定は業種に依存しません。差し替わるのは「表示ラベルやAI検索の例文」と「データの形」だけです。デモは製造業ERPの1本で公開しています。</p>
       <div class="diagram">
         <div class="node">
-          <h5>ERPインスタンス</h5>
-          <p>顧客・受注・仕入・売掛買掛など<br>製造業向けの語彙・データ</p>
+          <h5>業種ごとの語彙・データ</h5>
+          <p>顧客・受注・仕入・売掛買掛など<br>業務帳票の呼び方と項目<br>(デモは製造業ERP)</p>
         </div>
         <div class="conn">⇔</div>
         <div class="node core">
           <h5>共通のパネルコード</h5>
-          <p>ctx.INSTANCE で表示・例文を分岐<br>本体ロジックは1本化</p>
+          <p>表示・例文・検索・権限を担当<br>本体ロジックは1本化</p>
         </div>
         <div class="conn">⇔</div>
         <div class="node">
-          <h5>DMSインスタンス</h5>
-          <p>車両在庫・整備/車検・仕入先など<br>自動車販売向けの語彙・データ<br>(ほかに不動産仲介・自治体窓口・年金相談)</p>
+          <h5>接続アダプタ</h5>
+          <p>HTTP API / CSV・ファイル / RDB<br>導入先ごとに YAML で定義</p>
         </div>
       </div>
     </div>

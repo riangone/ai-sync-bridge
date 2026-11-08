@@ -17,8 +17,9 @@
 | `ai-api-server/app/bridge/` | Connector、差分同期、ACL、検索、権限内 RAG、監査ログ |
 | `packages/aisb-core/` | サイドパネルの共通コードと、組込み用ミドルウェア |
 | `chrome-extension/` | Chrome 拡張版のサイドパネル |
-| `demo-legacy-system*/` | 模擬の業務システム(ERP、ディーラー、不動産仲介、自治体窓口、年金相談) |
-| `landing/` | デモ選択ページとアーキテクチャ資料 |
+| `demo-legacy-system/` | 模擬の業務システム。公開デモは製造業 ERP の1本のみ |
+| `demo-legacy-system-{dealer,realestate,koseki,nenkin}/` | 撤退した業種デモ。pm2・Caddy・landing から外し、git タグ `demo-frozen` で凍結している(開発はしない) |
+| `landing/` | デモの入口ページとアーキテクチャ資料 |
 | `presentation/` | 仕様書と提案資料 |
 | `ops/` | OpenCode サーバーのサンドボックス設定 |
 
@@ -54,7 +55,7 @@ ERP デモだけを動かす場合:
 
 公開経路(リバースプロキシ経由)の ERP デモは、最初にロールを選んで入ります。パスワードはなく、認証ではありません。画面と JSON API の権限は `demo-legacy-system/demo_roles.py` が `aisb_profile/bridge.yaml` の定義に従って判定します。権限制御に未対応の AI パネルは管理者ロールにだけ表示します(表示の制御のみで、API 側は制限していません)。ロール選択と権限制御があるのは ERP デモだけです。
 
-全デモは pm2 で起動します。先に各デモの仮想環境を用意してください。
+デモは pm2 で起動します(`ecosystem.config.js` に載っているのは ERP のみ)。データを毎日初期状態へ戻す `ops/reset-demo-data.sh` も ERP だけを対象にしています。
 
 ```bash
 pm2 start ecosystem.config.js

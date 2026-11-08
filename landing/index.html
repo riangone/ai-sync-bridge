@@ -16,11 +16,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI-Sync Bridge デモ選択</title>
-<meta name="description" content="AI-Sync Bridge デモ：既存の業務Web画面を改変せず、Chrome拡張でAIサイドパネルを後付けし、自然文検索・入力支援・要約を追加します。製造業ERPなど5つの業務デモで試せます。">
+<meta name="description" content="AI-Sync Bridge デモ：既存の業務Web画面を改変せず、Chrome拡張でAIサイドパネルを後付けし、自然文検索・入力支援・要約を追加します。製造業ERPを題材にしたデモで試せます。">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="0101.click">
 <meta property="og:title" content="AI-Sync Bridge デモ選択">
-<meta property="og:description" content="AI-Sync Bridge デモ：既存の業務Web画面を改変せず、Chrome拡張でAIサイドパネルを後付けし、自然文検索・入力支援・要約を追加します。製造業ERPなど5つの業務デモで試せます。">
+<meta property="og:description" content="AI-Sync Bridge デモ：既存の業務Web画面を改変せず、Chrome拡張でAIサイドパネルを後付けし、自然文検索・入力支援・要約を追加します。製造業ERPを題材にしたデモで試せます。">
 <meta property="og:url" content="https://aisync.0101.click/">
 <meta property="og:locale" content="ja_JP">
 <style>
@@ -284,6 +284,7 @@
     color: #fff;
     flex: 1;
   }
+  .cards { max-width: 640px; margin: 0 auto; }
   .btn-primary:hover { background: var(--blue-dark); }
   .btn-secondary {
     background: #fff;
@@ -315,7 +316,7 @@
     <h1>レガシー基幹システムはそのまま。<br>AIサイドパネルだけを後付けする。</h1>
     <p>
       既存のWeb画面を改変せず、🤖ボタンから自然文検索・入力支援・要約を追加する
-      「AI-Sync Bridge」。5つの業務デモで試せます。
+      「AI-Sync Bridge」。製造業の基幹システムを題材にしたデモで試せます。
     </p>
   </div>
 
@@ -384,7 +385,7 @@
       </div>
     </div>
 
-    <p class="section-title">デモ環境を選択してください</p>
+    <p class="section-title">デモ環境</p>
 
     <div class="cards">
 
@@ -396,6 +397,7 @@
           <li><b>業務データ:</b> 顧客/受注/商品在庫/仕入先/見積/請求/発注/物件 など13エンティティ</li>
           <li><b>AI検索の例:</b> 「与信限度額が100万円を超える顧客を、限度額の高い順に5件」</li>
           <li><b>専用機能:</b> 会社検索・物件検索(外部情報から登録用データを自動生成)</li>
+          <li><b>権限:</b> 入る前にロール(営業/経理/管理者など)を選び、画面の表示とAI検索の対象範囲が変わります</li>
         </ul>
         <div class="card-actions">
           <a class="btn btn-primary" href="/erp/">ERPデモを開く</a>
@@ -403,71 +405,11 @@
         </div>
       </div>
 
-      <div class="card">
-        <span class="card-tag">LEGACY DMS</span>
-        <h2>自動車ディーラー向け基幹システム</h2>
-        <p class="card-sub">車両在庫・契約・整備/車検・仕入を扱う、BtoC向け自動車販売業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
-        <ul>
-          <li><b>業務データ:</b> 顧客/受注契約/車両在庫/仕入先/整備・車検(ServiceOrder) など13エンティティ</li>
-          <li><b>AI検索の例:</b> 「延滞している請求の金額を顧客区分(法人/個人)別に合計」</li>
-          <li><b>専用機能:</b> 仕入先検索(オークション会場・下取り仲介業者の情報を調べ登録用データを自動生成)</li>
-        </ul>
-        <div class="card-actions">
-          <a class="btn btn-primary" href="/dealer/">DMSデモを開く</a>
-          <a class="btn btn-secondary" href="/dealer/ai-panel">AI機能一覧</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <span class="card-tag">LEGACY 仲介システム</span>
-        <h2>不動産仲介向け基幹システム</h2>
-        <p class="card-sub">物件・内見・契約・売却査定を扱う、不動産仲介業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
-        <ul>
-          <li><b>業務データ:</b> 顧客/契約/物件在庫/協力会社/査定/仲介手数料請求/工事発注/内見予約 など13エンティティ</li>
-          <li><b>AI検索の例:</b> 「募集中の物件を、登録が古い順に5件」</li>
-          <li><b>専用機能:</b> 物件検索・会社検索(外部情報から登録用データを自動生成)</li>
-        </ul>
-        <div class="card-actions">
-          <a class="btn btn-primary" href="/realestate/">仲介デモを開く</a>
-          <a class="btn btn-secondary" href="/realestate/ai-panel">AI機能一覧</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <span class="card-tag">LEGACY 自治体窓口</span>
-        <h2>自治体窓口向け戸籍住民システム</h2>
-        <p class="card-sub">住民・世帯・戸籍・証明書交付申請・来庁受付を扱う、戸籍住民課の窓口業務のデモです。同じパネルが業種に合わせ語彙を出し分けます。</p>
-        <ul>
-          <li><b>業務データ:</b> 住民/世帯/戸籍/証明書交付申請/来庁受付(整理券)/窓口職員/異動履歴 など7エンティティ</li>
-          <li><b>AI検索の例:</b> 「今月の証明書交付申請を、手数料の高い順に5件」</li>
-          <li><b>想定シーン:</b> 紙の交付申請書をOCRで読み取り自動入力、自然文での住民検索、来庁受付の混雑予測</li>
-        </ul>
-        <div class="card-actions">
-          <a class="btn btn-primary" href="/koseki/">窓口デモを開く</a>
-          <a class="btn btn-secondary" href="/koseki/ai-panel">AI機能一覧</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <span class="card-tag">LEGACY 年金相談窓口</span>
-        <h2>年金相談窓口を想定した年金照会端末</h2>
-        <p class="card-sub">被保険者・適用事業所・年金請求(裁定請求)・来所/電話相談受付を扱う、年金相談業務のデモです。実在の機関やそのシステムとは関係ありません。同じパネルが業種に合わせ語彙を出し分けます。</p>
-        <ul>
-          <li><b>業務データ:</b> 被保険者/適用事業所/適用記録/相談員/年金請求(裁定請求)/来所・電話相談受付/資格異動履歴 など7エンティティ</li>
-          <li><b>AI検索の例:</b> 「今月の年金請求を、支給見込額の高い順に5件」</li>
-          <li><b>想定シーン:</b> 紙の裁定請求書をOCRで読み取り自動入力、自然文での被保険者検索、相談受付の混雑予測</li>
-        </ul>
-        <div class="card-actions">
-          <a class="btn btn-primary" href="/nenkin/">年金相談デモを開く</a>
-          <a class="btn btn-secondary" href="/nenkin/ai-panel">AI機能一覧</a>
-        </div>
-      </div>
-
     </div>
 
     <p class="note">
-      いずれもデータは自動生成されたデモ用サンプルであり、実在の企業・個人とは関係ありません。<br>
-      各デモ内の画面右下🤖ボタンから、AIサイドパネルの全機能をいつでも試せます。
+      データは自動生成されたデモ用サンプルであり、実在の企業・個人とは関係ありません。<br>
+      画面右下の🤖ボタンから、AIサイドパネルの全機能をいつでも試せます。
     </p>
 
   </div>

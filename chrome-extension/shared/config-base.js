@@ -55,22 +55,12 @@ window.AISB.configBase = (function () {
     "https://aisync.0101.click": "https://aisync-api.0101.click",
   };
 
-  // このコピーが対象とする業態("erp"|"dealer")。埋め込み版(aisb_embed/shared/config-base.js)
-  // ではアプリごとに物理コピーが分かれるため単純ハードコードだが、拡張版は同一コードが
-  // manifest.json content_scripts.matches に列挙したオリジンへ注入される仕組みなので、
-  // ORIGIN_API_MAPと同じ考え方でorigin別に解決する(panel-nlsql.js/panel-web-search.js/
-  // panel-conv-input.js が ctx.INSTANCE で業態別に中身を出し分ける、その唯一の分岐点)。
-  // 現時点の manifest.json matches / host_permissions はERP側オリジン
-  // (localhost:5010 / aisync.0101.click)のみで、dealer側オリジンは未登録のため、
-  // このマップは実質常に空振りし INSTANCE は "erp" に解決される。dealer側のレガシー画面
-  // にもこの拡張を注入したくなった場合は、ここへのエントリ追加に加えて manifest.json の
-  // matches / host_permissions も更新すること(そちらは新規オリジンへのアクセス許可を
-  // 増やす変更になるため、この分岐追加だけでは効果を持たない)。
-  const ORIGIN_INSTANCE_MAP = {
-    "http://localhost:5020": "dealer",
-    "https://aisync-dealer.0101.click": "dealer",
-  };
-  const INSTANCE = ORIGIN_INSTANCE_MAP[location.origin] || "erp";
+  // 公開する業態は ERP のみ(2026-11 に dealer を撤去)。埋め込み版
+  // (aisb_embed/shared/config-base.js)も同じく "erp" 固定。
+  // ctx.INSTANCE は panel-nlsql.js/panel-web-search.js/panel-conv-input.js が
+  // 業態別の中身を出し分ける唯一の分岐点なので、業態を再び増やすときは
+  // ここ・manifest.json の matches / host_permissions・各デモの配置を一緒に直すこと。
+  const INSTANCE = "erp";
 
   // レガシーERP 6.3章 全13業務エンティティ。id はレガシー側ルーティング
   // (/{entity}/List, /{entity}/Detail/{id}) およびJSON API (/api/{entity}/list,

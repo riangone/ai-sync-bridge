@@ -13,12 +13,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 
 # pm2名 ディレクトリ DBファイル デモのポート APIのポート
+# 公開しているデモはERPのみ。他業種のデモは pm2 / Caddy から外しており、ここにも載せない。
 DEMOS=(
   "erp demo-legacy-system erp.db 5010 5011"
-  "dealer demo-legacy-system-dealer dealer.db 5020 5021"
-  "realestate demo-legacy-system-realestate realestate.db 5030 5031"
-  "koseki demo-legacy-system-koseki koseki.db 5040 5041"
-  "nenkin demo-legacy-system-nenkin nenkin.db 5050 5051"
 )
 BRIDGE_API_PORT=5011
 BRIDGE_DB="$ROOT/ai-api-server/data/bridge_erp.db"

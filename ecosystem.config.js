@@ -3,12 +3,11 @@
 const path = require("path");
 const ROOT = __dirname;
 
+// 公開するデモはERP 1本のみ(2026-11)。dealer / realestate / koseki / nenkin は
+// 一時的に公開を止めたのではなく、スコープを絞るために撤去した。コードは
+// demo-legacy-system-* に残っているが、pm2 定義・Caddy・landing からは外している。
 const demos = [
-  { name: "erp",        dir: "demo-legacy-system",            port: 5010 },
-  { name: "dealer",     dir: "demo-legacy-system-dealer",     port: 5020 },
-  { name: "realestate", dir: "demo-legacy-system-realestate", port: 5030 },
-  { name: "koseki",     dir: "demo-legacy-system-koseki",     port: 5040 },
-  { name: "nenkin",     dir: "demo-legacy-system-nenkin",     port: 5050 },
+  { name: "erp", dir: "demo-legacy-system", port: 5010 },
 ];
 
 const apps = [
