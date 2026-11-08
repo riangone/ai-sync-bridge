@@ -135,6 +135,42 @@ class BridgeStore:
     def delete_doc(self, doc_id: int) -> None:
         self.conn.execute("DELETE FROM docs WHERE doc_id=?", (doc_id,))
 
+    # ---- embedder migration(埋め込みモデル切り替え後の追いつき)----
+    def update_vector(self, doc_id: int, embedder: str, vector: list[float]) -> None:
+        with self.lock:
+            self.conn.execute("UPDATE docs SET embedder=?, vector=?, synced_at=? WHERE doc_id=?",
+                              (embedder, json.dumps(vector), time.time(), doc_id))
+
+    def get_doc(self, doc_id: int) -> DocRecord | None:
+        with self.lock:
+            r = self.conn.execute("SELECT * FROM docs WHERE doc_id=?", (doc_id,)).fetchone()
+        return self._row_to_doc(r) if r else None
+
+    def docs_with_other_embedder(self, embedder: str) -> list[DocRecord]:
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM docs WHERE embedder != ? ORDER BY doc_id",
+                                     (embedder,)).fetchall()
+        return [self._row_to_doc(r) for r in rows]
+
+    def count_other_embedder(self, embedder: str) -> int:
+        with self.lock:
+            return self.conn.execute("SELECT COUNT(*) FROM docs WHERE embedder != ?", (embedder,)).fetchone()[0]
+
+    # ---- stats(運用の実感: /status に出す)----
+    def size_bytes(self) -> int | None:
+        """DB ファイル本体のサイズ。WAL 分は含まない(別ファイルにあり、チェックポイントで吸収される)。"""
+        path = self.conn.execute("PRAGMA database_list").fetchone()[2]
+        try:
+            return os.path.getsize(path) if path else None
+        except OSError:
+            return None
+
+    def vector_bytes(self) -> int | None:
+        """埋め込みベクトル列(text の JSON)の合計バイト数。DB 肥大化の主因を量る。"""
+        with self.lock:
+            r = self.conn.execute("SELECT SUM(LENGTH(vector)) FROM docs").fetchone()[0]
+        return int(r or 0)
+
     def count_docs(self) -> dict[str, int]:
         with self.lock:
             rows = self.conn.execute("SELECT source || '/' || entity AS k, COUNT(*) AS n FROM docs GROUP BY k")

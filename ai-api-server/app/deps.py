@@ -73,6 +73,8 @@ def get_bridge() -> BridgeRuntime:
     return BridgeRuntime.from_file(
         s.bridge_profile,
         embed=ai.embed,
+        # 非対称埋め込みのプロバイダだけ、検索語用の関数を持つ(無ければ文書と同じ)
+        embed_query=getattr(ai, "embed_query", None),
         embedder_id=ai.embedder_id,
         complete=ai.complete,
         default_store_path=s.bridge_db_path,

@@ -127,9 +127,16 @@ class OpenAIProvider(AiProvider):
                 return await MockProvider().embed(text)
 
 
+_GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+
 class GeminiProvider(AiProvider):
     name = "gemini"
-    embedder_id = "ngram-hash-64"  # embed() は MockProvider へ委譲している
+    # 埋め込みは実モデル。ID を擬似埋め込み(ngram-hash)と分けることで、切り替えた時点で
+    # 全文書が再埋め込み対象になる(sync_engine が embedder_id の不一致を見る)。
+    embedder_id = "gemini:gemini-embedding-2@768"
+    _EMBED_MODEL = "gemini-embedding-2"
+    _EMBED_DIM = 768
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -152,8 +159,46 @@ class GeminiProvider(AiProvider):
             except Exception as exc:
                 raise AIProviderError(self.name, exc) from exc
 
-    async def embed(self, text: str) -> list[float]:
-        return await MockProvider().embed(text)
+    async def embed_query(self, text: str) -> list[float]:
+        return await self.embed(text, kind="query")
+
+    async def embed(self, text: str, kind: str = "doc") -> list[float]:
+        """埋め込みの失敗を擬似埋め込みで隠さない(fail loud)。
+
+        kind: "doc"(文書の索引) or "query"(検索語)。Gemini Embedding 2 は task_type を
+        受け付けないため、入力の体裁で非対称検索の向きを伝える。
+
+        以前は MockProvider の n-gram ハッシュに黙って委譲していたため、埋め込みモデルを
+        変えた直後もエラーが出ずに「静かに精度が落ちる」だけだった。gemini への委譲中は
+        AIProviderError が同期の失敗として上がる(sync_engine は該当エンティティを失敗扱いし、
+        既存の文書とベクトルは書き換えない)。
+        """
+        # Gemini Embedding 2 は task_type を受け付けず、非対称検索では入力の体裁で向きを示す:
+        #   query:    "task: search result | query: {本文}"
+        #   document: "title: {タイトル} | text: {本文}"
+        # 呼び出し元(ベクトル索引の既存の約束)は "タイトル 本文" を連結して渡すので、
+        # 文書側は title: none にまとめる。全件で同じ接頭辞にならないよう本文はそのまま残す。
+        if kind == "query":
+            payload_text = f"task: search result | query: {text}"
+        else:
+            payload_text = f"title: none | text: {text}"
+        async with httpx.AsyncClient(timeout=30) as client:
+            try:
+                resp = await client.post(
+                    f"{_GEMINI_BASE}/models/{self._EMBED_MODEL}:embedContent",
+                    headers={"x-goog-api-key": self.api_key},
+                    json={"content": {"parts": [{"text": payload_text}]},
+                          "output_dimensionality": self._EMBED_DIM},
+                )
+                resp.raise_for_status()
+                values = resp.json()["embedding"]["values"]
+            except Exception as exc:
+                raise AIProviderError(self.name, exc) from exc
+        if not values:
+            raise AIProviderError(self.name, RuntimeError("空の埋め込みが返されました"))
+        # 3072 次元以外は自動正規化されるが、次元を自前で選ぶ可能性に備えて必ず正規化する
+        norm = sum(v * v for v in values) ** 0.5 or 1.0
+        return [v / norm for v in values]
 
 
 class OpenCodeProvider(AiProvider):

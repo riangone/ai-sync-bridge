@@ -29,6 +29,7 @@ class EntitySyncStats:
     deleted: int = 0
     skipped_invalid: int = 0
     source_unchanged: bool = False
+    pending_embeddings: int = 0   # このエンティティで再埋め込みが必要な行数(進捗の見積り用)
     error: str | None = None
     elapsed_ms: int = 0
     upserted_doc_ids: list[int] = field(default_factory=list, repr=False)
@@ -84,6 +85,7 @@ class SyncEngine:
                 if prev and prev[1] == h and prev[2] == self.embedder_id:
                     st.unchanged += 1
                     continue
+                st.pending_embeddings += 1
                 vec = await self._embed(f"{title} {body}")
                 pending.append((pk, title, body, h, acl, vec, prev[1] if prev else None))
 

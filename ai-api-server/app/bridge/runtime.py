@@ -96,7 +96,7 @@ def _entity_from_cfg(e: dict) -> EntitySpec:
 class BridgeRuntime:
     def __init__(self, profile: dict, *, embed, embedder_id: str, default_store_path: str,
                  vector_backend: str = "brute-force", profile_path: str | None = None,
-                 complete=None):
+                 complete=None, embed_query=None):
         profile = _expand_env(profile or {})
         self.profile_path = profile_path
         self.store = BridgeStore((profile.get("store") or {}).get("path") or default_store_path)
@@ -114,6 +114,13 @@ class BridgeRuntime:
         )
         self.sync_interval = float((profile.get("sync") or {}).get("interval_sec", 0) or 0)
         self._embed = embed
+        # 検索語用の埋め込み。非対称埋め込み(Gemini Embedding 2 等)だけ embed_query を持つ。
+        # 既定を embed にすると、同期側の embed が "doc" 体裁で全文書を埋めた後、検索語も
+        # "doc" 体裁になり非対称の利点が消える。embed_query が無い場合(擬似埋め込み等)のみ
+        # 文書と同じ処理を使う。
+        if embed_query is None and hasattr(embed, "__self__") and hasattr(getattr(embed, "__self__", None), "embed_query"):
+            embed_query = embed.__self__.embed_query
+        self._embed_query = embed_query or embed
         self.engine = SyncEngine(self.store, self.audit, embed, embedder_id)
         rcfg = profile.get("retrieval") or {}
         pseudo = _is_pseudo_embedder(embedder_id)
@@ -194,7 +201,9 @@ class BridgeRuntime:
     async def _retrieve(self, principal: Principal, query: str, top_k: int,
                         entities: list[str] | None, purpose: str):
         """ACL 前置フィルタ付き検索 + retrieval 監査。返す文書はすべて principal が閲覧可能。"""
-        qvec = await self._embed(query)
+        # 検索語の埋め込み。非対称埋め込み(Gemini Embedding 2 等)では文書と体裁を変えるため、
+        # 別の関数を渡せるようにしている。省略時は文書と同じ(擬似埋め込み等はこれで十分)。
+        qvec = await self._embed_query(query)
         hits, filtered, strategy = self.retriever.search(principal, qvec, top_k, set(entities) if entities else None, query=query)
         detail = {
             "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
@@ -237,15 +246,66 @@ class BridgeRuntime:
     def reset_conversation(self, principal: Principal, session_id: str) -> None:
         self.answerer.history.clear(self.answerer.history.key(principal, session_id))
 
+    # ---------------- embedder migration ----------------
+    async def reembed_stale(self, *, concurrency: int = 4, abort_after: int = 3) -> dict:
+        """埋め込みモデルを切り替えた後の追いつき(バックフィル)。
+
+        前のモデルのベクトルが混ざった索引は、エラーにならず「それらしいが外れる」検索になる。
+        内容ハッシュが同じでも embedder_id が違う行を再埋め込みして索引を作り直す。
+        失敗した文書は書き換えない(古いベクトルのまま残し、次回起動で再試行)。
+        連続 abort_after 件失敗したら打ち切る(キー不正・モデル退役などで全件呼ばない)。
+        """
+        stale = self.store.docs_with_other_embedder(self.engine.embedder_id)
+        if not stale:
+            return {"stale": 0, "upserted": 0, "errors": 0, "aborted": False}
+        sem = asyncio.Semaphore(max(1, concurrency))
+        stop = asyncio.Event()
+        stats = {"upserted": 0, "errors": 0}
+        lock = asyncio.Lock()
+        consecutive = 0
+
+        async def one(d):
+            nonlocal consecutive
+            async with sem:
+                if stop.is_set():
+                    return
+                try:
+                    vec = await self.engine._embed(f"{d.title} {d.body}")  # engine 側の実体を呼ぶ
+                except Exception:
+                    async with lock:
+                        stats["errors"] += 1
+                        consecutive += 1
+                        if consecutive >= abort_after:
+                            stop.set()
+                    return
+                async with lock:
+                    consecutive = 0
+                self.store.update_vector(d.doc_id, self.engine.embedder_id, vec)
+                self.retriever.upsert(self.store.get_doc(d.doc_id))
+                async with lock:
+                    stats["upserted"] += 1
+
+        await asyncio.gather(*(one(d) for d in stale))
+        remaining = len(self.store.docs_with_other_embedder(self.engine.embedder_id))
+        self.audit.append("embedder.backfill", "system:startup",
+                          detail={"embedder": self.engine.embedder_id, "stale": len(stale),
+                                  "upserted": stats["upserted"], "errors": stats["errors"],
+                                  "remaining": remaining})
+        return {"stale": len(stale), "remaining": remaining, "aborted": stop.is_set(), **stats}
+
     # ---------------- status ----------------
     def status(self) -> dict:
         return {
             "profile": self.profile_path,
             "auth_mode": self.resolver.mode,
             "embedder": self.engine.embedder_id,
+            "embedder_mixed": self.store.count_other_embedder(self.engine.embedder_id),
             "answer_enabled": self.answerer.enabled,
             "vector_backend": self.retriever.backend_name,
             "indexed_docs": self.retriever.size(),
+            # 運用の実感: 導入先の DB がどれだけ育つか・再埋め込みが何件残っているか
+            "store_bytes": self.store.size_bytes(),
+            "vector_bytes": self.store.vector_bytes(),
             "docs_by_entity": self.store.count_docs(),
             "sync_interval_sec": self.sync_interval,
             "last_sync": {k: v for k, v in (self.last_sync or {}).items() if k != "entities"} or None,

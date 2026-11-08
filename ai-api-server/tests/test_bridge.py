@@ -344,6 +344,145 @@ def test_profile_change_rereads_unchanged_source():
         assert all(e["source_unchanged"] for e in again["entities"]), again
 
 
+def test_embed_failure_blocks_sync_instead_of_hashing_silently():
+    """埋め込みの失敗で擬似埋め込みに黙って落ちると、埋め込みモデルを変えた直後に
+    混在ベクトルができて「静かに精度が落ちる」。同期は失敗し、既存ベクトルは書き換えない。"""
+    from app.services.ai_client import AIProviderError
+
+    with tempfile.TemporaryDirectory() as tmp:
+        profile = make_env(tmp)
+        first = build(profile)
+        run(first.sync("admin"))  # 正常に一度取り込む(store は同一ファイルなので rt にも反映される)
+
+        class Down:
+            async def __call__(self, text):
+                raise AIProviderError("gemini", RuntimeError("503"))
+
+        # ① 本文は変えないが埋め込みモデルが変わった(ID が違う)→ 再埋め込みが必要になり失敗する
+        rt = build(profile)
+        rt.engine._embed = Down()
+        rt.engine.embedder_id = "gemini:gemini-embedding-001"
+        res = run(rt.sync("admin"))
+        # ファイル系は API 側の snapshot が未変更なら読み直さない。埋め込み失敗を観測できるのは
+        # 毎回読む SQL 側なので、そこが失敗していれば「黙って擬似埋め込みに落ちる」なし。
+        assert {e["entity"]: e for e in res["entities"]}["Emp"]["error"], res
+        assert res["errors"] > 0
+
+        # ② 本文を変えた場合も、失敗した行は書き換えない(半端な状態を作らない)
+        with open(os.path.join(tmp, "items.csv"), "wb") as f:
+            f.write("code,name\nP1,ベアリング(改)\nP2,配管部材\n".encode("cp932"))
+        rt2 = build(profile)
+        rt2.engine._embed = Down()
+        res2 = run(rt2.sync("admin"))
+        assert {e["entity"]: e for e in res2["entities"] if e["source"] == "files"}["Item"]["error"], res2
+        p1 = next(d for d in rt2.store.all_docs() if d.pk == "P1")
+        assert "ベアリング(改)" not in p1.body
+
+
+def test_embedder_switch_backfills_all_stale_vectors():
+    """埋め込みモデルを切り替えたら、内容が未変更でも全件を新モデルで作り直す。
+    (混在した索引はエラーにならず、静かに検索が外れるため)"""
+    with tempfile.TemporaryDirectory() as tmp:
+        profile = make_env(tmp)
+        old = build(profile)
+        run(old.sync("admin"))
+
+        # 新しいプロバイダ(実埋め込みを模す)で起動した瞬間: 全件が「別モデル」になる
+        rt = BridgeRuntime(profile, embed=counting_embed, embedder_id="openai:text-embedding-3-small",
+                           default_store_path=profile["store"]["path"])
+        assert rt.store.count_other_embedder(rt.engine.embedder_id) > 0
+        assert rt.status()["embedder_mixed"] > 0
+        res = run(rt.reembed_stale(concurrency=2))
+        assert res["errors"] == 0 and res["remaining"] == 0, res
+        assert rt.store.count_other_embedder(rt.engine.embedder_id) == 0
+        # 監査に残る(誰が何件移したか)
+        assert any(it["kind"] == "embedder.backfill" for it in rt.audit.query(limit=50))
+
+        # 埋め込みが壊れている時は打ち切る(キー不正・モデル退役で全件叩かない)
+        rt2 = build(profile)  # 2つの store は同じファイルを共有(sqlite は別接続)
+        run(rt2.sync("admin"))  # 先に古いモデルで索引を満たす(未変更行は再埋め込みされない)
+        rt2.engine.embedder_id = "gemini:gemini-embedding-2@768"
+
+        class Down:
+            async def __call__(self, text):
+                raise RuntimeError("503")
+
+        rt2.engine._embed = Down()
+        res2 = run(rt2.reembed_stale(concurrency=2, abort_after=3))
+        assert res2["aborted"] and res2["errors"] == 3, res2
+        assert res2["remaining"] == rt2.store.count_other_embedder(rt2.engine.embedder_id)
+
+
+class _Patch:
+    """pytest の monkeypatch の最小代替(このファイルは pytest 無しでも直接実行できる)。"""
+
+    def __init__(self):
+        self._undo = []
+
+    def setattr(self, obj, name, value):
+        self._undo.append((obj, name, getattr(obj, name)))
+        setattr(obj, name, value)
+
+    def undo(self):
+        for obj, name, old in reversed(self._undo):
+            setattr(obj, name, old)
+
+
+def test_gemini_embed_uses_real_model_and_fails_loud(monkeypatch=None):
+    """Gemini は擬似埋め込みへ委譲せず実モデルを呼ぶ。失敗は同期失敗として上がる。"""
+    import httpx
+    from app.services.ai_client import AIProviderError, GeminiProvider
+
+    own = monkeypatch is None
+    monkeypatch = monkeypatch or _Patch()
+    try:
+        _assert_gemini_behaviour(httpx, AIProviderError, GeminiProvider, monkeypatch)
+    finally:
+        if own:
+            monkeypatch.undo()
+
+
+def _assert_gemini_behaviour(httpx, AIProviderError, GeminiProvider, monkeypatch):
+
+    p = GeminiProvider("dummy-key")
+    assert not p.embedder_id.startswith("ngram-hash")
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+        body = json.loads(request.content)
+        seen["url"] = str(request.url)
+        seen["body"] = body
+        seen["key"] = request.headers.get("x-goog-api-key")
+        return httpx.Response(200, json={"embedding": {"values": [3.0, 4.0]}})
+
+    real_client = httpx.AsyncClient
+
+    def fake_client(*a, **k):
+        k["transport"] = httpx.MockTransport(handler)
+        return real_client(*a, **k)
+
+    monkeypatch.setattr(httpx, "AsyncClient", fake_client)
+    vec = run(p.embed("山田商事 取引先"))
+    assert seen["url"].endswith("/models/gemini-embedding-2:embedContent")
+    assert seen["body"]["output_dimensionality"] == 768
+    assert seen["body"]["content"]["parts"][0]["text"].startswith("title:")
+    assert seen["key"] == "dummy-key"
+    assert abs(sum(v * v for v in vec) - 1.0) < 1e-9  # 正規化済み
+    q = run(p.embed_query("支払期限が過ぎた請求"))
+    assert seen["body"]["content"]["parts"][0]["text"].startswith("task: search result | query:")
+
+    monkeypatch.setattr(httpx, "AsyncClient",
+                        lambda *a, **k: real_client(transport=httpx.MockTransport(
+                            lambda r: httpx.Response(404, json={"error": {"code": 404}}))))
+    try:
+        run(p.embed("x"))
+    except AIProviderError:
+        pass
+    else:
+        raise AssertionError("埋め込み失敗が例外にならない(擬似埋め込みで隠れている)")
+
+
 def test_entity_label_is_searchable_and_pseudo_embedding_is_downweighted():
     """業務での呼び方(label)で検索でき、擬似埋め込みの順位が BM25 の一致を押しのけない。"""
     from app.bridge.runtime import _default_vector_weight

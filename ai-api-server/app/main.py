@@ -43,6 +43,11 @@ async def _start_bridge_scheduler():
     from app.deps import get_bridge
 
     bridge = get_bridge()
+    # 埋め込みモデルを切り替えた直後は、前のモデルのベクトルが混ざって「静かに外れる」検索に
+    # なる。起動時に追いつかせる(非同期なので起動自体は待たせない。待ち件数は /status の
+    # embedder_mixed で見える)。
+    if bridge.store.count_other_embedder(bridge.engine.embedder_id):
+        app.state.embedder_backfill = asyncio.create_task(bridge.reembed_stale())
     if bridge.sync_interval > 0:
         app.state.bridge_task = asyncio.create_task(bridge.run_periodic())
 
