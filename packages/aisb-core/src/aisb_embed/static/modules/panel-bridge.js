@@ -5,6 +5,8 @@
 //   2. 差分同期: 2回目以降は変更分だけを再ベクトル化する(unchanged が大半になる)
 //   3. 全検索・全同期がハッシュチェーン付き監査ログに残り、改ざん検証できる
 //   4. AI回答(RAG)も同じ権限の範囲内でしか答えない(/api/bridge/ask)。根拠文書と監査IDを表示
+//   5. A2A 連携(/api/a2a/demo/*): 別システムの Agent へ同じ質問を委譲し、相手の権限で答えた結論だけを
+//      並べる。委譲できるかは導入先の方針(peers[].allowed_roles)で決まり、ロールごとに結果が変わる
 //
 // 主体の切り替えはサーバー側で行う(/api/bridge/demo/*)。ブラウザに API キーは置かない。
 // 主体の一覧は導入先 bridge.yaml の demo.personas から取得する。
@@ -29,7 +31,8 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
       <input id="aisb-bridge-q" type="text" value="${esc(SAMPLE_QUERIES[0] || "")}" placeholder="例: 経理部 課長" />
       ${ME
         ? `<button id="aisb-bridge-self-run">検索</button>
-           <button id="aisb-bridge-self-ask" title="現在のロールの権限でAIに回答させる">AI回答</button>`
+           <button id="aisb-bridge-self-ask" title="現在のロールの権限でAIに回答させる">AI回答</button>
+           <button id="aisb-bridge-a2a" style="display:none" title="連携先システムの Agent にも A2A で問い合わせる">A2A連携回答</button>`
         : ""}
       ${ME ? "" : `<button id="aisb-bridge-run">比較検索</button>
       <button id="aisb-bridge-ask" title="同じ質問を各利用者の権限でAIに回答させる">AI回答を比較</button>`}
@@ -196,6 +199,58 @@ window.AISB.panels.bridge = function renderBridgePanel(el, ctx) {
     } catch (e) {
       out.textContent = `エラー: ${e.message}`;
     }
+  }
+
+  // A2A 連携: 自システムの回答と、連携先 Agent が自分の権限で答えた結論を並べる
+  let a2aPeers = [];
+  async function a2aAsk() {
+    const q = $("#aisb-bridge-q").value.trim();
+    const out = $("#aisb-bridge-results");
+    if (!q) return;
+    const seq = ++resultsSeq;
+    out.innerHTML = `<div class="aisb-card"><b>A2A連携回答</b><div style="color:#888;font-size:12px">自システムと連携先(${esc(a2aPeers.map((p) => p.name.toUpperCase()).join(", "))})に問い合わせ中...</div></div>`;
+    let html;
+    try {
+      const res = await fetch(`${ctx.API_BASE}/api/a2a/demo/federated-ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona: ME.id, question: q }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(`${res.status} ${d.detail || ""}`.trim());
+      const loc = d.local || {};
+      const cites = (loc.citations || []).map((c) => `<li>[${esc(String(c.n))}] ${refLabel(c)}</li>`).join("");
+      html = `<div class="aisb-card"><b>${esc(d.agent || "自システム")}</b> <span style="color:#888">(${esc(ME.label)}の権限)</span>
+          <div style="white-space:pre-wrap;font-size:12px;margin:4px 0">${esc(loc.answer || "(回答なし)")}</div>
+          <div style="font-size:11px;color:#666">権限で除外 ${esc(String(loc.acl_filtered ?? 0))} 件 · 監査ID ${esc(String(loc.audit_id || "").slice(0, 8))}</div>
+          ${cites ? `<ul style="margin:2px 0 0 16px;padding:0;font-size:11px">${cites}</ul>` : ""}</div>`;
+      html += (d.peers || []).map((p) => {
+        const name = `${esc(p.peer.toUpperCase())} Agent <span class="aisb-badge">A2A</span>`;
+        if (p.status === "forbidden") {
+          return `<div class="aisb-card">${name}<div style="font-size:12px;color:#888;margin-top:4px">${esc(ME.label)}のロールは ${esc(p.peer.toUpperCase())} への委譲が許可されていないため、問い合わせていません(委譲の方針: 導入先の bridge.yaml)。</div></div>`;
+        }
+        const ok = p.status === "completed";
+        return `<div class="aisb-card">${name} <span style="font-size:11px;color:${ok ? "#0ca30c" : "#d03b3b"}">${esc(p.status)}</span>
+          <div style="white-space:pre-wrap;font-size:12px;margin:4px 0">${esc(p.answer || p.error || "(応答なし)")}</div>
+          ${ok ? `<div style="font-size:11px;color:#666">相手側で権限により除外 ${esc(String(p.acl_filtered ?? 0))} 件 · 相手側の監査ID ${esc(String(p.audit_id || "").slice(0, 8))}(相手の DB には触れず、結論だけを受け取っています)</div>` : ""}</div>`;
+      }).join("");
+    } catch (e) {
+      html = `<div class="aisb-card"><span style="color:#d03b3b">${esc(e.message)}</span></div>`;
+    }
+    if (seq !== resultsSeq) return;
+    out.innerHTML = html;
+  }
+  if (ME) {
+    fetch(`${ctx.API_BASE}/api/a2a/demo/peers?persona=${encodeURIComponent(ME.id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || !d.enabled || !d.peers || !d.peers.length) return;
+        a2aPeers = d.peers;
+        // 委譲できないロールでもボタンは出し、「方針で委譲しない」結果そのものを見せる
+        $("#aisb-bridge-a2a").style.display = "";
+        $("#aisb-bridge-a2a").addEventListener("click", a2aAsk);
+      })
+      .catch(() => {});
   }
 
   const primarySearch = () => compare(ME ? selfOnly : null);

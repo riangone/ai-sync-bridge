@@ -39,6 +39,7 @@ from dataclasses import dataclass
 
 import yaml
 
+from app.bridge.a2a import A2AAdapter
 from app.bridge.acl import Principal, PrincipalResolver
 from app.bridge.answerer import GroundedAnswerer
 from app.bridge.audit import AuditLog
@@ -141,6 +142,7 @@ class BridgeRuntime:
         self.retriever.load(self.store.all_docs())
         self._sync_lock = asyncio.Lock()
         self.last_sync: dict | None = None
+        self.a2a = A2AAdapter(self, profile.get("a2a"))
 
     @classmethod
     def from_file(cls, path: str | None, **kw) -> "BridgeRuntime":

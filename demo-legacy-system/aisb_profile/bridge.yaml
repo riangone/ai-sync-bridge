@@ -13,6 +13,12 @@ auth:
       user_id: admin
       tenant: acme
       roles: [bridge_admin, sales, accounting, purchasing, hr, "dept:*"]
+    # CRM Agent からの A2A 委譲専用キー: Customer/Order/Product のみ閲覧可。Invoice(請求)やEmployee(人事)は不可。
+    # 値は ops/secrets/a2a.env(ops/gen-a2a-secrets.sh で生成)。未設定なら CRM からの委譲は受け付けない。
+    - key: ${AISB_A2A_CRM_PEER_KEY:-}
+      user_id: a2a_crm_agent
+      tenant: acme
+      roles: [sales]
 
 # 公開デモの入口(/api/bridge/demo/*)。サイドパネルはここの主体をサーバー側で切り替える。
 # 管理者ロールは付与できない。
@@ -87,6 +93,20 @@ answer:
 sync:
   interval_sec: 0   # >0 で定期差分同期。デモはパネルの差分同期ボタンで手動実行
 
+a2a:
+  enabled: true
+  name: "Manufacturing ERP Agent"
+  description: "Handles manufacturing orders, delivery schedules, inventory, and customers. Accounting invoices and HR employee records are strictly ACL-isolated from external peers."
+  url: ${AISB_A2A_PUBLIC_URL:-http://127.0.0.1:5011}
+  organization: "Acme Corp - Manufacturing ERP"
+  peers:
+    - name: crm
+      url: ${AISB_A2A_CRM_URL:-http://127.0.0.1:5021}
+      api_key: ${AISB_A2A_ERP_PEER_KEY:-}
+      description: "CRM Agent for VIP customer tiers and complaint tickets."
+      # 委譲上限: 顧客対応に関わる営業ロールだけが CRM へ問い合わせられる(人事・経理は不可)
+      allowed_roles: [sales]
+
 sources:
   # ① 既存の読み取り専用 HTTP 一覧API(最も侵襲が少ない)
   - name: legacy_api
@@ -104,7 +124,8 @@ sources:
         pk: Id
         title: Id
         label: 受注 注文
-        text: [CustomerName, OrderDate, DeliveryDate, TotalAmount, Status, Notes]
+        # CustomerId は CRM など他システムとの突き合わせキー(A2A で顧客コードから引けるように)
+        text: [CustomerId, CustomerName, OrderDate, DeliveryDate, TotalAmount, Status, Notes]
         acl: {tenant: acme, roles: [sales, accounting]}
       - name: Invoice
         pk: Id

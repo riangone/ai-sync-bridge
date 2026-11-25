@@ -13,12 +13,15 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 
 # pm2名 ディレクトリ DBファイル デモのポート APIのポート
-# 公開しているデモはERPのみ。他業種のデモは pm2 / Caddy から外しており、ここにも載せない。
+# 公開しているデモは ERP + CRM（A2A 連携デモ）。他業種のデモは pm2 / Caddy から外しており、ここにも載せない。
 DEMOS=(
   "erp demo-legacy-system erp.db 5010 5011"
+  "crm demo-legacy-system-crm crm.db 5020 5021"
 )
-BRIDGE_API_PORT=5011
-BRIDGE_DB="$ROOT/ai-api-server/data/bridge_erp.db"
+BRIDGE_TARGETS=(
+  "erp 5011 $ROOT/ai-api-server/data/bridge_erp.db"
+  "crm 5021 $ROOT/ai-api-server/data/bridge_crm.db"
+)
 
 failures=0
 log() { echo "$(date '+%F %T %z') $*"; }
@@ -61,14 +64,17 @@ done
 
 # 公開の同期ボタンと共有のクールダウンに当たったら(cached)、明けるまで待ってやり直す
 sync_bridge() {
-  curl -s -m 300 -X POST "http://127.0.0.1:$BRIDGE_API_PORT/api/bridge/demo/sync"
+  curl -s -m 300 -X POST "http://127.0.0.1:$1/api/bridge/demo/sync"
 }
-result="$(sync_bridge)"
-if printf '%s' "$result" | grep -q '"cached":true'; then
-  sleep 65
-  result="$(sync_bridge)"
-fi
-if printf '%s' "$result" | python3 -c '
+
+for b_entry in "${BRIDGE_TARGETS[@]}"; do
+  read -r b_name b_port b_db <<<"$b_entry"
+  result="$(sync_bridge "$b_port")"
+  if printf '%s' "$result" | grep -q '"cached":true'; then
+    sleep 65
+    result="$(sync_bridge "$b_port")"
+  fi
+  if printf '%s' "$result" | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 if d.get("cached"):
@@ -78,22 +84,23 @@ if failed or not d.get("entities"):
     sys.exit("failed entities=%s" % failed)
 print("bridge: synced", {k: d[k] for k in ("upserted", "deleted", "unchanged") if k in d})
 '; then
-  # 削除した文書の断片が DB の空きページに残らないよう、ファイルを詰め直す
-  if python3 - "$BRIDGE_DB" <<'PY'
+    # 削除した文書の断片が DB の空きページに残らないよう、ファイルを詰め直す
+    if python3 - "$b_db" <<'PY'
 import sqlite3, sys
 conn = sqlite3.connect(sys.argv[1], timeout=30)
 conn.execute("VACUUM")
 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 conn.close()
 PY
-  then
-    log "bridge: vacuumed"
+    then
+      log "bridge[$b_name]: vacuumed"
+    else
+      fail "bridge[$b_name]: vacuum failed"
+    fi
   else
-    fail "bridge: vacuum failed"
+    fail "bridge[$b_name]: sync failed"
   fi
-else
-  fail "bridge: sync failed"
-fi
+done
 
 log "done failures=$failures"
 [ "$failures" -eq 0 ]

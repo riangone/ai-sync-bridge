@@ -52,6 +52,9 @@ ANONYMOUS_WRITES = {
     ("POST", "/api/bridge/search"), ("POST", "/api/bridge/ask"), ("DELETE", "/api/bridge/ask/{session_id}"),
     ("POST", "/api/bridge/sync"),
     ("POST", "/api/bridge/demo/search"), ("POST", "/api/bridge/demo/ask"), ("POST", "/api/bridge/demo/sync"),
+    # A2A: 鍵付き経路は匿名主体を 401 で拒否、demo 経路はペルソナ必須 + DemoGateway の回数制限
+    # (app/routers/a2a.py、回帰は tests/test_a2a.py の 8〜12)
+    ("POST", "/a2a"), ("POST", "/api/a2a/federated-ask"), ("POST", "/api/a2a/demo/federated-ask"),
 }
 OPERATOR_READS = {"/api/analysis-history", "/api/push/subscriptions"}
 OPERATOR_WRITES = [

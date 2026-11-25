@@ -16,3 +16,6 @@ demo-legacy-system-koseki/aisb_embed/state.json
 *.db-wal
 *.db-shm
 ai-api-server/data/
+
+# A2A 共有キー(ops/gen-a2a-secrets.sh が生成)
+ops/secrets/

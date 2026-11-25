@@ -285,6 +285,7 @@
     flex: 1;
   }
   .cards { margin: 0 auto; }
+  .card + .card { margin-top: 22px; }
   .btn-primary:hover { background: var(--blue-dark); }
   .btn-secondary {
     background: #fff;
@@ -399,6 +400,22 @@
         <div class="card-actions">
           <a class="btn btn-primary" href="/erp/">ERPデモを開く</a>
           <a class="btn btn-secondary" href="/erp/ai-panel">AI機能一覧</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">A2A 連携 · LEGACY CRM</span>
+        <h2>システムをまたぐ質問を、データを渡さずに答える</h2>
+        <p class="card-sub">営業・クレーム管理の CRM を ERP とは別のシステムとして置き、Agent 同士(A2A)で問い合わせるデモです。DB や権限は共有しません。</p>
+        <ul>
+          <li><b>連携の例:</b> 「山田商事の ORD1015 にクレームは来ている？顧客ランクは？」— ERP の営業担当が、CRM の Agent に聞いて答えを並べます</li>
+          <li><b>境界:</b> 相手の DB や検索には触れず、相手 Agent が自分の権限の範囲で出した結論だけを受け取ります。機密契約(違約金)や人事情報は相手に渡りません</li>
+          <li><b>委譲の方針:</b> どのロールが相手システムに問い合わせられるかを導入先で決めます(営業は可、人事・法務は不可)</li>
+          <li><b>監査:</b> 両システムがそれぞれのハッシュチェーン監査ログに委譲を記録します</li>
+        </ul>
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/crm/">CRM × A2A デモを開く</a>
+          <a class="btn btn-secondary" href="/erp/">ERP 側から試す(権限検索タブ)</a>
         </div>
       </div>
 

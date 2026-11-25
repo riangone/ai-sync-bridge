@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, FastAPI
 
 from app.routers import (
+    a2a,
     admin,
     analysis_history,
     analytics,
@@ -40,6 +41,7 @@ from app.routers import (
 )
 
 CORE_ROUTERS: list[APIRouter] = [
+    a2a.router,
     bridge.router,
     bridge_demo.router,
     chat.router,

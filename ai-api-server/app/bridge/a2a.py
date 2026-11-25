@@ -1,0 +1,465 @@
+"""
+A2A (Agent-to-Agent) Adapter for AI-Sync Bridge.
+
+Exposes each BridgeRuntime instance as an opaque, permission-bounded A2A Agent:
+  - Agent Card discovery (`/.well-known/agent.json`)
+  - JSON-RPC 2.0 task lifecycle (`tasks/send`, `tasks/get`, `tasks/cancel`)
+  - Task states: submitted -> working -> input-required / completed / failed / canceled
+  - Peer delegation (`A2APeerClient`) & cross-system federated Q&A (`federated_ask`)
+  - Full hash-chained audit logging for inbound & outbound agent interactions
+"""
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import logging
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+import httpx
+
+from app.bridge.acl import Principal
+
+if TYPE_CHECKING:
+    from app.bridge.runtime import BridgeRuntime
+
+log = logging.getLogger(__name__)
+
+A2A_PROTOCOL_VERSION = "0.2.0"
+
+# JSON-RPC 2.0 standard error codes
+ERR_PARSE = -32700
+ERR_INVALID_REQUEST = -32600
+ERR_METHOD_NOT_FOUND = -32601
+ERR_INVALID_PARAMS = -32602
+ERR_INTERNAL = -32603
+ERR_TASK_NOT_FOUND = -32001
+ERR_FORBIDDEN = -32003
+
+
+@dataclass
+class PeerConfig:
+    name: str
+    url: str
+    api_key: str = ""
+    description: str = ""
+    timeout_sec: float = 30.0
+    # 委譲の上限(呼び出し側の方針): このロールのいずれかを持つ主体だけがこのPeerへ委譲できる。
+    # 空なら誰でも委譲可。Peer 側の ACL はキーに紐づく Agent 主体で別途かかる(二重の境界)。
+    allowed_roles: frozenset[str] = frozenset()
+
+    def allows(self, principal: Principal) -> bool:
+        return not self.allowed_roles or bool(self.allowed_roles & set(principal.roles))
+
+
+@dataclass
+class A2ATask:
+    id: str
+    session_id: str
+    owner_user_id: str
+    state: str = "submitted"
+    message: dict[str, Any] | None = None
+    history: list[dict[str, Any]] = field(default_factory=list)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "sessionId": self.session_id,
+            "status": {
+                "state": self.state,
+                "message": self.message,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.updated_at)),
+            },
+            "history": self.history,
+            "artifacts": self.artifacts,
+            "metadata": self.metadata,
+        }
+
+
+def _extract_text(message: dict[str, Any] | None) -> str:
+    if not isinstance(message, dict):
+        return ""
+    parts = message.get("parts") or []
+    texts: list[str] = []
+    for p in parts:
+        if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str):
+            texts.append(p["text"].strip())
+    return "\n".join(t for t in texts if t).strip()
+
+
+def _agent_message(text: str) -> dict[str, Any]:
+    return {"role": "agent", "parts": [{"type": "text", "text": text}]}
+
+
+def _rpc_ok(req_id: Any, result: Any) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+
+def _rpc_err(req_id: Any, code: int, message: str, data: Any = None) -> dict[str, Any]:
+    err: dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        err["data"] = data
+    return {"jsonrpc": "2.0", "id": req_id, "error": err}
+
+
+class A2AAdapter:
+    """Wraps a BridgeRuntime to speak the A2A protocol and delegate to peer agents."""
+
+    def __init__(self, runtime: "BridgeRuntime", cfg: dict[str, Any] | None = None):
+        cfg = cfg or {}
+        self.runtime = runtime
+        self.enabled: bool = bool(cfg.get("enabled", True))
+        self.agent_name: str = str(cfg.get("name") or "AI-Sync Bridge Agent")
+        self.agent_description: str = str(
+            cfg.get("description")
+            or "Opaque, ACL-enforced legacy system agent powered by AI-Sync Bridge."
+        )
+        self.public_url: str = str(cfg.get("url") or "http://localhost:5011").rstrip("/")
+        self.provider_org: str = str(cfg.get("organization") or "AI-Sync Bridge")
+        self.custom_skills: list[dict[str, Any]] = list(cfg.get("skills") or [])
+        self.peers: dict[str, PeerConfig] = {}
+        for p in cfg.get("peers") or []:
+            if not p.get("name") or not p.get("url"):
+                continue
+            self.peers[p["name"]] = PeerConfig(
+                name=str(p["name"]),
+                url=str(p["url"]).rstrip("/"),
+                api_key=str(p.get("api_key") or ""),
+                description=str(p.get("description") or ""),
+                timeout_sec=float(p.get("timeout_sec") or 30.0),
+                allowed_roles=frozenset(str(r) for r in (p.get("allowed_roles") or ())),
+            )
+        self._tasks: dict[str, A2ATask] = {}
+        self._max_tasks = 500
+        # 外向き HTTP の差し替え口(テストや同一プロセス内の Peer で ASGITransport を渡す)
+        self.transport: httpx.AsyncBaseTransport | None = None
+
+    # ---------------- Agent Card ----------------
+    def agent_card(self, base_url: str | None = None) -> dict[str, Any]:
+        url = (base_url or self.public_url).rstrip("/")
+        skills = list(self.custom_skills)
+        if not skills:
+            for src_name, src in self.runtime.sources.items():
+                for spec in src.entities:
+                    skills.append({
+                        "id": f"query_{spec.name.lower()}",
+                        "name": f"Query {spec.name}",
+                        "description": f"Permission-bounded search & grounded Q&A over {spec.name} ({spec.label or src_name}).",
+                        "tags": [src_name, spec.name.lower()],
+                    })
+        return {
+            "name": self.agent_name,
+            "description": self.agent_description,
+            "url": f"{url}/a2a",
+            "version": A2A_PROTOCOL_VERSION,
+            "provider": {"organization": self.provider_org},
+            "capabilities": {
+                "streaming": False,
+                "pushNotifications": False,
+                "stateTransitionHistory": True,
+            },
+            "authentication": {
+                "schemes": ["Bearer", "ApiKey"],
+                "credentials": "X-AISB-Key or Authorization: Bearer <key>",
+            },
+            "defaultInputModes": ["text/plain"],
+            "defaultOutputModes": ["text/plain", "application/json"],
+            "skills": skills,
+        }
+
+    # ---------------- JSON-RPC 2.0 Dispatcher ----------------
+    async def handle_rpc(self, principal: Principal, payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0":
+            return _rpc_err(None, ERR_INVALID_REQUEST, "Invalid JSON-RPC 2.0 request")
+        req_id = payload.get("id")
+        method = payload.get("method")
+        params = payload.get("params") or {}
+        if not isinstance(params, dict):
+            return _rpc_err(req_id, ERR_INVALID_PARAMS, "params must be an object")
+
+        if method == "tasks/send":
+            return await self._handle_tasks_send(req_id, principal, params)
+        if method == "tasks/get":
+            return self._handle_tasks_get(req_id, principal, params)
+        if method == "tasks/cancel":
+            return self._handle_tasks_cancel(req_id, principal, params)
+        return _rpc_err(req_id, ERR_METHOD_NOT_FOUND, f"Unknown method: {method}")
+
+    async def _handle_tasks_send(self, req_id: Any, principal: Principal, params: dict[str, Any]) -> dict[str, Any]:
+        task_id = str(params.get("id") or uuid.uuid4().hex)
+        session_id = str(params.get("sessionId") or f"a2a:{task_id}")
+        message = params.get("message")
+        text = _extract_text(message)
+        metadata = dict(params.get("metadata") or {})
+        entities = metadata.get("entities")
+        top_k = metadata.get("top_k")
+
+        task = self._tasks.get(task_id)
+        if task is not None and task.owner_user_id != principal.user_id and not principal.is_admin:
+            return _rpc_err(req_id, ERR_FORBIDDEN, "Task belongs to another principal")
+
+        if task is None:
+            task = A2ATask(id=task_id, session_id=session_id, owner_user_id=principal.user_id)
+            self._store_task(task)
+
+        if message:
+            task.history.append(message)
+
+        if not text:
+            task.state = "input-required"
+            task.message = _agent_message("Please provide a non-empty text query in message.parts.")
+            task.updated_at = time.time()
+            return _rpc_ok(req_id, task.to_dict())
+
+        task.state = "working"
+        task.updated_at = time.time()
+        self.runtime.audit.append(
+            "a2a.task.received",
+            principal.user_id,
+            detail={
+                "task_id": task_id,
+                "session_id": session_id,
+                "query_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "principal": principal.to_json(),
+                # 呼び出し元 Agent が申告した利用者。追跡用の情報で、権限判定には使わない
+                "on_behalf_of": str(metadata.get("on_behalf_of") or "")[:64] or None,
+            },
+        )
+
+        try:
+            if self.runtime.answerer.enabled:
+                res = await self.runtime.ask(
+                    principal=principal,
+                    question=text,
+                    session_id=session_id,
+                    top_k=top_k,
+                    entities=entities,
+                )
+                answer_text = res.get("answer") or ""
+                citations = res.get("citations") or []
+                acl_filtered = res.get("acl_filtered", 0)
+                audit_id = res.get("audit_id") or res.get("retrieval_audit_id")
+                if res.get("unanswered") and metadata.get("require_grounding"):
+                    task.state = "input-required"
+                    task.message = _agent_message(
+                        answer_text or "No authorized records matched. Please provide an order ID or customer code."
+                    )
+                else:
+                    task.state = "completed"
+                    task.message = _agent_message(answer_text)
+                artifact_data = {
+                    "answer": answer_text,
+                    "citations": citations,
+                    "acl_filtered": acl_filtered,
+                    "audit_id": audit_id,
+                    "unanswered": bool(res.get("unanswered", False)),
+                }
+            else:
+                res = await self.runtime.search(
+                    principal=principal,
+                    query=text,
+                    top_k=top_k or 5,
+                    entities=entities,
+                )
+                results = res.get("results") or []
+                if not results:
+                    summary = "No authorized records matched your query."
+                    task.state = "input-required" if metadata.get("require_grounding") else "completed"
+                else:
+                    lines = [f"- [{r['entity']}/{r['pk']}] {r['title']}: {r['snippet']}" for r in results]
+                    summary = "\n".join(lines)
+                    task.state = "completed"
+                task.message = _agent_message(summary)
+                artifact_data = {
+                    "results": results,
+                    "acl_filtered": res.get("acl_filtered", 0),
+                    "audit_id": res.get("audit_id"),
+                }
+
+            task.history.append(task.message)
+            task.artifacts = [
+                {
+                    "name": "bridge_response",
+                    "parts": [
+                        {"type": "text", "text": _extract_text(task.message)},
+                        {"type": "data", "data": artifact_data},
+                    ],
+                }
+            ]
+            task.metadata = {
+                "agent": self.agent_name,
+                "acl_filtered": artifact_data.get("acl_filtered", 0),
+                "audit_id": artifact_data.get("audit_id"),
+            }
+            task.updated_at = time.time()
+            self.runtime.audit.append(
+                "a2a.task.completed",
+                principal.user_id,
+                detail={
+                    "task_id": task_id,
+                    "state": task.state,
+                    "acl_filtered": artifact_data.get("acl_filtered", 0),
+                    "audit_id": artifact_data.get("audit_id"),
+                },
+            )
+            return _rpc_ok(req_id, task.to_dict())
+        except Exception as exc:
+            task.state = "failed"
+            task.message = _agent_message(f"Task execution failed: {type(exc).__name__}")
+            task.updated_at = time.time()
+            self.runtime.audit.append(
+                "a2a.task.failed",
+                principal.user_id,
+                detail={"task_id": task_id, "error": type(exc).__name__},
+            )
+            return _rpc_ok(req_id, task.to_dict())
+
+    def _handle_tasks_get(self, req_id: Any, principal: Principal, params: dict[str, Any]) -> dict[str, Any]:
+        task_id = params.get("id")
+        if not task_id or task_id not in self._tasks:
+            return _rpc_err(req_id, ERR_TASK_NOT_FOUND, f"Task not found: {task_id}")
+        task = self._tasks[task_id]
+        if task.owner_user_id != principal.user_id and not principal.is_admin:
+            return _rpc_err(req_id, ERR_FORBIDDEN, "Task belongs to another principal")
+        return _rpc_ok(req_id, task.to_dict())
+
+    def _handle_tasks_cancel(self, req_id: Any, principal: Principal, params: dict[str, Any]) -> dict[str, Any]:
+        task_id = params.get("id")
+        if not task_id or task_id not in self._tasks:
+            return _rpc_err(req_id, ERR_TASK_NOT_FOUND, f"Task not found: {task_id}")
+        task = self._tasks[task_id]
+        if task.owner_user_id != principal.user_id and not principal.is_admin:
+            return _rpc_err(req_id, ERR_FORBIDDEN, "Task belongs to another principal")
+        task.state = "canceled"
+        task.message = _agent_message("Task canceled by caller.")
+        task.updated_at = time.time()
+        return _rpc_ok(req_id, task.to_dict())
+
+    def _store_task(self, task: A2ATask) -> None:
+        if len(self._tasks) >= self._max_tasks:
+            oldest = min(self._tasks.values(), key=lambda t: t.updated_at)
+            self._tasks.pop(oldest.id, None)
+        self._tasks[task.id] = task
+
+    # ---------------- Peer Discovery & Delegation ----------------
+    async def discover_peer(self, peer_name: str, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+        peer = self.peers.get(peer_name)
+        if not peer:
+            raise KeyError(f"Unknown A2A peer: {peer_name}")
+        url = f"{peer.url}/.well-known/agent.json"
+        if client is not None:
+            resp = await client.get(url, timeout=peer.timeout_sec)
+            resp.raise_for_status()
+            return resp.json()
+        async with httpx.AsyncClient(timeout=peer.timeout_sec, transport=self.transport) as c:
+            resp = await c.get(url)
+            resp.raise_for_status()
+            return resp.json()
+
+    async def delegate_to_peer(
+        self,
+        peer_name: str,
+        question: str,
+        *,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        client: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any]:
+        peer = self.peers.get(peer_name)
+        if not peer:
+            raise KeyError(f"Unknown A2A peer: {peer_name}")
+        task_id = uuid.uuid4().hex
+        rpc_body = {
+            "jsonrpc": "2.0",
+            "id": task_id,
+            "method": "tasks/send",
+            "params": {
+                "id": task_id,
+                "sessionId": session_id or f"fed:{task_id}",
+                "message": {"role": "user", "parts": [{"type": "text", "text": question}]},
+                "metadata": metadata or {},
+            },
+        }
+        headers = {"Content-Type": "application/json"}
+        if peer.api_key:
+            headers["Authorization"] = f"Bearer {peer.api_key}"
+        endpoint = f"{peer.url}/a2a"
+        if client is not None:
+            resp = await client.post(endpoint, json=rpc_body, headers=headers, timeout=peer.timeout_sec)
+            resp.raise_for_status()
+            return resp.json()
+        async with httpx.AsyncClient(timeout=peer.timeout_sec, transport=self.transport) as c:
+            resp = await c.post(endpoint, json=rpc_body, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+
+    async def federated_ask(
+        self,
+        principal: Principal,
+        question: str,
+        *,
+        peers: list[str] | None = None,
+        session_id: str = "federated",
+        top_k: int | None = None,
+        client: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any]:
+        """Run local ACL-bounded Bridge Q&A and delegate in parallel to selected A2A peers."""
+        target_peers = [p for p in (peers if peers is not None else list(self.peers.keys())) if p in self.peers]
+
+        async def _local():
+            if self.runtime.answerer.enabled:
+                return await self.runtime.ask(principal, question, session_id=session_id, top_k=top_k)
+            return await self.runtime.search(principal, question, top_k=top_k or 5)
+
+        async def _call_peer(name: str) -> tuple[str, dict[str, Any]]:
+            if not self.peers[name].allows(principal):
+                return name, {"status": "forbidden", "error": "delegation not permitted for this principal"}
+            try:
+                rpc_res = await self.delegate_to_peer(
+                    name, question, session_id=session_id, client=client,
+                    metadata={"on_behalf_of": principal.user_id},
+                )
+                if "error" in rpc_res:
+                    return name, {"status": "error", "error": (rpc_res["error"] or {}).get("message", "error")}
+                result = rpc_res.get("result") or {}
+                status = (result.get("status") or {}).get("state", "unknown")
+                msg_text = _extract_text((result.get("status") or {}).get("message"))
+                return name, {
+                    "status": status,
+                    "task_id": result.get("id"),
+                    "answer": msg_text,
+                    "metadata": result.get("metadata") or {},
+                }
+            except Exception as exc:
+                # 接続先URLや内部構成を含み得るため、詳細はログにだけ残す
+                log.warning("A2A peer %s failed: %s", name, exc)
+                if isinstance(exc, httpx.HTTPStatusError):
+                    return name, {"status": "error", "error": f"peer returned HTTP {exc.response.status_code}"}
+                return name, {"status": "unreachable", "error": type(exc).__name__}
+
+        local_coro = _local()
+        peer_coros = [_call_peer(name) for name in target_peers]
+        local_res, *peer_pairs = await asyncio.gather(local_coro, *peer_coros)
+        peer_results = dict(peer_pairs)
+
+        self.runtime.audit.append(
+            "a2a.delegated",
+            principal.user_id,
+            detail={
+                "peers": target_peers,
+                "peer_statuses": {k: v.get("status") for k, v in peer_results.items()},
+                "query_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
+            },
+        )
+        return {
+            "question": question,
+            "agent": self.agent_name,
+            "local": local_res,
+            "peers": peer_results,
+        }

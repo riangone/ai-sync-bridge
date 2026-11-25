@@ -1,0 +1,82 @@
+# ============================================================================
+# AI-Sync Bridge 導入先プロファイル: レガシーCRM(営業・クレーム管理)デモ
+#   ai-api-server 起動時に AISB_BRIDGE_PROFILE=<このファイル> を指定する(start-crm.sh)。
+#   ERP(demo-legacy-system)とは独立したDB/ACL/監査チェーンを持ち、A2Aで疎結合連携する。
+# ============================================================================
+
+auth:
+  # キーはこのファイルにもブラウザにも置かず環境変数で渡す(ops/secrets/a2a.env)。未設定のキーは無効。
+  mode: api_key
+  api_keys:
+    - key: ${AISB_CRM_ADMIN_KEY:-}
+      user_id: crm_admin
+      tenant: acme
+      roles: [bridge_admin, crm_sales, crm_support, crm_legal, "dept:*"]
+    - key: ${AISB_CRM_SUPPORT_KEY:-}
+      user_id: support01
+      tenant: acme
+      roles: [crm_support, crm_sales]
+    # ERP Agent からの A2A 委譲専用キー: Account/Ticket のみ閲覧可。機密 Contract は閲覧不可。
+    - key: ${AISB_A2A_ERP_PEER_KEY:-}
+      user_id: a2a_erp_agent
+      tenant: acme
+      roles: [a2a_erp_peer]
+
+audit:
+  store_query_text: false
+  store_answer_text: false
+
+answer:
+  top_k: 10
+
+sync:
+  interval_sec: 0
+
+# 公開デモの入口(/api/bridge/demo/*, /api/a2a/demo/*)。CRM 画面のコンソールはここの主体で呼ぶ。
+demo:
+  ask_per_ip_per_hour: 40
+  read_per_ip_per_minute: 60
+  sync_cooldown_sec: 60
+  personas:
+    - {id: support, label: サポート担当, note: カスタマーサポート部, user_id: support01, tenant: acme, roles: [crm_support, crm_sales]}
+    - {id: legal, label: 法務, note: 法務部, user_id: legal01, tenant: acme, roles: [crm_legal]}
+
+a2a:
+  enabled: true
+  name: "CRM Support & Sales Agent"
+  description: "Handles VIP account tiers, customer complaints (tickets), and renewal impact. Confidential legal contracts are strictly ACL-isolated."
+  url: ${AISB_A2A_PUBLIC_URL:-http://127.0.0.1:5021}
+  organization: "Acme Corp - CRM Division"
+  peers:
+    - name: erp
+      url: ${AISB_A2A_ERP_URL:-http://127.0.0.1:5011}
+      api_key: ${AISB_A2A_CRM_PEER_KEY:-}
+      description: "Manufacturing ERP Agent for order status, delivery dates, and product stock."
+      # 委譲上限: 顧客対応ロールだけが ERP へ問い合わせられる(法務は不可)
+      allowed_roles: [crm_support, crm_sales]
+
+sources:
+  - name: legacy_crm_api
+    type: http_list
+    config:
+      base_url: ${AISB_LEGACY_BASE_URL:-http://localhost:5020}
+    entities:
+      - name: Account
+        pk: Id
+        title: CustomerName
+        label: 顧客ランク 商談 CRM顧客
+        text: [CustomerId, CustomerName, Tier, AccountOwner, AnnualRevenue, RenewalDate, Notes]
+        acl: {tenant: acme, roles: [crm_sales, crm_support, a2a_erp_peer]}
+      - name: Ticket
+        pk: Id
+        title: Subject
+        label: クレーム 問い合わせ チケット
+        text: [CustomerId, CustomerName, OrderId, Severity, Status, Subject, Summary, CreatedAt]
+        acl: {tenant: acme, roles: [crm_sales, crm_support, a2a_erp_peer]}
+      - name: Contract
+        pk: Id
+        title: CustomerName
+        label: 機密契約 違約金 秘密合意
+        text: [CustomerId, CustomerName, ConfidentialLevel, PenaltyClause, MaxDiscountRate, ApprovedBy]
+        # 機密契約: 法務(crm_legal)のみ。a2a_erp_peer や一般サポートからは絶対に閲覧不可
+        acl: {tenant: acme, roles: [crm_legal]}
