@@ -223,15 +223,15 @@
     margin: 0 0 18px;
   }
   .cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 22px;
+    display: block;
+    max-width: 680px;
+    margin: 0 auto;
   }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 24px;
+    padding: 28px 32px;
     box-shadow: 0 6px 18px rgba(23,73,126,.06);
     display: flex;
     flex-direction: column;
@@ -284,7 +284,7 @@
     color: #fff;
     flex: 1;
   }
-  .cards { max-width: 640px; margin: 0 auto; }
+  .cards { margin: 0 auto; }
   .btn-primary:hover { background: var(--blue-dark); }
   .btn-secondary {
     background: #fff;
@@ -299,11 +299,8 @@
     color: var(--sub);
     line-height: 1.8;
   }
-  @media (max-width: 980px) {
-    .cards { grid-template-columns: 1fr 1fr; }
-  }
   @media (max-width: 720px) {
-    .cards { grid-template-columns: 1fr; }
+    .card { padding: 20px; }
     .concept-cols { grid-template-columns: 1fr; }
   }
 </style>
@@ -350,7 +347,7 @@
         <div class="easy-box easy-new">
           <span class="ico">🤖</span>
           <b>AIパネル</b>
-          画面右下のボタンで開く小窓。ここに質問や指示を書く。
+          画面右側のボタンで開く小窓。ここに質問や指示を書く。
           <span class="tag">後から追加</span>
         </div>
         <div class="easy-arrow"><span>→</span>質問を渡す</div>
@@ -363,7 +360,7 @@
       </div>
 
       <ol class="easy-steps">
-        <li>画面右下の 🤖 ボタンを押して、AIパネルを開く。</li>
+        <li>画面右側の 🤖 ボタンを押して、AIパネルを開く。</li>
         <li>「延滞している請求を見せて」のように、ふつうの言葉で質問する。</li>
         <li>AIが業務データを読み取り、結果や要約をパネルに表示する。</li>
       </ol>
@@ -409,7 +406,7 @@
 
     <p class="note">
       データは自動生成されたデモ用サンプルであり、実在の企業・個人とは関係ありません。<br>
-      画面右下の🤖ボタンから、AIサイドパネルの全機能をいつでも試せます。
+      画面右側の🤖ボタンから、AIサイドパネルの全機能をいつでも試せます。
     </p>
 
   </div>
