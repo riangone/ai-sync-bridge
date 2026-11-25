@@ -225,12 +225,12 @@ window.AISB.panels.ocr = function renderOcrPanel(el, ctx) {
     try {
       const res = await fetch(`${ctx.API_BASE}/api/ocr`, { method: "POST", body: fd });
       const data = await res.json();
-      if (data.source === "opencode-vision") {
-        sourceEl.className = "aisb-ws-source aisb-ws-source-real";
-        sourceEl.textContent = "🌐 AIビジョンによる実読み取り結果";
-      } else if (data.source === "opencode-vision-pdf") {
+      if (data.source && data.source.includes("-vision-pdf")) {
         sourceEl.className = "aisb-ws-source aisb-ws-source-real";
         sourceEl.textContent = "🌐 AIビジョンによる実読み取り結果(PDFをページ毎に画像化して解析)";
+      } else if (data.source && data.source.includes("-vision")) {
+        sourceEl.className = "aisb-ws-source aisb-ws-source-real";
+        sourceEl.textContent = "🌐 AIビジョンによる実読み取り結果";
       } else {
         sourceEl.className = "aisb-ws-source aisb-ws-source-mock";
         sourceEl.textContent = file.type === "application/pdf"

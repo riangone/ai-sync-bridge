@@ -352,18 +352,26 @@ class AntigravityProvider(AiProvider):
       4. 環境変数は最小限に絞り、プロンプトは stdin で渡す(ps に業務データを出さない)。
     --dangerously-skip-permissions は絶対に付けないこと。
 
-    画像は stream-json 入力が受け付けず(text のみ)、ファイル読取ツールを許可するしか方法が
-    無いため vision は非対応とする。
+    画像は stream-json 入力が受け付けず(text のみ)のため、一時ファイルに画像を書き出し、
+    read_file ツールを明示的に許可した vision 専用エージェントで読み取らせることで
+    complete_vision() を実現する。
     """
     name = "antigravity"
     embedder_id = "ngram-hash-64"  # embed() は MockProvider へ委譲している
+    supports_vision = True
     supports_web_search = True
 
     _AGENT = "aisync-demo"
     _WEB_AGENT = "aisync-demo-web"
+    _VISION_AGENT = "aisync-demo-vision"
     _WEB_TOOL = "search_web"
+    _READ_FILE_TOOL = "read_file"
     _SESSION_SETTINGS = json.dumps({
         "permissions": {"allow": [], "deny": ["command(*)"]},
+        "allowNonWorkspaceAccess": False,
+    })
+    _VISION_SESSION_SETTINGS = json.dumps({
+        "permissions": {"allow": ["read_file(*)"], "deny": ["command(*)"]},
         "allowNonWorkspaceAccess": False,
     })
     _ENV_KEYS = ("HOME", "USER", "PATH", "LANG")
@@ -387,16 +395,22 @@ class AntigravityProvider(AiProvider):
         web_note = (
             "\n例外: Web検索(search_web)だけは使えます。指示文の websearch は search_web を指します。\n"
         )
-        for agent, tools, extra in (
-            (self._AGENT, "[]", ""),
-            (self._WEB_AGENT, f"[{self._WEB_TOOL}]", web_note),
+        vision_system_prompt = (
+            "あなたは画像・文書解析専用のアシスタントです。\n"
+            "与えられた画像ファイルを read_file ツールで読み取り、ユーザーの指示に従って正確に内容を抽出してください。\n"
+            "指示されたJSONフォーマット以外の余計な解説は出力しないでください。"
+        )
+        for agent, tools, system_prompt in (
+            (self._AGENT, "[]", f"# AI-Sync Bridge\n{GUARDRAIL_SYSTEM_PROMPT}"),
+            (self._WEB_AGENT, f"[{self._WEB_TOOL}]", f"# AI-Sync Bridge\n{GUARDRAIL_SYSTEM_PROMPT}{web_note}"),
+            (self._VISION_AGENT, f"[{self._READ_FILE_TOOL}]", vision_system_prompt),
         ):
             text = (
                 f"---\nname: {agent}\n"
-                "description: AI-Sync demo assistant\n"
+                "description: AI-Sync assistant\n"
                 "mainAgent: true\nsubagent: false\nexcludeDefaultComponents: true\n"
                 f"inheritMcp: false\ntools: {tools}\nskills: []\nrules: []\nagents: []\n"
-                f"---\n# AI-Sync Bridge\n{GUARDRAIL_SYSTEM_PROMPT}{extra}"
+                f"---\n{system_prompt}"
             )
             # 複数インスタンスが同時に起動しても読み手が書きかけを見ないよう一時ファイル経由で置く。
             tmp = agents_dir / f".{agent}.{os.getpid()}.tmp"
@@ -498,6 +512,90 @@ class AntigravityProvider(AiProvider):
             raise
         except Exception as exc:
             raise AIProviderError(self.name, exc) from exc
+
+    async def complete_vision(self, prompt: str, image_bytes: bytes, mime: str) -> str:
+        """画像を一時ファイルに書き出し、read_file ツール経由で vision 解析を実行する。"""
+        self._reserve_call()
+        ext = ".png"
+        if mime == "image/jpeg" or mime == "image/jpg":
+            ext = ".jpg"
+        elif mime == "image/webp":
+            ext = ".webp"
+        elif mime == "image/gif":
+            ext = ".gif"
+
+        # 一時ファイルは workdir 内の .tmp_ocr 配下に配置し、CLI のワークスペース境界内に収める
+        tmp_dir = Path(self.workdir) / ".tmp_ocr"
+        tmp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tmp_file = tmp_dir / f"ocr_{os.getpid()}_{time.time_ns()}{ext}"
+
+        try:
+            tmp_file.write_bytes(image_bytes)
+            vision_prompt = (
+                f"Please inspect and read the image file at: {tmp_file.resolve()}\n\n"
+                f"{prompt}"
+            )
+            message = json.dumps({"event": "user", "message": {"role": "user", "content": vision_prompt}})
+            async with self._semaphore:
+                proc = await asyncio.create_subprocess_exec(
+                    self.binary,
+                    "--print", "",
+                    "--agent", self._VISION_AGENT,
+                    "--model", self.model,
+                    "--disable-slash-commands",
+                    "--sandbox",
+                    "--settings", self._VISION_SESSION_SETTINGS,
+                    "--print-timeout", f"{int(self.timeout)}s",
+                    "--input-format", "stream-json",
+                    "--output-format", "stream-json",
+                    cwd=self.workdir,
+                    env={k: os.environ[k] for k in self._ENV_KEYS if k in os.environ},
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    limit=self._STREAM_LINE_LIMIT,
+                    start_new_session=True,
+                )
+                allowed_tools = frozenset({self._READ_FILE_TOOL})
+
+                async def communicate() -> tuple[dict, bytes]:
+                    proc.stdin.write(message.encode("utf-8") + b"\n")
+                    await proc.stdin.drain()
+                    proc.stdin.close()
+                    stderr_task = asyncio.create_task(proc.stderr.read())
+                    try:
+                        result = await self._read_result(proc.stdout, allowed_tools)
+                        await proc.wait()
+                        return result, await stderr_task
+                    finally:
+                        stderr_task.cancel()
+
+                try:
+                    result, stderr = await asyncio.wait_for(communicate(), timeout=self.timeout + 5)
+                except asyncio.TimeoutError as exc:
+                    raise AIProviderError(self.name, f"{self.timeout:.0f}秒以内に応答がありませんでした") from exc
+                finally:
+                    if proc.returncode is None:
+                        with contextlib.suppress(ProcessLookupError):
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        await proc.wait()
+
+                if result.get("denied_actions"):
+                    actions = [a.get("action") for a in result["denied_actions"]]
+                    raise AIProviderError(self.name, f"許可されていない操作の要求を検知したため応答を破棄しました: {actions}")
+                response = result.get("response") or ""
+                if proc.returncode != 0 or result.get("status") != "SUCCESS" or not response.strip():
+                    detail = result.get("error") or stderr.decode("utf-8", "replace").strip() or f"exit={proc.returncode}"
+                    raise AIProviderError(self.name, redact_output(detail)[:500])
+                return redact_output(response)
+        except AIProviderError:
+            raise
+        except Exception as exc:
+            raise AIProviderError(self.name, exc) from exc
+        finally:
+            with contextlib.suppress(OSError):
+                if tmp_file.exists():
+                    tmp_file.unlink()
 
     async def embed(self, text: str) -> list[float]:
         # CLI は埋め込みを公開していないため n-gram 擬似埋め込みに委譲する。opencode と同じ

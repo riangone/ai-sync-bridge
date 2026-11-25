@@ -373,12 +373,13 @@ class OcrService:
                 if not fields.get(k) and v:
                     fields[k] = v
             confidences.append(r.get("confidence") or 0.0)
+        ai_name = getattr(self.ai, "name", "ai")
         return {
             "filename": filename,
             "extracted_text": "\n".join(texts),
             "fields": fields,
             "confidence": (sum(confidences) / len(confidences)) if confidences else 0.0,
-            "source": "opencode-vision-pdf",
+            "source": f"{ai_name}-vision-pdf",
         }
 
     async def _ai_extract(self, filename: str, content: bytes, mime: str, prompt: str = _PROMPT) -> dict:
@@ -395,12 +396,13 @@ class OcrService:
         except (TypeError, ValueError):
             confidence = 0.0
         confidence = max(0.0, min(1.0, confidence))
+        ai_name = getattr(self.ai, "name", "ai")
         return {
             "filename": filename,
             "extracted_text": extracted_text,
             "fields": fields,
             "confidence": confidence,
-            "source": "opencode-vision",
+            "source": f"{ai_name}-vision",
         }
 
     def _mock_extract(self, filename: str, content: bytes) -> dict:
