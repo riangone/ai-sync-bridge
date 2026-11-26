@@ -36,6 +36,8 @@ window.AISB.configBase = (function () {
       { id: "chat", label: "AIチャット", enabled: true },
       // /api/bridge(権限付き検索・差分同期・監査)。bridge.yaml を持つ導入先でのみ有効化する
       { id: "bridge", label: "権限検索・監査", enabled: true },
+      // /api/a2a/demo(システム間 A2A 連携デモ・Agent Card 発見と二重権限境界)
+      { id: "a2a", label: "A2A連携", enabled: true },
       { id: "legacy", label: "業務データ", enabled: false },
       { id: "nlsql", label: "AI検索", enabled: true },
       { id: "customers", label: "顧客検索", enabled: false },

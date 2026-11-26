@@ -319,121 +319,293 @@ def demo_acl_check(request: Request, direction: Literal["erp_to_crm", "crm_to_er
     }
 
 
+def _load_public_crm_data() -> dict:
+    """公開画面向けデータ。Contract は機密のため件数のみ返し、本文・違約金は絶対に渡さない。"""
+    accounts = [
+        json.loads(r[0])
+        for r in _conn.execute("SELECT value FROM accounts ORDER BY id").fetchall()
+    ]
+    tickets = [
+        json.loads(r[0])
+        for r in _conn.execute("SELECT value FROM tickets ORDER BY id").fetchall()
+    ]
+    contract_count = _conn.execute("SELECT COUNT(*) FROM contracts").fetchone()[0]
+    return {"accounts": accounts, "tickets": tickets, "contract_count": contract_count}
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return _INDEX_HTML
+    data_json = json.dumps(_load_public_crm_data(), ensure_ascii=False).replace("</", "<\\/")
+    return _INDEX_HTML.replace("__CRM_PUBLIC_DATA__", data_json)
 
 
 _INDEX_HTML = """<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>レガシーCRM × A2A 連携デモ | AI-Sync Bridge</title>
+<title>レガシーCRM 業務システム × A2A 連携デモ | AI-Sync Bridge</title>
 <style>
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;max-width:1080px;margin:1.5rem auto;padding:0 1rem;line-height:1.6;color:#1f2937;background:#f8fafc}
-  h1{margin-bottom:.25rem;font-size:1.5rem} .sub{color:#64748b;margin-top:0}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;margin:0;line-height:1.6;color:#1f2937;background:#f1f5f9}
+  .topbar{background:#0f172a;color:#fff;padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+  .brand{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.05rem}
+  .brand small{font-weight:400;color:#94a3b8;font-size:.8rem}
+  .toplinks{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .toplinks a{color:#cbd5e1;text-decoration:none;font-size:.84rem;padding:.3rem .65rem;border:1px solid #334155;border-radius:6px}
+  .toplinks a:hover{background:#1e293b;color:#fff}
+  .wrap{max-width:1120px;margin:1.25rem auto;padding:0 1rem}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1rem}
+  @media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.75rem 1rem}
+  .kpi .lbl{font-size:.78rem;color:#64748b}
+  .kpi .val{font-size:1.35rem;font-weight:700;color:#0f172a;margin-top:.15rem}
+  .tabs{display:flex;gap:.4rem;border-bottom:2px solid #cbd5e1;margin-bottom:1rem;flex-wrap:wrap}
+  .tab{padding:.55rem 1rem;border:none;background:transparent;color:#475569;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;font-size:.92rem}
+  .tab:hover{background:#e2e8f0;color:#0f172a}
+  .tab.active{color:#1d4ed8;border-bottom-color:#2563eb;background:#fff}
+  .pane{display:none}
+  .pane.active{display:block}
   .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-  .card h3{margin-top:.25rem}
+  .card h3{margin-top:.25rem;margin-bottom:.6rem;font-size:1.05rem}
+  .sub{color:#64748b;margin:0 0 .75rem;font-size:.9rem}
   .row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-  input[type=text]{flex:1;min-width:260px;padding:.55rem .75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.95rem}
-  select{padding:.5rem;border:1px solid #cbd5e1;border-radius:6px}
-  button{padding:.55rem .9rem;border:none;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
-  button.sec{background:#0f766e} button.warn{background:#b45309} button:disabled{opacity:.5}
+  input[type=text]{flex:1;min-width:240px;padding:.55rem .75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.92rem}
+  select{padding:.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9rem}
+  button{padding:.5rem .85rem;border:none;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;font-size:.88rem}
+  button.sec{background:#0f766e} button.warn{background:#b45309} button.sm{padding:.3rem .6rem;font-size:.78rem} button:disabled{opacity:.5}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.75rem}
   @media(max-width:760px){.grid{grid-template-columns:1fr}}
   .box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:.75rem 1rem}
   .ans{margin-top:.5rem;white-space:pre-wrap;font-size:.92rem}
   .meta{font-size:.78rem;color:#64748b;margin-top:.35rem}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;background:#e0f2fe;color:#0369a1}
-  .badge.red{background:#fee2e2;color:#b91c1c} .badge.green{background:#dcfce7;color:#15803d} .badge.gray{background:#e2e8f0;color:#475569}
-  table{border-collapse:collapse;width:100%;font-size:.88rem} td,th{border-top:1px solid #e2e8f0;padding:.35rem .5rem;text-align:left}
-  .err{color:#b91c1c}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.74rem;font-weight:600;background:#e0f2fe;color:#0369a1}
+  .badge.red{background:#fee2e2;color:#b91c1c} .badge.green{background:#dcfce7;color:#15803d} .badge.gray{background:#e2e8f0;color:#475569} .badge.amber{background:#fef3c7;color:#92400e}
+  .tbl-wrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.88rem}
+  th{background:#f8fafc;color:#475569;font-weight:600}
+  td,th{border-top:1px solid #e2e8f0;padding:.5rem .6rem;text-align:left;vertical-align:top}
+  tr:hover td{background:#f8fafc}
+  .err{color:#b91c1c;margin-top:.4rem}
+  .lock-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:1rem;color:#7f1d1d}
 </style></head>
 <body>
-  <h1>レガシーCRM(営業・クレーム管理) × A2A 連携デモ</h1>
-  <p class="sub">ERP とは DB・権限・監査チェーンを共有しない第2の業務システム。顧客コード(<code>C0001</code>…)と受注番号(<code>ORD1001</code>…)だけで疎結合し、
-  システム間は <b>A2A(Agent-to-Agent)</b> で問い合わせます。相手の DB や検索ツールには触れず、相手 Agent が<b>自分の権限の範囲で答えた結論</b>だけを受け取ります。</p>
-
-  <div class="card">
-    <h3>1. 跨システム連携回答(CRM → ERP)</h3>
-    <div class="row">
-      <select id="persona" title="CRM 側の利用者">
-        <option value="support">サポート担当(ERP への委譲可)</option>
-        <option value="legal">法務(ERP への委譲は不可)</option>
-      </select>
-      <input id="q" type="text" maxlength="500" value="山田商事(C0001)の注文 ORD1015 のクレーム状況と、ERP 側の受注・出荷状況は？">
-      <button id="btnAsk">A2A 連携で回答</button>
+  <header class="topbar">
+    <div class="brand">
+      <span>📇 レガシーCRM</span>
+      <small>営業・クレーム管理システム（Port 5020 / crm.db）</small>
     </div>
-    <div class="meta">CRM Agent が自分の権限で回答しつつ、同じ質問を A2A で ERP Agent へ委譲します。どの利用者が委譲できるかは CRM 側の方針(<code>allowed_roles</code>)で決まり、ERP 側では CRM Agent に与えた権限(営業相当)の範囲でしか答えません。</div>
-    <div id="fedErr" class="err"></div>
-    <div id="fedOut" style="display:none">
-      <div class="grid">
-        <div class="box"><div><strong>CRM Agent(自システム)</strong> <span id="crmMeta" class="badge"></span></div>
-          <div id="crmAns" class="ans"></div><div id="crmSub" class="meta"></div></div>
-        <div class="box"><div><strong>ERP Agent(A2A 委譲先)</strong> <span id="erpMeta" class="badge"></span></div>
-          <div id="erpAns" class="ans"></div><div id="erpSub" class="meta"></div></div>
+    <div class="toplinks">
+      <a href="/erp/ai-panel">🏭 ERPデモを開く</a>
+      <a href="/">🏠 トップへ戻る</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">登録顧客 (Account)</div><div class="val" id="kpiAcc">-</div></div>
+      <div class="kpi"><div class="lbl">クレーム・問合せ (Ticket)</div><div class="val" id="kpiTck">-</div></div>
+      <div class="kpi"><div class="lbl">対応中クレーム (Open/進行中)</div><div class="val" id="kpiOpen">-</div></div>
+      <div class="kpi"><div class="lbl">機密契約 (Contract)</div><div class="val" id="kpiCtr">-</div></div>
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="a2a">🤝 A2A連携コンソール</button>
+      <button class="tab" data-tab="accounts">🏢 顧客マスタ (Account)</button>
+      <button class="tab" data-tab="tickets">🎫 クレーム・問合せ (Ticket)</button>
+      <button class="tab" data-tab="contracts">🔒 機密契約・権限 (Contract)</button>
+    </nav>
+
+    <!-- Tab 1: A2A Console -->
+    <section id="pane-a2a" class="pane active">
+      <div class="card">
+        <h3>1. 跨システム連携回答（CRM → ERP）</h3>
+        <p class="sub">ERP とは DB・権限・監査チェーンを共有しない独立システムです。顧客コード(<code>C0001</code>…)と受注番号(<code>ORD1015</code>…)だけで疎結合し、A2A で ERP Agent に問い合わせます。</p>
+        <div class="row">
+          <select id="persona" title="CRM 側の利用者">
+            <option value="support">サポート担当（ERP への委譲可）</option>
+            <option value="legal">法務（ERP への委譲は不可）</option>
+          </select>
+          <input id="q" type="text" maxlength="500" value="山田商事(C0001)の注文 ORD1015 のクレーム状況と、ERP 側の受注・出荷状況は？">
+          <button id="btnAsk">A2A 連携で回答</button>
+        </div>
+        <div class="meta">CRM Agent が自分の権限で回答しつつ、同じ質問を A2A で ERP Agent へ委譲します。委譲可否は CRM 側の方針(<code>allowed_roles</code>)で制御されます。</div>
+        <div id="fedErr" class="err"></div>
+        <div id="fedOut" style="display:none">
+          <div class="grid">
+            <div class="box"><div><strong>CRM Agent（自システム）</strong> <span id="crmMeta" class="badge"></span></div>
+              <div id="crmAns" class="ans"></div><div id="crmSub" class="meta"></div></div>
+            <div class="box"><div><strong>ERP Agent（A2A 委譲先）</strong> <span id="erpMeta" class="badge"></span></div>
+              <div id="erpAns" class="ans"></div><div id="erpSub" class="meta"></div></div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <div class="card">
-    <h3>2. 双方向の権限分離を検証(Opaque Agent の境界)</h3>
-    <div class="row">
-      <button class="warn" data-dir="erp_to_crm">ERP → CRM: 機密契約の違約金(15%)を聞き出す</button>
-      <button class="sec" data-dir="crm_to_erp">CRM → ERP: 従業員の給与を聞き出す</button>
-    </div>
-    <div class="meta">相手 Agent に与えたキーの権限で A2A タスクを送り、機密が応答(引用・成果物を含む)に出ないことを確認します。</div>
-    <div id="aclErr" class="err"></div>
-    <div id="aclOut" style="display:none;margin-top:.5rem" class="box">
-      <div id="aclBadge"></div><div id="aclQ" class="meta"></div><div id="aclAns" class="ans"></div><div id="aclSub" class="meta"></div>
-    </div>
-  </div>
+      <div class="card">
+        <h3>2. 双方向の権限分離を検証（Opaque Agent の境界）</h3>
+        <div class="row">
+          <button class="warn" data-dir="erp_to_crm">ERP → CRM: 機密契約の違約金(15%)を聞き出す</button>
+          <button class="sec" data-dir="crm_to_erp">CRM → ERP: 従業員の給与を聞き出す</button>
+        </div>
+        <div class="meta">相手 Agent に与えたキーの権限で A2A タスクを送り、機密が応答（引用・成果物を含む）に出ないことを確認します。</div>
+        <div id="aclErr" class="err"></div>
+        <div id="aclOut" style="display:none;margin-top:.5rem" class="box">
+          <div id="aclBadge"></div><div id="aclQ" class="meta"></div><div id="aclAns" class="ans"></div><div id="aclSub" class="meta"></div>
+        </div>
+      </div>
+    </section>
 
-  <div class="card">
-    <h3>3. CRM 側のデータと権限(<code>crm.db</code>)</h3>
-    <table>
-      <tr><th>データ</th><th>内容</th><th>閲覧できる主体</th></tr>
-      <tr><td>Account</td><td>顧客ランク・商談・更新日</td><td>営業 / サポート / ERP Agent</td></tr>
-      <tr><td>Ticket</td><td>クレーム・問い合わせ(受注番号つき)</td><td>営業 / サポート / ERP Agent</td></tr>
-      <tr><td>Contract</td><td>機密契約・違約金条項・最大値引率</td><td><span class="badge red">法務のみ</span></td></tr>
-    </table>
-    <div class="meta">業務データの API は AI-Sync Bridge の同期専用で、公開経路からは読めません。データは毎日 04:10 に初期状態へ戻ります。架空のサンプルであり、実在の企業とは関係ありません。</div>
-  </div>
+    <!-- Tab 2: Accounts -->
+    <section id="pane-accounts" class="pane">
+      <div class="card">
+        <h3>🏢 顧客マスタ一覧（Account）</h3>
+        <p class="sub">営業・サポート・ERP Agent から参照可能な顧客基本情報です。各行のボタンから ERP 側と横断確認できます。</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr><th>顧客コード</th><th>顧客名</th><th>ランク</th><th>担当</th><th>年間取引額</th><th>更新日</th><th>備考</th><th>連携</th></tr>
+            </thead>
+            <tbody id="accBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Tickets -->
+    <section id="pane-tickets" class="pane">
+      <div class="card">
+        <h3>🎫 クレーム・問合せ一覧（Ticket）</h3>
+        <p class="sub">ERP の受注番号（<code>ORD1015</code> 等）と紐づくサポート履歴です。「ERP状況をA2Aで確認」から即座に跨システム回答を実行できます。</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>重要度</th><th>状態</th><th>顧客</th><th>関連受注</th><th>件名・概要</th><th>登録日</th><th>連携</th></tr>
+            </thead>
+            <tbody id="tckBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Contracts & ACL -->
+    <section id="pane-contracts" class="pane">
+      <div class="card">
+        <h3>🔒 機密契約（Contract）とデータ権限境界</h3>
+        <div class="lock-box">
+          <strong>法務限定データ（閲覧制限中）</strong>
+          <p style="margin:.35rem 0 0;font-size:.9rem">
+            現在 <code>crm.db</code> 内には <b id="ctrCountText">-</b> 件の機密契約（違約金条項・最大値引率等）が保管されていますが、
+            公開画面および ERP Agent からは直接閲覧できないよう隔離されています。
+            A2A 連携コンソールの「法務」ロールまたは権限分離テストで ACL 保護の挙動を確認できます。
+          </p>
+        </div>
+        <div class="tbl-wrap" style="margin-top:1rem">
+          <table>
+            <thead><tr><th>データ</th><th>内容</th><th>閲覧できる主体</th></tr></thead>
+            <tbody>
+              <tr><td>Account</td><td>顧客ランク・商談・更新日</td><td>営業 / サポート / ERP Agent</td></tr>
+              <tr><td>Ticket</td><td>クレーム・問い合わせ（受注番号つき）</td><td>営業 / サポート / ERP Agent</td></tr>
+              <tr><td>Contract</td><td>機密契約・違約金条項・最大値引率</td><td><span class="badge red">法務のみ</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="meta">業務データの API は AI-Sync Bridge の同期専用で、公開経路からは読めません。データは毎日 04:10 に初期状態へ戻ります。架空のサンプルであり、実在の企業とは関係ありません。</div>
+      </div>
+    </section>
+  </main>
 
 <script>
-const $=(id)=>document.getElementById(id);
-async function post(url,body){
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+const CRM_DATA = __CRM_PUBLIC_DATA__;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('active', p.id === 'pane-' + name));
+}
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+function askA2A(question) {
+  switchTab('a2a');
+  $('persona').value = 'support';
+  $('q').value = question;
+  $('btnAsk').click();
+}
+
+// Render KPIs & tables
+(function initViews() {
+  const accs = CRM_DATA.accounts || [];
+  const tcks = CRM_DATA.tickets || [];
+  const openCount = tcks.filter((t) => t.Status !== 'Resolved').length;
+  $('kpiAcc').textContent = accs.length + ' 社';
+  $('kpiTck').textContent = tcks.length + ' 件';
+  $('kpiOpen').textContent = openCount + ' 件';
+  $('kpiCtr').textContent = (CRM_DATA.contract_count ?? 0) + ' 件 (法務限定)';
+  $('ctrCountText').textContent = CRM_DATA.contract_count ?? 0;
+
+  const tierCls = (t) => t === 'VIP' ? 'amber' : t === 'Enterprise' ? '' : 'gray';
+  $('accBody').innerHTML = accs.map((a) => `
+    <tr>
+      <td><code>${esc(a.CustomerId)}</code></td>
+      <td><strong>${esc(a.CustomerName)}</strong></td>
+      <td><span class="badge ${tierCls(a.Tier)}">${esc(a.Tier)}</span></td>
+      <td>${esc(a.AccountOwner)}</td>
+      <td>¥${Number(a.AnnualRevenue || 0).toLocaleString('ja-JP')}</td>
+      <td>${esc(a.RenewalDate)}</td>
+      <td>${esc(a.Notes)}</td>
+      <td><button class="sm" data-ask="${esc(a.CustomerName + '(' + a.CustomerId + ')のCRM上の状況と、ERP側の関連受注・出荷状況を教えて')}">A2Aで確認</button></td>
+    </tr>`).join('');
+
+  const sevCls = (s) => s === 'High' ? 'red' : s === 'Medium' ? 'amber' : 'gray';
+  const stCls = (s) => s === 'Open' ? 'red' : s === 'InProgress' ? 'amber' : 'green';
+  $('tckBody').innerHTML = tcks.map((t) => `
+    <tr>
+      <td><code>${esc(t.Id)}</code></td>
+      <td><span class="badge ${sevCls(t.Severity)}">${esc(t.Severity)}</span></td>
+      <td><span class="badge ${stCls(t.Status)}">${esc(t.Status)}</span></td>
+      <td><strong>${esc(t.CustomerName)}</strong><div class="meta">${esc(t.CustomerId)}</div></td>
+      <td><code>${esc(t.OrderId)}</code></td>
+      <td><strong>${esc(t.Subject)}</strong><div class="meta">${esc(t.Summary)}</div></td>
+      <td>${esc(t.CreatedAt)}</td>
+      <td><button class="sm sec" data-ask="${esc(t.CustomerName + '(' + t.CustomerId + ')の注文 ' + t.OrderId + ' のクレーム状況と、ERP側の受注・出荷状況は？')}">ERP状況をA2Aで確認</button></td>
+    </tr>`).join('');
+
+  document.querySelectorAll('button[data-ask]').forEach((btn) => {
+    btn.addEventListener('click', () => askA2A(btn.dataset.ask));
+  });
+})();
+
+async function post(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
   return d;
 }
-const STATUS={completed:'完了',forbidden:'委譲不可(方針)','input-required':'追加情報が必要',error:'エラー',unreachable:'接続不可',failed:'失敗'};
-$('btnAsk').addEventListener('click',async()=>{
-  const btn=$('btnAsk'); btn.disabled=true; $('fedErr').textContent=''; btn.textContent='回答作成中...';
-  try{
-    const d=await post('api/a2a-demo/federated-ask',{question:$('q').value,persona:$('persona').value});
-    $('fedOut').style.display='block';
-    const loc=d.local||{}; const erp=(d.peers||[]).find(p=>p.peer==='erp')||{};
-    $('crmMeta').textContent=(d.persona&&d.persona.label)||'';
-    $('crmAns').textContent=loc.answer||'(回答なし)';
-    $('crmSub').textContent=`権限で除外 ${loc.acl_filtered??0} 件 · 引用 ${(loc.citations||[]).length} 件 · 監査ID ${String(loc.audit_id||'').slice(0,8)}`;
-    $('erpMeta').textContent=STATUS[erp.status]||erp.status||'';
-    $('erpMeta').className='badge '+(erp.status==='completed'?'green':erp.status==='forbidden'?'gray':'red');
-    $('erpAns').textContent=erp.status==='forbidden'?'この利用者のロールは ERP への委譲が許可されていないため、ERP Agent を呼び出していません。':(erp.answer||erp.error||'(応答なし)');
-    $('erpSub').textContent=erp.status==='completed'?`ERP 側で権限により除外 ${erp.acl_filtered??0} 件 · ERP 監査ID ${String(erp.audit_id||'').slice(0,8)}`:'';
-  }catch(e){$('fedErr').textContent='エラー: '+e.message;}
-  finally{btn.disabled=false; btn.textContent='A2A 連携で回答';}
+const STATUS = {completed:'完了', forbidden:'委譲不可(方針)', 'input-required':'追加情報が必要', error:'エラー', unreachable:'接続不可', failed:'失敗'};
+$('btnAsk').addEventListener('click', async () => {
+  const btn = $('btnAsk'); btn.disabled = true; $('fedErr').textContent = ''; btn.textContent = '回答作成中...';
+  try {
+    const d = await post('api/a2a-demo/federated-ask', {question:$('q').value, persona:$('persona').value});
+    $('fedOut').style.display = 'block';
+    const loc = d.local || {}; const erp = (d.peers || []).find((p) => p.peer === 'erp') || {};
+    $('crmMeta').textContent = (d.persona && d.persona.label) || '';
+    $('crmAns').textContent = loc.answer || '(回答なし)';
+    $('crmSub').textContent = `権限で除外 ${loc.acl_filtered ?? 0} 件 · 引用 ${(loc.citations || []).length} 件 · 監査ID ${String(loc.audit_id || '').slice(0, 8)}`;
+    $('erpMeta').textContent = STATUS[erp.status] || erp.status || '';
+    $('erpMeta').className = 'badge ' + (erp.status === 'completed' ? 'green' : erp.status === 'forbidden' ? 'gray' : 'red');
+    $('erpAns').textContent = erp.status === 'forbidden' ? 'この利用者のロールは ERP への委譲が許可されていないため、ERP Agent を呼び出していません。' : (erp.answer || erp.error || '(応答なし)');
+    $('erpSub').textContent = erp.status === 'completed' ? `ERP 側で権限により除外 ${erp.acl_filtered ?? 0} 件 · ERP 監査ID ${String(erp.audit_id || '').slice(0, 8)}` : '';
+  } catch (e) { $('fedErr').textContent = 'エラー: ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'A2A 連携で回答'; }
 });
-document.querySelectorAll('button[data-dir]').forEach(b=>b.addEventListener('click',async()=>{
-  b.disabled=true; $('aclErr').textContent='';
-  try{
-    const d=await post('api/a2a-demo/acl-check?direction='+encodeURIComponent(b.dataset.dir));
-    $('aclOut').style.display='block';
-    $('aclBadge').innerHTML=d.leaked?'<span class="badge red">漏えいを検出</span>':'<span class="badge green">PASS: 機密は返されていません</span>';
-    $('aclQ').textContent=`${d.agent||''} への質問: ${d.question}`;
-    $('aclAns').textContent=d.answer||'(回答なし)';
-    $('aclSub').textContent=`タスク状態 ${d.state} · 相手側で権限により除外 ${d.acl_filtered??0} 件 · 監査ID ${String(d.audit_id||'').slice(0,8)}`;
-  }catch(e){$('aclErr').textContent='エラー: '+e.message;}
-  finally{b.disabled=false;}
+document.querySelectorAll('button[data-dir]').forEach((b) => b.addEventListener('click', async () => {
+  b.disabled = true; $('aclErr').textContent = '';
+  try {
+    const d = await post('api/a2a-demo/acl-check?direction=' + encodeURIComponent(b.dataset.dir));
+    $('aclOut').style.display = 'block';
+    $('aclBadge').innerHTML = d.leaked ? '<span class="badge red">漏えいを検出</span>' : '<span class="badge green">PASS: 機密は返されていません</span>';
+    $('aclQ').textContent = `${d.agent || ''} への質問: ${d.question}`;
+    $('aclAns').textContent = d.answer || '(回答なし)';
+    $('aclSub').textContent = `タスク状態 ${d.state} · 相手側で権限により除外 ${d.acl_filtered ?? 0} 件 · 監査ID ${String(d.audit_id || '').slice(0, 8)}`;
+  } catch (e) { $('aclErr').textContent = 'エラー: ' + e.message; }
+  finally { b.disabled = false; }
 }));
 </script>
 </body></html>"""

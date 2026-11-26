@@ -30,8 +30,8 @@
 </div>
 {% endif %}
 <div id="nav">
-    <a href="{{ bp }}/">ホーム</a>
     <a href="{{ bp }}/ai-panel" class="nav-ai-link">🤖 AIパネル紹介</a>
+    <a href="{{ bp }}/home">ホーム</a>
     {% for path, label, entity in nav_items(request) %}<a href="{{ bp }}{{ path }}">{{ label }}</a>
     {% endfor %}
 </div>

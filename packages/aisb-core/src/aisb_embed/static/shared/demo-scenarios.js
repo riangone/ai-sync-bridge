@@ -18,6 +18,20 @@ window.AISB.demoScenarios = {
       { type: "highlight", selector: "#aisb-bridge-results" },
     ],
   },
+  a2a: {
+    title: "別システム(CRM)とA2A連携で横断回答を体験",
+    doneText: "相手システムのDBには触れず、権限と委譲方針に応じて返された結論だけを並べて確認できました。下部の折りたたみから Agent Card の発見仕組みも確認できます。",
+    steps: [
+      { type: "openPanel", panel: "a2a", text: "AIパネルの「A2A連携」専用タブを自動で開きます…" },
+      { type: "waitFor", selector: "#aisb-a2a-run", timeoutMs: 10000 },
+      { type: "narrate", text: "ERP(受注・納期)とCRM(VIP・クレーム)の両方にまたがる質問を入力します" },
+      { type: "setValue", selector: "#aisb-a2a-q", value: "山田商事の注文 ORD1015 の状況とクレーム履歴を教えて" },
+      { type: "narrate", text: "「A2A連携で質問」を押すと、ERP自身の回答とCRM Agentへ委譲した結論を並べて表示します" },
+      { type: "click", selector: "#aisb-a2a-run" },
+      { type: "waitFor", selector: "#aisb-a2a-results .aisb-badge", timeoutMs: 120000 },
+      { type: "highlight", selector: "#aisb-a2a-results" },
+    ],
+  },
   inventory: {
     title: "在庫の異常を1クリックで発見",
     doneText: "発注点を割った商品が一目でわかりました。",

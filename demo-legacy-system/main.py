@@ -326,6 +326,11 @@ def api_entity_detail(request: Request, entity: str, rid: str):
 # Home / Dashboard
 # ---------------------------------------------------------------------------
 @app.get("/")
+def root(request: Request):
+    return redirect_to(request, "/ai-panel", status_code=302)
+
+
+@app.get("/home")
 def home(request: Request):
     summary = {
         "customers": len(db.customers),

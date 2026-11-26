@@ -52,6 +52,7 @@ _SCRIPT_FILES = [
     "modules/panel-recommend.js",
     "modules/panel-web-search.js",
     "modules/panel-bridge.js",
+    "modules/panel-a2a.js",
     # ↓ ここに profile.extra_modules (例: modules/panel-valuation.js) が挿入される
     "modules/panel-assistant.js",
     "modules/panel-conv-input.js",

@@ -78,7 +78,9 @@ def test_role_select_lists_only_selectable_personas():
 
 def test_internal_calls_are_not_restricted():
     local = _client(("127.0.0.1", 50000))
-    assert local.get("/").status_code == 200
+    root_res = local.get("/")
+    assert root_res.status_code == 302 and root_res.headers["location"] == "/ai-panel"
+    assert local.get("/home").status_code == 200
     res = local.get("/api/Employee/list", params={"limit": 1000})
     assert res.status_code == 200 and res.json()["count"] == len(db.employees)
     # 同じマシンでもプロキシ経由なら公開経路として扱う
@@ -124,12 +126,12 @@ def test_screen_and_api_matrix():
 
 
 def test_nav_and_home_follow_role():
-    hr = _as("hr").get("/").text
+    hr = _as("hr").get("/home").text
     assert "従業員管理" in hr and "顧客管理" not in hr and "受注合計金額" not in hr and "顧客数" not in hr
-    assert '"id": "hr"' in hr and '"panels": ["bridge"]' in hr
-    sales = _as("sales").get("/").text
+    assert '"id": "hr"' in hr and '"panels": ["bridge", "a2a"]' in hr
+    sales = _as("sales").get("/home").text
     assert "顧客管理" in sales and "受注合計金額" in sales and "従業員管理" not in sales and "請求管理" not in sales
-    admin = _as("admin").get("/").text
+    admin = _as("admin").get("/home").text
     assert '"panels": ["*"]' in admin
     # 権限エラーの画面にも AI パネルと切り替え導線を出す
     denied = _as("sales").get("/Employee/List")
@@ -194,7 +196,7 @@ def test_next_outside_the_role_falls_back_to_home():
 
 def test_every_route_is_classified():
     """業務画面を追加したのに権限を定義し忘れる、を防ぐ。"""
-    role_only = {"/", "/ai-panel", "/role", "/api/entities", "/api/{entity}/list", "/api/{entity}/detail/{rid}",
+    role_only = {"/", "/home", "/ai-panel", "/role", "/api/entities", "/api/{entity}/list", "/api/{entity}/detail/{rid}",
                  "/aisb-embed/status", "/aisb-embed/toggle", "/aisb-embed/admin",
                  "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
     policy = main.roles.policy
