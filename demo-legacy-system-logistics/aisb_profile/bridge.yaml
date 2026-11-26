@@ -1,0 +1,85 @@
+# ============================================================================
+# AI-Sync Bridge 導入先プロファイル: レガシー物流・倉庫管理(WMS/TMS)デモ
+#   ai-api-server 起動時に AISB_BRIDGE_PROFILE=<このファイル> を指定する(start-logistics.sh)。
+#   ERP / CRM とは独立した DB・ACL・監査チェーンを持つ。信頼する相手は ERP だけ(CRM とは直接つながない)。
+# ============================================================================
+
+auth:
+  mode: api_key
+  api_keys:
+    - key: ${AISB_LOGI_ADMIN_KEY:-}
+      user_id: logi_admin
+      tenant: acme
+      roles: [bridge_admin, logi_ops, logi_contract]
+    # ERP Agent が物流を呼ぶときのキー。受信時はこの主体を ERP Peer と見なす(a2a.peers[].inbound_user_id)
+    - key: ${AISB_A2A_ERP_LOGI_KEY:-}
+      user_id: a2a_erp_agent
+      tenant: acme
+      roles: [a2a_erp_peer]
+
+audit:
+  store_query_text: false
+  store_answer_text: false
+
+answer:
+  top_k: 10
+
+sync:
+  interval_sec: 0
+
+demo:
+  ask_per_ip_per_hour: 40
+  read_per_ip_per_minute: 60
+  sync_cooldown_sec: 60
+  personas:
+    - {id: ops, label: 倉庫・配送担当, note: 物流部, user_id: logi_ops01, tenant: acme, roles: [logi_ops]}
+    - {id: contract, label: 契約担当, note: 物流部 契約, user_id: logi_contract01, tenant: acme, roles: [logi_contract]}
+
+a2a:
+  enabled: true
+  id: logistics
+  name: "Logistics & Warehouse Agent"
+  description: "Handles shipment status, delivery ETA, delay reasons and warehouse stock allocation. Freight contracts are never shared with any agent."
+  url: ${AISB_A2A_PUBLIC_URL:-http://127.0.0.1:5031}
+  organization: "Acme Corp - Logistics Division"
+  # 受け付ける経路長の上限: crm → erp → logistics(2) まで。それより長い中継は拒否
+  max_hops: 2
+  peers:
+    - name: erp
+      url: ${AISB_A2A_ERP_URL:-http://127.0.0.1:5011}
+      api_key: ${AISB_A2A_LOGI_ERP_KEY:-}
+      description: "Manufacturing ERP Agent (hub). Direct requests see shipments and stock."
+      inbound_user_id: a2a_erp_agent
+      # ERP が「中継してきた」依頼(CRM 発など)は、配送状況だけ見える縮退ロールで評価する
+      relay_roles: [a2a_relay_view]
+      rate_per_min: 30
+      allowed_roles: [logi_ops]
+      acl_probe:
+        question: "請求書(Invoice)の請求金額と支払状況を一覧で教えて"
+        secret_entity: Invoice
+
+sources:
+  - name: legacy_logi_api
+    type: http_list
+    config:
+      base_url: ${AISB_LEGACY_BASE_URL:-http://localhost:5030}
+    entities:
+      - name: Shipment
+        pk: Id
+        title: Id
+        label: 出荷 配送 到着予定 遅延
+        text: [OrderId, CustomerId, CustomerName, Carrier, Status, ShipDate, ETA, Destination, DelayReason]
+        acl: {tenant: acme, roles: [logi_ops, a2a_erp_peer, a2a_relay_view]}
+      - name: Stock
+        pk: Id
+        title: ProductName
+        label: 倉庫在庫 ロケーション 引当 入荷
+        text: [ProductId, ProductName, Warehouse, Location, OnHand, Allocated, AllocatedOrderId, NextInbound]
+        # 倉庫内の情報は ERP からの直接の依頼まで。中継(a2a_relay_view)には出さない
+        acl: {tenant: acme, roles: [logi_ops, a2a_erp_peer]}
+      - name: FreightContract
+        pk: Id
+        title: Carrier
+        label: 運送契約 運賃 秘密割引
+        text: [Carrier, ConfidentialLevel, BaseRate, CustomerSurcharge, SecretDiscount, ApprovedBy]
+        acl: {tenant: acme, roles: [logi_contract]}

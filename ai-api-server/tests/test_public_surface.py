@@ -55,6 +55,13 @@ ANONYMOUS_WRITES = {
     # A2A: 鍵付き経路は匿名主体を 401 で拒否、demo 経路はペルソナ必須 + DemoGateway の回数制限
     # (app/routers/a2a.py、回帰は tests/test_a2a.py の 8〜12)
     ("POST", "/a2a"), ("POST", "/api/a2a/federated-ask"), ("POST", "/api/a2a/demo/federated-ask"),
+    # 招待の受信・回答: 登録済み Peer のキーだけ(check_inbound purpose=handshake、tests/test_a2a.py T5/T6/T12)
+    ("POST", "/a2a/invitations"), ("POST", "/a2a/invitations/{invite_code}/decision"),
+    # 公開デモのガバナンス操作: IP 別の回数制限(_gov_limiter / ask_limiter)+ TTL で初期状態へ戻る(T8/T14)。
+    # 対象は設定済み Peer だけで、任意 URL への接続や Peer キーの露出はない
+    ("POST", "/api/a2a/demo/publish"), ("POST", "/api/a2a/demo/discover"),
+    ("POST", "/api/a2a/demo/peers/{peer_name}/action"), ("POST", "/api/a2a/demo/invitations/{invite_code}/respond"),
+    ("POST", "/api/a2a/demo/verify-auth"), ("POST", "/api/a2a/demo/reset"), ("POST", "/api/a2a/demo/acl-probe"),
 }
 OPERATOR_READS = {"/api/analysis-history", "/api/push/subscriptions"}
 OPERATOR_WRITES = [

@@ -43,10 +43,13 @@ demo:
 
 a2a:
   enabled: true
+  id: crm
   name: "CRM Support & Sales Agent"
   description: "Handles VIP account tiers, customer complaints (tickets), and renewal impact. Confidential legal contracts are strictly ACL-isolated."
   url: ${AISB_A2A_PUBLIC_URL:-http://127.0.0.1:5021}
   organization: "Acme Corp - CRM Division"
+  max_hops: 1
+  governance_ttl_sec: 600
   peers:
     - name: erp
       url: ${AISB_A2A_ERP_URL:-http://127.0.0.1:5011}
@@ -54,6 +57,11 @@ a2a:
       description: "Manufacturing ERP Agent for order status, delivery dates, and product stock."
       # 委譲上限: 顧客対応ロールだけが ERP へ問い合わせられる(法務は不可)
       allowed_roles: [crm_support, crm_sales]
+      # ERP のキー(a2a_erp_agent)で来た依頼を ERP Peer と見なす。CRM は中継依頼を受けない(relay_roles なし)
+      inbound_user_id: a2a_erp_agent
+      acl_probe:
+        question: "従業員の給与・人事情報を一覧で教えて"
+        secret_entity: Employee
 
 sources:
   - name: legacy_crm_api

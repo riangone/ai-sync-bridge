@@ -417,17 +417,20 @@
       </div>
 
       <div class="card">
-        <span class="card-tag">A2A 連携 · LEGACY CRM</span>
+        <span class="card-tag">A2A 連携 · LEGACY CRM ＋ 物流</span>
         <h2>システムをまたぐ質問を、データを渡さずに答える</h2>
-        <p class="card-sub">営業・クレーム管理の CRM を ERP とは別のシステムとして置き、Agent 同士(A2A)で問い合わせるデモです。DB や権限は共有しません。</p>
+        <p class="card-sub">営業・クレーム管理の CRM と、出荷・倉庫を扱う物流システムを ERP とは別のシステムとして置き、Agent 同士(A2A)で問い合わせるデモです。DB や権限は共有しません。</p>
         <ul>
           <li><b>連携の例:</b> 「山田商事の ORD1015 にクレームは来ている？顧客ランクは？」— ERP の営業担当が、CRM の Agent に聞いて答えを並べます</li>
           <li><b>境界:</b> 相手の DB や検索には触れず、相手 Agent が自分の権限の範囲で出した結論だけを受け取ります。機密契約(違約金)や人事情報は相手に渡りません</li>
           <li><b>委譲の方針:</b> どのロールが相手システムに問い合わせられるかを導入先で決めます(営業は可、人事・法務は不可)</li>
-          <li><b>監査:</b> 両システムがそれぞれのハッシュチェーン監査ログに委譲を記録します</li>
+          <li><b>多段委譲:</b> CRM と物流は直接つながっていません。CRM の質問は ERP が物流へ中継し、物流は中継された依頼を<b>権限を縮退</b>して評価します(配送状況は見せるが倉庫在庫は見せない)</li>
+          <li><b>統合回答:</b> 3つの Agent の結論だけから1つの回答を作り、根拠の Agent を文ごとに示します</li>
+          <li><b>監査:</b> 各システムがそれぞれのハッシュチェーン監査ログに委譲・中継を記録します</li>
         </ul>
         <div class="card-actions">
           <a class="btn btn-primary" href="/crm/">CRM × A2A デモを開く</a>
+          <a class="btn btn-primary" href="/logistics/">物流 × A2A デモを開く</a>
           <a class="btn btn-secondary" href="/erp/">ERP 側から試す(権限検索タブ)</a>
         </div>
       </div>

@@ -1,7 +1,8 @@
 // modules/panel-a2a.js — A2A (Agent-to-Agent) システム間連携 & ライフサイクル管理の専用デモタブ
 //
 // 2つのサブビューを提供:
-//   1. 🤝 連携デモ: 2つの独立システム(ERP / CRM)が DB 非共有のまま協調回答・機密隔離を実演
+//   1. 🤝 連携デモ: 3つの独立システム(ERP / CRM / 物流)が DB 非共有のまま協調回答・機密隔離を実演
+//      (統合回答・ホップごとのトレース付き)
 //   2. 🛡️ 発見・認証・管理: 定義・公開・一覧・探索・招待・認証・拒否・遮断の全ライフサイクルを実操作
 window.AISB = window.AISB || {};
 window.AISB.panels = window.AISB.panels || {};
@@ -11,6 +12,12 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
   const ME = window.AISB_DEMO_ROLE || null;
 
   const SCENARIOS = [
+    {
+      label: "🚚 3システム統合（ERP＋CRM＋物流）",
+      desc: "受注(ERP)・クレーム(CRM)・出荷保留の理由(物流)を並列に委譲し、各Agentの結論だけから統合回答を作成",
+      q: "山田商事の注文 ORD1015 はいつ届く？クレーム状況と、出荷が止まっている理由もまとめて",
+      synthesize: true,
+    },
     {
       label: "📦 注文遅延＋クレーム横断",
       desc: "ERPの受注(ORD1015)とCRMのクレーム履歴を横断確認",
@@ -28,6 +35,9 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
     },
   ];
 
+  const PEER_LABEL = { crm: "CRM", logistics: "物流", erp: "ERP" };
+  const PEER_PAGE = { crm: "/crm/", logistics: "/logistics/" };
+  const peerLabel = (n) => PEER_LABEL[n] || String(n || "").toUpperCase();
   const STATUS_META = {
     active: { label: "連携中", bg: "#e6f7ec", fg: "#0a7d34" },
     invited: { label: "招待中", bg: "#eff6ff", fg: "#1d4ed8" },
@@ -59,10 +69,13 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         ).join("")}
       </div>
 
-      <div id="aisb-a2a-row" style="display:flex;gap:4px;margin-bottom:8px">
+      <div id="aisb-a2a-row" style="display:flex;gap:4px;margin-bottom:4px">
         <input id="aisb-a2a-q" type="text" value="${esc(SCENARIOS[0].q)}" placeholder="システム横断で質問を入力..." style="flex:1" />
         <button id="aisb-a2a-run" type="button">A2A連携回答</button>
       </div>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555;margin-bottom:8px">
+        <input id="aisb-a2a-synth" type="checkbox" checked /> 各Agentの結論から<b>統合回答</b>を作る（相手の回答は「データ」として扱い、指示には従わない）
+      </label>
 
       <div id="aisb-a2a-results"></div>
     </div>
@@ -100,8 +113,9 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         <div style="color:#555;margin:4px 0">
           ホワイトリスト登録済みの Peer から <code>/.well-known/agent.json</code> をリアルタイム取得します（未登録URLはSSRF防止で拒否）。
         </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <div id="aisb-gov-disc-btns" style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="aisb-gov-disc" data-target="crm" type="button" style="font-size:11px;padding:3px 8px">🔎 CRM Agent を発見</button>
+          <button class="aisb-gov-disc" data-target="logistics" type="button" style="font-size:11px;padding:3px 8px">🔎 物流 Agent を発見</button>
           <button class="aisb-gov-disc" data-target="unknown-ext" type="button" style="font-size:11px;padding:3px 8px">⚠️ 未登録外部Agentを探索</button>
         </div>
         <div id="aisb-gov-disc-out" style="margin-top:6px"></div>
@@ -110,28 +124,56 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
       <!-- ③ 一覧・相互招待・拒否・遮断 -->
       <div class="aisb-card" style="margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <b>③ 一覧・相互招待・拒否・遮断 (ERP ⇄ CRM)</b>
+          <b>③ 一覧・相互招待・拒否・遮断 (ERP ⇄ CRM / 物流)</b>
           <button id="aisb-gov-refresh" type="button" style="font-size:10.5px;padding:2px 7px">↻ 状態更新</button>
         </div>
         <div style="color:#555;margin:4px 0">
-          実システム間で招待を送信します。ERP から CRM へ招待を送ると、<a href="/crm/" target="_blank" style="color:#1d4ed8">CRM コンソール</a>側にリアルタイムで届き、承認・拒否が即時反映されます。
+          実システム間で招待を送信します。招待は <a href="/crm/" target="_blank" style="color:#1d4ed8">CRM</a> / <a href="/logistics/" target="_blank" style="color:#1d4ed8">物流</a> の画面にリアルタイムで届き、承認・拒否が即時反映されます。
+          差出人は本文ではなく<b>認証済みのキー</b>から相手が判定します。招待中（未承認）・遮断中の相手からの依頼は <b>受信側でも 403</b> です。
+          <div id="aisb-gov-ttl" style="color:#92400e;margin-top:2px"></div>
         </div>
         <div id="aisb-gov-peers"></div>
         <div id="aisb-gov-inbox" style="margin-top:8px"></div>
       </div>
 
       <!-- ④ 認証テスト -->
-      <div class="aisb-card" style="margin-bottom:4px">
+      <div class="aisb-card" style="margin-bottom:8px">
         <b>④ 認証テスト (Authenticate)</b>
         <div style="color:#555;margin:4px 0">
-          CRM Agent の <code>POST /a2a</code> へ実際にリクエストを送り、正規キー・匿名・不正キーの挙動を検証します（LLM消費なし）。
+          相手 Agent の <code>POST /a2a</code> へ実際にリクエストを送り、正規キー・匿名・不正キーの挙動を検証します（LLM消費なし）。
+          相手がこちらを遮断/未承認にしていれば、正規キーでも <b>403</b> になります。
         </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          <select id="aisb-gov-auth-peer" style="font-size:11px;padding:2px 4px"><option value="crm">CRM</option><option value="logistics">物流</option></select>
           <button class="aisb-gov-auth" data-mode="valid" type="button" style="font-size:11px;padding:3px 8px">✅ 正規Peerキー</button>
           <button class="aisb-gov-auth" data-mode="anonymous" type="button" style="font-size:11px;padding:3px 8px">🚫 匿名アクセス</button>
           <button class="aisb-gov-auth" data-mode="invalid" type="button" style="font-size:11px;padding:3px 8px">🔑 不正キー</button>
         </div>
         <div id="aisb-gov-auth-out" style="margin-top:6px"></div>
+      </div>
+
+      <!-- ⑤ 多段委譲の信頼関係 -->
+      <div class="aisb-card" style="margin-bottom:8px">
+        <b>⑤ 多段委譲と権限の縮退 (Relay / Attenuation)</b>
+        <div style="color:#555;margin:4px 0">
+          各 Agent は<b>自分の Peer しか知りません</b>。CRM と物流は直接つながっておらず、CRM の依頼は ERP が中継したときだけ物流に届きます。
+          物流は中継された依頼を <code>relay_roles</code> の<b>縮退ロール</b>で評価し（倉庫在庫は見せない）、ループや <code>max_hops</code> 超過は拒否します。
+        </div>
+        <div id="aisb-gov-topo" style="font-size:11px"></div>
+        <div style="color:#555;margin-top:6px">試す: <a href="/crm/" target="_blank" style="color:#1d4ed8">CRM</a> で「🚚 3システム多段」を実行 → <a href="/logistics/" target="_blank" style="color:#1d4ed8">物流の受信ログ</a>に <code>crm → erp → logistics（中継・縮退）</code> と記録されます。</div>
+      </div>
+
+      <!-- ⑥ ACL 検証 -->
+      <div class="aisb-card" style="margin-bottom:4px">
+        <b>⑥ 権限分離の検証 (ACL Probe)</b>
+        <div style="color:#555;margin:4px 0">
+          ERP の Peer キーで、相手の<b>機密</b>を狙う固定の質問を送ります（質問文は <code>bridge.yaml</code> の <code>acl_probe</code> で固定）。Peer キーは Bridge の外に出しません。
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="aisb-gov-probe" data-peer="crm" type="button" style="font-size:11px;padding:3px 8px">🔒 CRM の違約金(15%)を聞き出す</button>
+          <button class="aisb-gov-probe" data-peer="logistics" type="button" style="font-size:11px;padding:3px 8px">🔒 物流の秘密割引(22%)を聞き出す</button>
+        </div>
+        <div id="aisb-gov-probe-out" style="margin-top:6px"></div>
       </div>
     </div>
   `;
@@ -185,7 +227,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
                 ? `<span style="background:#e6f7ec;color:#0a7d34;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">委譲許可</span>`
                 : `<span style="background:#f3f4f6;color:#666;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">方針により委譲不可</span>`;
           return `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee">
-            <b>Peer: ${esc(p.name.toUpperCase())} Agent</b> ${stBadge} ${roleBadge}
+            <b>Peer: ${esc(peerLabel(p.name))} Agent</b> ${stBadge} ${roleBadge}
             <div style="font-size:11px;color:#666">${esc(p.description || "")}</div>
           </div>`;
         })
@@ -218,15 +260,71 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
 
       renderGovPeers(d.peers || []);
       renderGovInbox(d.incoming_invitations || []);
+      $("#aisb-gov-ttl").textContent =
+        d.governance_expires_in != null
+          ? `※ 公開デモの変更は全訪問者で共有されるため、あと約${Math.ceil(d.governance_expires_in / 60)}分で自動的に初期状態へ戻ります。`
+          : "";
+      loadTopology();
     } catch (e) {
       $("#aisb-gov-peers").innerHTML = `<div style="color:#d03b3b">取得エラー: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function loadTopology() {
+    const box = $("#aisb-gov-topo");
+    try {
+      const res = await fetch(`${ctx.API_BASE}/api/a2a/demo/topology`);
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.detail || `HTTP ${res.status}`);
+      const rows = (d.edges || [])
+        .map((e) => {
+          const path =
+            e.kind === "relay"
+              ? `${peerLabel(e.from)} → ${peerLabel(e.via)} → ${peerLabel(e.to)}`
+              : `${peerLabel(e.from)} → ${peerLabel(e.to)}`;
+          const kind =
+            e.kind === "relay"
+              ? `<span style="color:#92400e;font-weight:700">中継</span>（受信側で縮退）`
+              : `<span style="color:#1d4ed8;font-weight:700">委譲</span> 上限: <code>${esc((e.allowed_roles || []).join(", ") || "全ロール")}</code>`;
+          return `<tr><td style="padding:2px 4px"><code>${esc(path)}</code></td><td style="padding:2px 4px">${kind}</td><td style="padding:2px 4px">${badgeHtml(e.status === "inactive" ? "blocked" : e.status)}</td></tr>`;
+        })
+        .join("");
+      box.innerHTML = `<table style="width:100%;border-collapse:collapse;margin-top:4px">
+        <thead><tr style="color:#64748b;text-align:left"><th style="padding:2px 4px">経路</th><th style="padding:2px 4px">種類</th><th style="padding:2px 4px">状態</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+        <div style="color:#64748b;margin-top:3px">自Agent: <code>${esc(d.self && d.self.id)}</code> · 受け付ける経路長の上限 <code>max_hops: ${esc(String(d.self && d.self.max_hops))}</code></div>`;
+    } catch (e) {
+      box.innerHTML = `<span style="color:#d03b3b">取得エラー: ${esc(e.message)}</span>`;
+    }
+  }
+
+  async function runProbe(peer) {
+    const out = $("#aisb-gov-probe-out");
+    out.innerHTML = `<div style="color:#666">${esc(peerLabel(peer))} Agent へ検証中（LLMを1回使います）...</div>`;
+    try {
+      const res = await fetch(`${ctx.API_BASE}/api/a2a/demo/acl-probe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ peer }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.detail || `HTTP ${res.status}`);
+      const color = d.leaked ? "#b91c1c" : "#0a7d34";
+      out.innerHTML = `<div style="padding:6px;border-radius:4px;background:#f8fafc;border-left:3px solid ${color}">
+        <div style="color:${color};font-weight:700">${d.leaked ? "漏えいを検出" : "PASS: 機密は返されていません"}</div>
+        <div style="font-size:10.5px;color:#555">質問: ${esc(d.question)} · 狙った機密: <code>${esc(d.secret_entity || "")}</code></div>
+        <div style="white-space:pre-wrap;margin-top:3px">${esc(d.answer || d.error || "(回答なし)")}</div>
+        <div style="font-size:10.5px;color:#666;margin-top:3px">状態 ${esc(d.state)} · 相手側で権限により除外 <b>${esc(String(d.acl_filtered ?? 0))}</b> 件 · 根拠エンティティ: <code>${esc((d.cited_entities || []).join(", ") || "なし")}</code></div>
+      </div>`;
+    } catch (e) {
+      out.innerHTML = `<div style="color:#d03b3b">検証エラー: ${esc(e.message)}</div>`;
     }
   }
 
   function renderGovInbox(invs) {
     const box = $("#aisb-gov-inbox");
     if (!invs.length) {
-      box.innerHTML = `<div style="font-size:10.5px;color:#64748b;border-top:1px dashed #cbd5e1;padding-top:6px">📥 受信した招待（他システムから）: なし（CRM側から招待を送るとここに表示されます）</div>`;
+      box.innerHTML = `<div style="font-size:10.5px;color:#64748b;border-top:1px dashed #cbd5e1;padding-top:6px">📥 受信した招待（他システムから）: なし（CRM / 物流の画面から招待を送るとここに表示されます）</div>`;
       return;
     }
     const stMap = {
@@ -248,7 +346,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
                 : "";
             return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:5px 6px;margin-top:4px">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
-                <div><b>${esc(inv.from_agent)}</b> ${badge}</div>
+                <div><b>${esc(inv.from_agent)}</b> ${badge} <span style="font-size:10px;color:#64748b">差出人(キーで判定): <code>${esc(inv.from_peer_name)}</code></span></div>
                 <div style="display:flex;gap:4px">${actBtns}</div>
               </div>
               <div style="font-size:10.5px;color:#555;margin-top:2px">コード: <code>${esc(inv.invite_code)}</code> · ${esc(inv.note || "")}</div>
@@ -291,7 +389,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         const invTxt = p.invite_code ? ` · 招待コード: <code>${esc(p.invite_code)}</code>` : "";
         const btns = [];
         if (p.status === "invited") {
-          btns.push(`<a href="/crm/" target="_blank" style="font-size:10.5px;padding:2px 6px;border:1px solid #2563eb;border-radius:4px;color:#1d4ed8;text-decoration:none">CRM側で承認 ↗</a>`);
+          btns.push(`<a href="${esc(PEER_PAGE[p.name] || "/")}" target="_blank" style="font-size:10.5px;padding:2px 6px;border:1px solid #2563eb;border-radius:4px;color:#1d4ed8;text-decoration:none">${esc(peerLabel(p.name))}側で承認 ↗</a>`);
         }
         if (p.status === "active") {
           btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="invite" type="button" style="font-size:10.5px;padding:2px 6px">✉️ 招待送信</button>`);
@@ -306,11 +404,11 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         return `
           <div style="border-top:1px solid #eee;padding-top:6px;margin-top:6px">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
-              <div><b>${esc(p.name.toUpperCase())} Agent</b> ${badgeHtml(p.status)}</div>
+              <div><b>${esc(peerLabel(p.name))} Agent</b> ${badgeHtml(p.status)}</div>
               <div style="display:flex;gap:4px">${btns.join("")}</div>
             </div>
             <div style="font-size:10.5px;color:#555;margin-top:2px">
-              委譲許可ロール: <code>${esc(roles)}</code> · ${authTxt}${invTxt}
+              委譲許可ロール: <code>${esc(roles)}</code> · ${authTxt} · 受信主体: ${p.inbound_bound ? "固定済" : "⚠️未設定"}${(p.relay_to || []).length ? ` · 中継先: <code>${esc(p.relay_to.map(peerLabel).join(", "))}</code>` : ""}${invTxt}
             </div>
           </div>`;
       })
@@ -327,10 +425,14 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action }),
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
           await loadGovernance();
         } catch (e) {
           alert(`操作失敗: ${e.message}`);
+          btn.disabled = false;
         }
       });
     });
@@ -380,12 +482,13 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
 
   async function runVerifyAuth(mode) {
     const out = $("#aisb-gov-auth-out");
-    out.innerHTML = `<div style="color:#666">CRM Agent (/a2a) へ認証テスト送信中...</div>`;
+    const authPeer = $("#aisb-gov-auth-peer").value;
+    out.innerHTML = `<div style="color:#666">${esc(peerLabel(authPeer))} Agent (/a2a) へ認証テスト送信中...</div>`;
     try {
       const res = await fetch(`${ctx.API_BASE}/api/a2a/demo/verify-auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ peer: "crm", mode }),
+        body: JSON.stringify({ peer: authPeer, mode }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.detail || `HTTP ${res.status}`);
@@ -412,7 +515,8 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
       return;
     }
     const seq = ++reqSeq;
-    const peerNames = (peerInfo.peers || []).map((p) => p.name.toUpperCase()).join(", ") || "Peer";
+    const peerNames = (peerInfo.peers || []).map((p) => peerLabel(p.name)).join(" / ") || "Peer";
+    const synthesize = $("#aisb-a2a-synth").checked;
     out.innerHTML = `<div class="aisb-card"><b>A2A 連携回答を実行中...</b>
       <div style="color:#666;font-size:11.5px;margin-top:4px">① 自システム(${esc(peerInfo.agent || "ERP")})の権限検索と、② ${esc(peerNames)} Agent への A2A 質問委譲を並列実行しています...</div></div>`;
 
@@ -420,16 +524,48 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
       const res = await fetch(`${ctx.API_BASE}/api/a2a/demo/federated-ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona: ME.id, question: q }),
+        body: JSON.stringify({ persona: ME.id, question: q, synthesize }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(`${res.status} ${d.detail || ""}`.trim());
       if (seq !== reqSeq) return;
 
       const loc = d.local || {};
+      const KIND = { local: "自システム検索", delegate: "A2A 委譲", relay: "中継", synthesize: "統合回答" };
+      const traceRows = (d.trace || [])
+        .map((t) => {
+          const ok = t.status === "completed";
+          const st = ok ? `<span style="color:#0a7d34">✔ ${esc(t.status)}</span>` : `<span style="color:#b91c1c">✖ ${esc(t.status)}</span>`;
+          const extra = [
+            t.acl_filtered != null ? `除外 ${esc(String(t.acl_filtered))}` : "",
+            t.attenuated ? `縮退 <code>${esc((t.effective_roles || []).join(","))}</code>` : "",
+            t.error ? esc(t.error) : "",
+          ].filter(Boolean).join(" · ");
+          return `<tr>
+            <td style="padding:2px 4px;color:#64748b">${esc(String(t.step))}</td>
+            <td style="padding:2px 4px">${esc(KIND[t.kind] || t.kind)}</td>
+            <td style="padding:2px 4px"><code>${esc((t.path || []).map(peerLabel).join(" → "))}</code></td>
+            <td style="padding:2px 4px">${st}</td>
+            <td style="padding:2px 4px;text-align:right">${t.latency_ms != null ? esc(String(t.latency_ms)) + "ms" : "-"}</td>
+            <td style="padding:2px 4px;color:#555">${extra}</td></tr>`;
+        })
+        .join("");
+      const traceHtml = traceRows
+        ? `<div class="aisb-card" style="font-size:11px">
+            <b>🧭 実行トレース</b> <span style="color:#666">（各ホップは相手側で独立に権限判定・監査されます）</span>
+            <table style="width:100%;border-collapse:collapse;margin-top:4px"><tbody>${traceRows}</tbody></table>
+          </div>`
+        : "";
+      const synthHtml = d.synthesis
+        ? `<div class="aisb-card" style="border-left:3px solid #7c3aed;background:#faf5ff">
+            <div><b>🧩 統合回答</b> <span style="color:#666;font-size:11px">（各Agentの結論だけから作成 · ${esc(String(d.synthesis.latency_ms))}ms）</span></div>
+            <div style="white-space:pre-wrap;font-size:12px;margin-top:6px">${esc(d.synthesis.answer || "(回答なし)")}</div>
+            <div style="font-size:10.5px;color:#666;margin-top:4px">※ 相手システムの DB には一切アクセスしていません。[erp] [crm] [logistics] は根拠の Agent です。</div>
+          </div>`
+        : "";
       const cites = (loc.citations || []).map((c) => `<li>[${esc(String(c.n))}] ${refLabel(c)}</li>`).join("");
 
-      let html = `
+      let html = synthHtml + traceHtml + `
         <div class="aisb-card" style="border-left:3px solid #2563eb">
           <div><b>① ${esc(d.agent || "自システム (ERP)")}</b> <span style="color:#666;font-size:11px">(${esc(ME.label)}の権限で回答)</span></div>
           <div style="white-space:pre-wrap;font-size:12px;margin:6px 0">${esc(loc.answer || "(回答なし)")}</div>
@@ -439,7 +575,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
 
       html += (d.peers || [])
         .map((p) => {
-          const head = `<b>② ${esc(p.peer.toUpperCase())} Agent</b> <span class="aisb-badge">A2A</span>`;
+          const head = `<b>② ${esc(peerLabel(p.peer))} Agent</b> <span class="aisb-badge">A2A</span>`;
           if (p.status === "blocked") {
             return `<div class="aisb-card" style="border-left:3px solid #374151">
               <div>${head} ${badgeHtml("blocked")}</div>
@@ -455,7 +591,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
           if (p.status === "forbidden") {
             return `<div class="aisb-card" style="border-left:3px solid #9ca3af">
               <div>${head} <span style="font-size:11px;color:#666">委譲ブロック</span></div>
-              <div style="font-size:12px;color:#555;margin-top:4px">${esc(ME.label)}ロールは ${esc(p.peer.toUpperCase())} への委譲が許可されていないため、相手システムには問い合わせていません（<code>bridge.yaml</code> の <code>allowed_roles</code> で制御）。</div>
+              <div style="font-size:12px;color:#555;margin-top:4px">${esc(ME.label)}ロールは ${esc(peerLabel(p.peer))} への委譲が許可されていないため、相手システムには問い合わせていません（<code>bridge.yaml</code> の <code>allowed_roles</code> で制御）。</div>
             </div>`;
           }
           const ok = p.status === "completed";
@@ -489,6 +625,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
       const s = SCENARIOS[Number(btn.dataset.idx)];
       if (!s) return;
       $("#aisb-a2a-q").value = s.q;
+      $("#aisb-a2a-synth").checked = !!s.synthesize;
       runA2A();
     });
   });
@@ -498,6 +635,9 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
   $("#aisb-gov-probe-self").addEventListener("click", () => runDiscover("self"));
   el.querySelectorAll(".aisb-gov-disc").forEach((b) =>
     b.addEventListener("click", () => runDiscover(b.dataset.target)),
+  );
+  el.querySelectorAll(".aisb-gov-probe").forEach((b) =>
+    b.addEventListener("click", () => runProbe(b.dataset.peer)),
   );
   el.querySelectorAll(".aisb-gov-auth").forEach((b) =>
     b.addEventListener("click", () => runVerifyAuth(b.dataset.mode)),

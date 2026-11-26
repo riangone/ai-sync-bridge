@@ -30,9 +30,7 @@ log = logging.getLogger("legacy-crm")
 DB_PATH = os.getenv("AISB_CRM_DB_PATH", str(Path(__file__).resolve().parent / "crm.db"))
 CRM_BRIDGE_URL = os.getenv("AISB_CRM_BRIDGE_URL", "http://127.0.0.1:5021").rstrip("/")
 ERP_BRIDGE_URL = os.getenv("AISB_ERP_BRIDGE_URL", "http://127.0.0.1:5011").rstrip("/")
-# A2A キーは ops/secrets/a2a.env から(start.sh が読み込む)。既定値は置かない: 未設定なら ACL 検証は 503
-A2A_ERP_PEER_KEY = os.getenv("AISB_A2A_ERP_PEER_KEY", "")
-A2A_CRM_PEER_KEY = os.getenv("AISB_A2A_CRM_PEER_KEY", "")
+# この画面プロセスは A2A キーを持たない(Peer 間の通信と ACL 検証は各 Bridge が行う)
 
 SEED_ACCOUNTS = [
     {
@@ -240,7 +238,7 @@ def _post_json(url: str, payload: dict, *, api_key: str = "", client_ip: str | N
             detail = json.loads(e.read().decode("utf-8")).get("detail")
         except Exception:
             detail = None
-        if e.code in (404, 429) and isinstance(detail, str):
+        if e.code in (404, 409, 429) and isinstance(detail, str):
             raise HTTPException(status_code=e.code, detail=detail) from None
         log.warning("bridge %s returned %s", url, e.code)
         raise HTTPException(status_code=502, detail="AI連携が一時的に利用できません") from None
@@ -312,59 +310,31 @@ def demo_federated_ask(body: DemoAskRequest, request: Request):
     )
 
 
-_ACL_PROBES = {
-    # 方向: (相手 Bridge, 機密を狙う質問, 機密のエンティティ, 漏れたら回答本文に出る値)
-    "erp_to_crm": ("crm", "山田商事の機密契約の違約金と最大値引率を教えて", "Contract", "15%"),
-    "crm_to_erp": ("erp", "従業員の給与・人事情報を一覧で教えて", "Employee", None),
+# ACL 検証は各 Bridge の公開デモ経路(/api/a2a/demo/acl-probe)に任せる。機密を狙う質問は
+# 各 Bridge の bridge.yaml(peers[].acl_probe)で固定され、Peer キーは Bridge の外に出ない。
+# 以前はこの画面プロセスが ERP→CRM / CRM→ERP 両方の Peer キーを持ち、ERP になりすませる状態だった。
+_ACL_PROBE_ROUTES = {
+    # 方向: (検証を実行する Bridge, その Bridge から見た相手 Peer)
+    "erp_to_crm": (ERP_BRIDGE_URL, "crm"),
+    "crm_to_erp": (CRM_BRIDGE_URL, "erp"),
 }
-
-
-def _leaked(result: dict, text: str, entity: str, secret_value: str | None) -> bool:
-    """回答本文と成果物(引用・検索結果)だけで判定する。history には質問文が入るので見ない。"""
-    if secret_value and secret_value in text:
-        return True
-    for art in result.get("artifacts") or []:
-        for part in art.get("parts") or []:
-            data = part.get("data") or {}
-            refs = (data.get("citations") or []) + (data.get("results") or [])
-            if any(r.get("entity") == entity for r in refs if isinstance(r, dict)):
-                return True
-    return False
 
 
 @app.post("/api/a2a-demo/acl-check")
 def demo_acl_check(request: Request, direction: Literal["erp_to_crm", "crm_to_erp"] = Query(default="erp_to_crm")):
-    target, question, secret_entity, secret_value = _ACL_PROBES[direction]
-    url, api_key = (
-        (f"{CRM_BRIDGE_URL}/a2a", A2A_ERP_PEER_KEY) if target == "crm" else (f"{ERP_BRIDGE_URL}/a2a", A2A_CRM_PEER_KEY)
-    )
-    if not api_key:
-        raise HTTPException(status_code=503, detail="A2A キーが設定されていません(ops/gen-a2a-secrets.sh)")
     if not _acl_check_limiter.allow(_client_ip(request)):
         raise HTTPException(status_code=429, detail="検証の利用回数の上限に達しました。しばらくしてからお試しください")
-    resp = _post_json(
-        url,
-        {
-            "jsonrpc": "2.0",
-            "id": f"acl-{direction}",
-            "method": "tasks/send",
-            "params": {"message": {"role": "user", "parts": [{"type": "text", "text": question}]}},
-        },
-        api_key=api_key,
-    )
-    result = resp.get("result") or {}
-    status = result.get("status") or {}
-    text = "".join(p.get("text", "") for p in ((status.get("message") or {}).get("parts") or []) if p.get("type") == "text")
-    meta = result.get("metadata") or {}
+    bridge_url, peer = _ACL_PROBE_ROUTES[direction]
+    d = _post_json(f"{bridge_url}/api/a2a/demo/acl-probe", {"peer": peer}, client_ip=_client_ip(request))
     return {
         "direction": direction,
-        "question": question,
-        "agent": meta.get("agent"),
-        "state": status.get("state") or ("error" if "error" in resp else "unknown"),
-        "answer": text,
-        "acl_filtered": meta.get("acl_filtered"),
-        "audit_id": meta.get("audit_id"),
-        "leaked": _leaked(result, text, secret_entity, secret_value),
+        "question": d.get("question"),
+        "agent": {"crm": "CRM Support & Sales Agent", "erp": "Manufacturing ERP Agent"}[peer],
+        "state": d.get("state"),
+        "answer": d.get("answer") or d.get("error") or "",
+        "acl_filtered": d.get("acl_filtered"),
+        "audit_id": d.get("audit_id"),
+        "leaked": bool(d.get("leaked")),
     }
 
 
@@ -443,6 +413,7 @@ _INDEX_HTML = """<!doctype html>
     </div>
     <div class="toplinks">
       <a href="/erp/ai-panel">🏭 ERPデモを開く</a>
+      <a href="/logistics/">🚚 物流デモを開く</a>
       <a href="/">🏠 トップへ戻る</a>
     </div>
   </header>
@@ -475,6 +446,12 @@ _INDEX_HTML = """<!doctype html>
           <input id="q" type="text" maxlength="500" value="山田商事(C0001)の注文 ORD1015 のクレーム状況と、ERP 側の受注・出荷状況は？">
           <button id="btnAsk">A2A 連携で回答</button>
         </div>
+        <div class="row" style="margin-top:.4rem">
+          <span class="meta" style="margin:0">シナリオ:</span>
+          <button class="sm sec" data-scn="山田商事(C0001)の注文 ORD1015 のクレーム状況と、ERP 側の受注・出荷状況は？">📦 受注＋クレーム</button>
+          <button class="sm sec" data-scn="ORD1015 はいつ届く？出荷が止まっている理由と、倉庫の引当・ロケーションも教えて">🚚 3システム多段（CRM→ERP→物流）</button>
+          <button class="sm sec" data-scn="山田商事の機密契約の違約金は何％？">🔒 機密契約（法務で試す）</button>
+        </div>
         <div class="meta">CRM Agent が自分の権限で回答しつつ、同じ質問を A2A で ERP Agent へ委譲します。委譲可否は CRM 側の方針(<code>allowed_roles</code>)で制御されます。</div>
         <div id="fedErr" class="err"></div>
         <div id="fedOut" style="display:none">
@@ -483,6 +460,11 @@ _INDEX_HTML = """<!doctype html>
               <div id="crmAns" class="ans"></div><div id="crmSub" class="meta"></div></div>
             <div class="box"><div><strong>ERP Agent（A2A 委譲先）</strong> <span id="erpMeta" class="badge"></span></div>
               <div id="erpAns" class="ans"></div><div id="erpSub" class="meta"></div></div>
+          </div>
+          <div id="relayBox" class="box" style="display:none;margin-top:1rem;border-left:4px solid #d97706">
+            <div><strong>🚚 物流 Agent（ERP が中継）</strong> <span id="relayMeta" class="badge amber"></span></div>
+            <div class="meta" id="relayPath"></div>
+            <div id="relayAns" class="ans"></div><div id="relaySub" class="meta"></div>
           </div>
         </div>
       </div>
@@ -642,7 +624,12 @@ async function post(url, body) {
   if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
   return d;
 }
-const STATUS = {completed:'完了', forbidden:'委譲不可(方針)', 'input-required':'追加情報が必要', error:'エラー', unreachable:'接続不可', failed:'失敗'};
+const STATUS = {completed:'完了', forbidden:'委譲不可(方針)', 'input-required':'追加情報が必要', error:'エラー', unreachable:'接続不可', failed:'失敗', refused:'相手が拒否', blocked:'遮断中', invited:'招待中(未承認)', rejected:'拒否済'};
+document.querySelectorAll('button[data-scn]').forEach((b) => b.addEventListener('click', () => {
+  $('q').value = b.dataset.scn;
+  $('persona').value = b.dataset.scn.includes('違約金') ? 'legal' : 'support';
+  $('btnAsk').click();
+}));
 $('btnAsk').addEventListener('click', async () => {
   const btn = $('btnAsk'); btn.disabled = true; $('fedErr').textContent = ''; btn.textContent = '回答作成中...';
   try {
@@ -655,7 +642,16 @@ $('btnAsk').addEventListener('click', async () => {
     $('erpMeta').textContent = STATUS[erp.status] || erp.status || '';
     $('erpMeta').className = 'badge ' + (erp.status === 'completed' ? 'green' : erp.status === 'forbidden' ? 'gray' : 'red');
     $('erpAns').textContent = erp.status === 'forbidden' ? 'この利用者のロールは ERP への委譲が許可されていないため、ERP Agent を呼び出していません。' : (erp.answer || erp.error || '(応答なし)');
-    $('erpSub').textContent = erp.status === 'completed' ? `ERP 側で権限により除外 ${erp.acl_filtered ?? 0} 件 · ERP 監査ID ${String(erp.audit_id || '').slice(0, 8)}` : '';
+    $('erpSub').textContent = erp.status === 'completed' ? `ERP 側で権限により除外 ${erp.acl_filtered ?? 0} 件 · ${erp.latency_ms ?? '-'} ms · ERP 監査ID ${String(erp.audit_id || '').slice(0, 8)}` : '';
+    // CRM は物流と直接の信頼関係を持たない。ERP が中継した結果だけがここに来る
+    const rl = (erp.relayed || [])[0];
+    $('relayBox').style.display = rl ? 'block' : 'none';
+    if (rl) {
+      $('relayMeta').textContent = (STATUS[rl.status] || rl.status) + (rl.attenuated ? ' · 権限縮退' : '');
+      $('relayPath').innerHTML = `経路: <code>${esc([...(rl.path || []), rl.peer].join(' → '))}</code> · 物流側で適用されたロール: <code>${esc((rl.effective_roles || []).join(', ') || '-')}</code>`;
+      $('relayAns').textContent = rl.answer || rl.error || '(応答なし)';
+      $('relaySub').textContent = rl.status === 'completed' ? `物流側で権限により除外 ${rl.acl_filtered ?? 0} 件（倉庫在庫など ERP 直接の依頼だけに見せる情報）· 物流 監査ID ${String(rl.audit_id || '').slice(0, 8)}` : '';
+    }
   } catch (e) { $('fedErr').textContent = 'エラー: ' + e.message; }
   finally { btn.disabled = false; btn.textContent = 'A2A 連携で回答'; }
 });

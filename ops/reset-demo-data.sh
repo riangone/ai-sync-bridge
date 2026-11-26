@@ -13,14 +13,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 
 # pm2名 ディレクトリ DBファイル デモのポート APIのポート
-# 公開しているデモは ERP + CRM（A2A 連携デモ）。他業種のデモは pm2 / Caddy から外しており、ここにも載せない。
+# 公開しているデモは ERP + CRM + 物流（A2A 連携デモ）。他業種のデモは pm2 / Caddy から外しており、ここにも載せない。
 DEMOS=(
   "erp demo-legacy-system erp.db 5010 5011"
   "crm demo-legacy-system-crm crm.db 5020 5021"
+  "logistics demo-legacy-system-logistics logistics.db 5030 5031"
 )
 BRIDGE_TARGETS=(
   "erp 5011 $ROOT/ai-api-server/data/bridge_erp.db"
   "crm 5021 $ROOT/ai-api-server/data/bridge_crm.db"
+  "logistics 5031 $ROOT/ai-api-server/data/bridge_logistics.db"
 )
 
 failures=0

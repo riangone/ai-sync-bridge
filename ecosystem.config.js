@@ -3,14 +3,17 @@
 const path = require("path");
 const ROOT = __dirname;
 
-// 公開するデモは ERP と、ERP と A2A で連携する CRM(2026-11)。dealer / realestate / koseki / nenkin は
+// 公開するデモは ERP と、ERP と A2A で連携する CRM・物流(2026-11)。dealer / realestate / koseki / nenkin は
 // 一時的に公開を止めたのではなく、スコープを絞るために撤去した。コードは
 // demo-legacy-system-* に残っているが、pm2 定義・Caddy・landing からは外している。
 // CRM は 5020/5021 を使う(旧 dealer の番号。dealer の Caddy 経路は撤去済み)。
-// script を持つデモは A2A キー(ops/secrets/a2a.env)を読み込むため起動スクリプト経由で動かす。
+// script を持つデモは起動スクリプト経由で動かす。A2A キーは画面プロセスには渡さず、
+// ai-api-server/start-*.sh が自分に必要なキーだけを ops/secrets/a2a.env から読む。
 const demos = [
   { name: "erp", dir: "demo-legacy-system", port: 5010 },
   { name: "crm", dir: "demo-legacy-system-crm", port: 5020, script: "start.sh" },
+  // 3つ目: 物流・倉庫管理(2026-11-26)。ERP とだけ直接つながり、CRM の依頼は ERP の中継で縮退して受ける
+  { name: "logistics", dir: "demo-legacy-system-logistics", port: 5030, script: "start.sh" },
 ];
 
 const apps = [

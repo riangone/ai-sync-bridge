@@ -23,7 +23,17 @@ router = APIRouter(prefix="/api/bridge", tags=["bridge"])
 
 
 def principal_dep(request: Request, bridge: BridgeRuntime = Depends(get_bridge)) -> Principal:
-    return bridge.resolver.resolve(request)
+    return resolve_human_principal(bridge, request)
+
+
+def resolve_human_principal(bridge: BridgeRuntime, request: Request) -> Principal:
+    """利用者・運用者の主体を解決する。Peer Agent のキーはここでは使えない。
+    Peer の入口は /a2a だけにして、遮断・未承認・回数上限・経路検査をそこで必ず通す
+    (でないと遮断した相手が /api/bridge/ask で直接読めてしまう)。"""
+    p = bridge.resolver.resolve(request)
+    if bridge.a2a.peer_for_principal(p) is not None:
+        raise HTTPException(status_code=403, detail="peer agent keys are limited to /a2a")
+    return p
 
 
 def admin_dep(p: Principal = Depends(principal_dep)) -> Principal:
