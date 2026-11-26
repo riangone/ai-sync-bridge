@@ -699,6 +699,75 @@
     <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
   </section>
 
+  <!-- 9.5 A2A 連携アーキテクチャ -->
+  <section class="slide" id="s-a2a-arch">
+    <div class="slide-inner">
+      <div class="eyebrow">09 ― A2A連携アーキテクチャ（ERP ⇔ CRM 連邦構成）</div>
+      <h2>データを1か所に集めず、Agent同士で横断回答する。</h2>
+      <p class="lead">既存システムごとに独立した Bridge（Agent）を配置し、<span class="code-chip">A2A (Agent-to-Agent)</span> プロトコルで必要な質問だけを委譲します。統合DBへのデータ複製は不要で、各システムが自データの権限境界を守り続けます。</p>
+      <div class="diagram">
+        <div class="node">
+          <h5>製造業 ERP（:5010 / Bridge :5011）</h5>
+          <p>顧客・受注（ORD1015）・在庫・請求・人事<br>サイドパネル「A2A連携」タブから質問</p>
+        </div>
+        <div class="conn">⇄<br><span style="font-size:.7rem;font-weight:700;">A2A<br>JSON-RPC</span></div>
+        <div class="node core">
+          <h5>権限・監査つき委譲</h5>
+          <p>POST /a2a（tasks/send）<br>ロール委譲ポリシー＋相互Bearer認証</p>
+        </div>
+        <div class="conn">⇄<br><span style="font-size:.7rem;font-weight:700;">ACL<br>再評価</span></div>
+        <div class="node">
+          <h5>顧客管理 CRM（:5020 / Bridge :5021）</h5>
+          <p>VIPランク・クレーム履歴・法務限定契約<br>機密条項はCRM側で自動除外して応答</p>
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top:1.4em;">
+        <div class="card">
+          <h3>📦 横断照会の例（受注＋クレーム）</h3>
+          <p>「山田商事の注文 ORD1015 の状況とクレーム履歴」を質問すると、ERP が納期・受注状況を回答し、CRM が VIP ランクと遅延クレームを補足します。</p>
+        </div>
+        <div class="card">
+          <h3>🔒 機密データの自動遮断</h3>
+          <p>「違約金（ペナルティ条項）」を尋ねても、CRM 側の ACL が法務限定レコードを除外。回答にもログにも機密内容は一切漏洩しません。</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
+  <!-- 9.6 2つのAgentの発見と安全な関連付け -->
+  <section class="slide" id="s-a2a-security">
+    <div class="slide-inner">
+      <div class="eyebrow">10 ― 2つのAgentはどう発見し、安全に連携するのか？</div>
+      <h2>明示登録・相互認証・二重ACLで、安全に発見し連携する。</h2>
+      <p class="lead">勝手な外部探索は行わず、管理者が登録した相手だけを <span class="code-chip">Agent Card</span> で確認し、4段階の防御境界を通して委譲します。</p>
+      <div class="arrowflow">
+        <div class="box">① 発見（Discovery）<small>bridge.yaml に登録済みの<br>/.well-known/agent.json を取得</small></div>
+        <div class="arrow">→</div>
+        <div class="box">② 相互認証（Auth）<small>Peer専用 Bearer トークン検証<br>（匿名401・外部Caddy 404遮断）</small></div>
+        <div class="arrow">→</div>
+        <div class="box">③ 委譲上限（Policy）<small>allowed_roles で委譲可否判定<br>（人事・経理は方針により遮断）</small></div>
+        <div class="arrow">→</div>
+        <div class="box">④ 受信側ACL＆監査<small>CRM側でも権限フィルタ再評価<br>双方に独立した監査IDを記録</small></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:1.5em;">
+        <div class="card">
+          <span class="tag fix">Discovery</span>
+          <p>各Bridgeが <span class="code-chip">GET /.well-known/agent.json</span> で名前・スキル・認証要件を公開。ホワイトリスト登録されたPeerのみ接続します。</p>
+        </div>
+        <div class="card">
+          <span class="tag note">Key Isolation</span>
+          <p>対等鍵は <span class="code-chip">ops/gen-a2a-secrets.sh</span> でランダム生成し、Git管理外の環境ファイルに隔離。公網からの直接呼出しはプロキシ層で遮断します。</p>
+        </div>
+        <div class="card">
+          <span class="tag fix">Zero-Trust ACL</span>
+          <p>送信元のロール宣言を鵜呑みにせず、受信側Agentも自システムのACLで必ず再フィルタリング。データ所有権を侵害しません。</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
+  </section>
+
   <!-- 10. まとめ -->
   <section class="slide" id="s10">
     <div class="slide-inner" style="text-align:center;">
@@ -714,13 +783,14 @@
           <p>UIはChrome拡張、またはサーバー埋め込みの2経路で後から差し込む。</p>
         </div>
         <div class="card">
-          <h3><span class="num">03</span>AIは別プロセス</h3>
-          <p>AI処理はai-api-serverに分離し、業務システム本体には触れない。</p>
+          <h3><span class="num">03</span>AIは別プロセス＆A2A連携</h3>
+          <p>AI処理はai-api-serverに分離し、複数システム間も権限を守ったままA2Aで安全に連携する。</p>
         </div>
       </div>
       <div class="cta" style="justify-content:center; margin-top:2.2em;">
-        <a class="btn primary" href="/">デモ選択ページに戻る</a>
-        <a class="btn ghost" href="/erp/ai-panel">AI機能一覧を見る</a>
+        <a class="btn primary" href="/erp/ai-panel">ERP デモ（A2Aタブ体験）</a>
+        <a class="btn ghost" href="/crm/">CRM デモ（連邦コンソール）</a>
+        <a class="btn ghost" href="/">デモ選択ページに戻る</a>
       </div>
     </div>
     <div class="foot-brand"><span class="sq"></span>AI-Sync Bridge ― Architecture Overview</div>
