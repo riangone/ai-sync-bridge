@@ -49,6 +49,10 @@ class PeerConfig:
     # 委譲の上限(呼び出し側の方針): このロールのいずれかを持つ主体だけがこのPeerへ委譲できる。
     # 空なら誰でも委譲可。Peer 側の ACL はキーに紐づく Agent 主体で別途かかる(二重の境界)。
     allowed_roles: frozenset[str] = frozenset()
+    # 連携ライフサイクル状態: active | invited | rejected | blocked
+    status: str = "active"
+    invite_code: str = ""
+    simulated: bool = False
 
     def allows(self, principal: Principal) -> bool:
         return not self.allowed_roles or bool(self.allowed_roles & set(principal.roles))
@@ -115,6 +119,8 @@ class A2AAdapter:
         cfg = cfg or {}
         self.runtime = runtime
         self.enabled: bool = bool(cfg.get("enabled", True))
+        self.discoverable: bool = bool(cfg.get("discoverable", True))
+        self._initial_discoverable: bool = self.discoverable
         self.agent_name: str = str(cfg.get("name") or "AI-Sync Bridge Agent")
         self.agent_description: str = str(
             cfg.get("description")
@@ -135,6 +141,7 @@ class A2AAdapter:
                 timeout_sec=float(p.get("timeout_sec") or 30.0),
                 allowed_roles=frozenset(str(r) for r in (p.get("allowed_roles") or ())),
             )
+        self._initial_peer_names: set[str] = set(self.peers.keys())
         self._tasks: dict[str, A2ATask] = {}
         self._max_tasks = 500
         # 外向き HTTP の差し替え口(テストや同一プロセス内の Peer で ASGITransport を渡す)
@@ -418,7 +425,14 @@ class A2AAdapter:
             return await self.runtime.search(principal, question, top_k=top_k or 5)
 
         async def _call_peer(name: str) -> tuple[str, dict[str, Any]]:
-            if not self.peers[name].allows(principal):
+            peer = self.peers[name]
+            if peer.status == "blocked":
+                return name, {"status": "blocked", "error": "peer is blocked by local governance policy"}
+            if peer.status != "active":
+                return name, {"status": peer.status, "error": f"peer is {peer.status} (not active)"}
+            if peer.simulated:
+                return name, {"status": "completed", "answer": f"[{peer.name.upper()} 模擬Agent] 接続・委譲テストOK（デモ用模擬Peerのため実DB照会はスキップ）", "metadata": {"acl_filtered": 0, "audit_id": f"sim-{uuid.uuid4().hex[:8]}"}}
+            if not peer.allows(principal):
                 return name, {"status": "forbidden", "error": "delegation not permitted for this principal"}
             try:
                 rpc_res = await self.delegate_to_peer(
@@ -462,4 +476,141 @@ class A2AAdapter:
             "agent": self.agent_name,
             "local": local_res,
             "peers": peer_results,
+        }
+
+    # ---------------- Governance & Lifecycle Demo Helpers ----------------
+    def peer_summary(self, principal: Principal | None = None) -> list[dict[str, Any]]:
+        return [
+            {
+                "name": p.name,
+                "description": p.description,
+                "status": p.status,
+                "allowed_roles": sorted(p.allowed_roles),
+                "allowed": (principal is None or p.allows(principal)) and p.status == "active",
+                "role_allowed": principal is None or p.allows(principal),
+                "auth_configured": bool(p.api_key),
+                "simulated": p.simulated,
+                "invite_code": p.invite_code,
+            }
+            for p in self.peers.values()
+        ]
+
+    def set_peer_status(self, peer_name: str, status: str) -> PeerConfig:
+        if status not in ("active", "invited", "rejected", "blocked"):
+            raise ValueError(f"Unsupported peer status: {status}")
+        peer = self.peers.get(peer_name)
+        if not peer:
+            raise KeyError(f"Unknown A2A peer: {peer_name}")
+        peer.status = status
+        if status == "invited" and not peer.invite_code:
+            peer.invite_code = f"inv_{uuid.uuid4().hex[:10]}"
+        elif status == "active":
+            peer.invite_code = ""
+        self.runtime.audit.append(
+            "a2a.governance.status_changed",
+            "demo-governance",
+            detail={"peer": peer_name, "status": status},
+        )
+        return peer
+
+    def invite_simulated_peer(
+        self,
+        name: str = "warehouse",
+        description: str = "倉庫・在庫管理システム Agent（デモ用招待Peer）",
+        allowed_roles: list[str] | None = None,
+    ) -> PeerConfig:
+        code = f"inv_{uuid.uuid4().hex[:10]}"
+        peer = PeerConfig(
+            name=name,
+            url="https://warehouse.internal.example",
+            api_key="",
+            description=description,
+            allowed_roles=frozenset(allowed_roles or ["admin", "sales"]),
+            status="invited",
+            invite_code=code,
+            simulated=True,
+        )
+        self.peers[name] = peer
+        self.runtime.audit.append(
+            "a2a.governance.invited",
+            "demo-governance",
+            detail={"peer": name, "invite_code": code, "simulated": True},
+        )
+        return peer
+
+    def reset_governance_demo(self) -> None:
+        self.discoverable = self._initial_discoverable
+        for name in list(self.peers.keys()):
+            if name not in self._initial_peer_names:
+                self.peers.pop(name, None)
+            else:
+                self.peers[name].status = "active"
+                self.peers[name].invite_code = ""
+        self.runtime.audit.append("a2a.governance.reset", "demo-governance", detail={})
+
+    async def verify_peer_auth(
+        self,
+        peer_name: str,
+        mode: str = "valid",
+        client: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any]:
+        """Real authentication probe against a configured peer's /a2a endpoint (no LLM call)."""
+        peer = self.peers.get(peer_name)
+        if not peer:
+            raise KeyError(f"Unknown A2A peer: {peer_name}")
+        if peer.simulated:
+            ok = mode == "valid" and bool(peer.api_key)
+            return {
+                "peer": peer.name,
+                "mode": mode,
+                "http_status": 200 if ok else 401,
+                "authenticated": ok,
+                "header_sent": "Authorization: Bearer <simulated>" if mode != "anonymous" else "(なし / 匿名)",
+                "summary": "模擬Peerのためローカル判定" + ("（認証OK）" if ok else "（401 拒否）"),
+            }
+        rpc_body = {
+            "jsonrpc": "2.0",
+            "id": f"auth-probe-{uuid.uuid4().hex[:6]}",
+            "method": "tasks/get",
+            "params": {"id": "auth-probe-nonexistent"},
+        }
+        headers = {"Content-Type": "application/json"}
+        if mode == "valid":
+            if peer.api_key:
+                headers["Authorization"] = f"Bearer {peer.api_key}"
+            header_sent = "Authorization: Bearer <env:A2A_PEER_KEY (マスク済)>"
+        elif mode == "invalid":
+            headers["Authorization"] = "Bearer invalid-demo-key-0000"
+            header_sent = "Authorization: Bearer invalid-demo-key-0000"
+        else:
+            header_sent = "(認証ヘッダなし / 匿名)"
+
+        endpoint = f"{peer.url}/a2a"
+        if client is not None:
+            resp = await client.post(endpoint, json=rpc_body, headers=headers, timeout=peer.timeout_sec)
+        else:
+            async with httpx.AsyncClient(timeout=peer.timeout_sec, transport=self.transport) as c:
+                resp = await c.post(endpoint, json=rpc_body, headers=headers)
+
+        try:
+            body = resp.json()
+        except Exception:
+            body = {"raw": resp.text[:200]}
+
+        authenticated = resp.status_code == 200
+        if authenticated:
+            summary = "HTTP 200: 認証成功（Peer専用キーで最小権限Agent主体にマッピングされ、JSON-RPC層へ到達）"
+        elif resp.status_code == 401:
+            summary = f"HTTP 401: 認証拒否（{body.get('detail', 'API key required')} — 匿名・不正キーは即座に遮断）"
+        else:
+            summary = f"HTTP {resp.status_code}: {body}"
+
+        return {
+            "peer": peer.name,
+            "mode": mode,
+            "http_status": resp.status_code,
+            "authenticated": authenticated,
+            "header_sent": header_sent,
+            "response_excerpt": body,
+            "summary": summary,
         }

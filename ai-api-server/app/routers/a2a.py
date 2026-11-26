@@ -50,6 +50,8 @@ class FederatedAskRequest(BaseModel):
 def agent_card(request: Request, bridge: BridgeRuntime = Depends(get_bridge)):
     if not bridge.a2a.enabled:
         raise HTTPException(status_code=404, detail="A2A adapter is disabled")
+    if not bridge.a2a.discoverable:
+        raise HTTPException(status_code=404, detail="Agent Card publication is currently disabled (non-discoverable)")
     base_url = str(request.base_url).rstrip("/")
     return bridge.a2a.agent_card(base_url=base_url)
 
@@ -137,12 +139,217 @@ def demo_list_peers(persona: str | None = None, bridge: BridgeRuntime = Depends(
     principal = _persona(bridge.demo, persona).principal if persona else None
     return {
         "enabled": True,
+        "discoverable": bridge.a2a.discoverable,
         "agent": bridge.a2a.agent_name,
-        "peers": [
-            {"name": p.name, "description": p.description,
-             "allowed": principal is None or p.allows(principal)}
-            for p in bridge.a2a.peers.values()
-        ],
+        "peers": bridge.a2a.peer_summary(principal),
+    }
+
+
+class DemoPublishRequest(BaseModel):
+    discoverable: bool
+
+
+class DemoDiscoverRequest(BaseModel):
+    target: str = Field(min_length=1, max_length=50)
+
+
+class DemoPeerActionRequest(BaseModel):
+    action: str = Field(pattern="^(invite|approve|reject|block|unblock)$")
+
+
+class DemoVerifyAuthRequest(BaseModel):
+    peer: str = Field(min_length=1, max_length=50)
+    mode: str = Field(default="valid", pattern="^(valid|anonymous|invalid)$")
+
+
+@router.get("/api/a2a/demo/governance")
+def demo_governance_state(
+    request: Request,
+    persona: str | None = None,
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    principal = _persona(bridge.demo, persona).principal if (persona and bridge.demo) else None
+    base_url = str(request.base_url).rstrip("/")
+    card = bridge.a2a.agent_card(base_url=base_url)
+    return {
+        "agent": bridge.a2a.agent_name,
+        "description": bridge.a2a.agent_description,
+        "discoverable": bridge.a2a.discoverable,
+        "well_known_path": "/.well-known/agent.json",
+        "agent_card": card,
+        "yaml_snippet": (
+            "a2a:\n"
+            f"  enabled: true\n"
+            f"  discoverable: {'true' if bridge.a2a.discoverable else 'false'}\n"
+            f"  name: \"{bridge.a2a.agent_name}\"\n"
+            "  peers:\n"
+            + "\n".join(
+                f"    - name: {p.name}\n"
+                f"      status: {p.status}\n"
+                f"      allowed_roles: [{', '.join(sorted(p.allowed_roles))}]\n"
+                f"      api_key: \"${{A2A_KEY_{p.name.upper()}}}\""
+                for p in bridge.a2a.peers.values()
+            )
+        ),
+        "peers": bridge.a2a.peer_summary(principal),
+    }
+
+
+@router.post("/api/a2a/demo/publish")
+def demo_toggle_publish(
+    body: DemoPublishRequest,
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    bridge.a2a.discoverable = body.discoverable
+    bridge.audit.append(
+        "a2a.governance.publish_changed",
+        "demo-governance",
+        detail={"discoverable": body.discoverable},
+    )
+    return {
+        "discoverable": bridge.a2a.discoverable,
+        "http_status_if_probed": 200 if bridge.a2a.discoverable else 404,
+        "message": (
+            "公開ON: GET /.well-known/agent.json が AgentCard (HTTP 200) を返します"
+            if bridge.a2a.discoverable
+            else "非公開OFF: GET /.well-known/agent.json は HTTP 404 を返し、外部からの自動発見を遮断します"
+        ),
+    }
+
+
+@router.post("/api/a2a/demo/discover")
+async def demo_discover(
+    body: DemoDiscoverRequest,
+    request: Request,
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    target = body.target.strip().lower()
+    if target == "self":
+        if not bridge.a2a.discoverable:
+            return {
+                "target": "self",
+                "found": False,
+                "http_status": 404,
+                "message": "HTTP 404: 現在このAgentは非公開（discoverable=false）のため AgentCard を取得できません",
+            }
+        card = bridge.a2a.agent_card(base_url=str(request.base_url).rstrip("/"))
+        return {
+            "target": "self",
+            "found": True,
+            "http_status": 200,
+            "card": card,
+            "message": f"HTTP 200: 自Agent ({card['name']}) の AgentCard を公開エンドポイントから取得しました",
+        }
+    if target == "unknown-ext":
+        return {
+            "target": "unknown-ext",
+            "found": False,
+            "http_status": 403,
+            "message": "ホワイトリスト外のため探索拒否: bridge.yaml に未登録の任意URLへの自動探索は SSRF・不正連携防止のため遮断されます",
+        }
+    peer = bridge.a2a.peers.get(target)
+    if not peer:
+        raise HTTPException(status_code=404, detail=f"unknown target: {target}")
+    if peer.simulated:
+        return {
+            "target": target,
+            "found": True,
+            "http_status": 200,
+            "card": {
+                "name": f"{peer.name.upper()} Agent (Simulated)",
+                "description": peer.description,
+                "version": "0.2.0",
+                "authentication": {"schemes": ["Bearer", "ApiKey"]},
+                "skills": [{"id": "query_inventory", "name": "Query Inventory"}],
+            },
+            "message": f"模擬Agent ({peer.name}) の AgentCard を確認しました",
+        }
+    try:
+        card = await bridge.a2a.discover_peer(target)
+        return {
+            "target": target,
+            "found": True,
+            "http_status": 200,
+            "card": card,
+            "message": f"HTTP 200: {card.get('name', target)} の /.well-known/agent.json からリアルタイムに能力(Skills)と認証方式を発見しました",
+        }
+    except Exception as exc:
+        log_upstream("demo a2a discover failed", exc)
+        return {
+            "target": target,
+            "found": False,
+            "http_status": 502,
+            "message": f"Peer ({target}) の AgentCard 取得に失敗しました: {type(exc).__name__}",
+        }
+
+
+@router.post("/api/a2a/demo/peers/{peer_name}/action")
+def demo_peer_action(
+    peer_name: str,
+    body: DemoPeerActionRequest,
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    action_to_status = {
+        "invite": "invited",
+        "approve": "active",
+        "reject": "rejected",
+        "block": "blocked",
+        "unblock": "active",
+    }
+    try:
+        peer = bridge.a2a.set_peer_status(peer_name, action_to_status[body.action])
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown peer: {peer_name}") from None
+    return {
+        "peer": peer.name,
+        "status": peer.status,
+        "invite_code": peer.invite_code,
+        "peers": bridge.a2a.peer_summary(),
+    }
+
+
+@router.post("/api/a2a/demo/peers/invite-sample")
+def demo_invite_sample_peer(
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    peer = bridge.a2a.invite_simulated_peer()
+    return {
+        "peer": peer.name,
+        "status": peer.status,
+        "invite_code": peer.invite_code,
+        "peers": bridge.a2a.peer_summary(),
+    }
+
+
+@router.post("/api/a2a/demo/verify-auth")
+async def demo_verify_auth(
+    body: DemoVerifyAuthRequest,
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    try:
+        return await bridge.a2a.verify_peer_auth(body.peer, mode=body.mode)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown peer: {body.peer}") from None
+    except Exception as exc:
+        log_upstream("demo a2a verify-auth failed", exc)
+        raise HTTPException(status_code=502, detail="Peer への認証疎通テストに失敗しました") from None
+
+
+@router.post("/api/a2a/demo/reset")
+def demo_reset_governance(
+    _: DemoGateway = Depends(_demo_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    bridge.a2a.reset_governance_demo()
+    return {
+        "discoverable": bridge.a2a.discoverable,
+        "peers": bridge.a2a.peer_summary(),
     }
 
 
