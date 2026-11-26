@@ -249,9 +249,58 @@ def _post_json(url: str, payload: dict, *, api_key: str = "", client_ip: str | N
         raise HTTPException(status_code=502, detail="AI連携が一時的に利用できません") from None
 
 
+def _get_json(url: str, *, client_ip: str | None = None) -> dict:
+    headers = {}
+    if client_ip and client_ip not in _LOOPBACK:
+        headers["X-Forwarded-For"] = client_ip
+    req = urllib.request.Request(url, method="GET", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        log.warning("bridge GET %s failed: %s", url, e)
+        raise HTTPException(status_code=502, detail="AI連携が一時的に利用できません") from None
+
+
 class DemoAskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     persona: Literal["support", "legal"] = "support"
+
+
+class DemoPeerActionBody(BaseModel):
+    action: Literal["invite", "approve", "reject", "block", "unblock"]
+
+
+class DemoInvitationRespondBody(BaseModel):
+    decision: Literal["approve", "reject"]
+
+
+@app.get("/api/a2a-demo/governance")
+def demo_governance(request: Request):
+    return _get_json(f"{CRM_BRIDGE_URL}/api/a2a/demo/governance", client_ip=_client_ip(request))
+
+
+@app.post("/api/a2a-demo/peers/{peer_name}/action")
+def demo_peer_action(peer_name: str, body: DemoPeerActionBody, request: Request):
+    return _post_json(
+        f"{CRM_BRIDGE_URL}/api/a2a/demo/peers/{peer_name}/action",
+        {"action": body.action},
+        client_ip=_client_ip(request),
+    )
+
+
+@app.post("/api/a2a-demo/invitations/{invite_code}/respond")
+def demo_respond_invitation(invite_code: str, body: DemoInvitationRespondBody, request: Request):
+    return _post_json(
+        f"{CRM_BRIDGE_URL}/api/a2a/demo/invitations/{invite_code}/respond",
+        {"decision": body.decision},
+        client_ip=_client_ip(request),
+    )
+
+
+@app.post("/api/a2a-demo/reset")
+def demo_reset(request: Request):
+    return _post_json(f"{CRM_BRIDGE_URL}/api/a2a/demo/reset", {}, client_ip=_client_ip(request))
 
 
 @app.post("/api/a2a-demo/federated-ask")
@@ -450,6 +499,21 @@ _INDEX_HTML = """<!doctype html>
           <div id="aclBadge"></div><div id="aclQ" class="meta"></div><div id="aclAns" class="ans"></div><div id="aclSub" class="meta"></div>
         </div>
       </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+          <h3 style="margin:0">3. 実システム間の相互招待・承認（ERP ⇄ CRM）</h3>
+          <div style="display:flex;gap:.4rem">
+            <button id="btnGovRefresh" class="sm sec">↻ 状態更新</button>
+            <button id="btnGovReset" class="sm sec">↺ 初期状態に戻す</button>
+          </div>
+        </div>
+        <p class="sub" style="margin:.4rem 0 .8rem">
+          ERP 側（<a href="/erp/ai-panel" target="_blank">/erp/ai-panel</a> の「A2A連携 → 発見・認証・管理」）から招待を送ると、下の「受信した招待」にリアルタイムで届きます。CRM 側から ERP へ招待を送ることもできます。
+        </p>
+        <div id="govPeers" class="box" style="margin-bottom:.75rem">読み込み中...</div>
+        <div id="govInbox" class="box">受信した招待を確認中...</div>
+      </div>
     </section>
 
     <!-- Tab 2: Accounts -->
@@ -607,6 +671,64 @@ document.querySelectorAll('button[data-dir]').forEach((b) => b.addEventListener(
   } catch (e) { $('aclErr').textContent = 'エラー: ' + e.message; }
   finally { b.disabled = false; }
 }));
+
+const GOV_ST = {active:['green','連携中'], invited:['','招待中（相手承認待ち）'], rejected:['red','拒否済'], blocked:['gray','遮断中']};
+const INV_ST = {pending:['','承認待ち'], approved:['green','承認済'], rejected:['red','拒否済']};
+async function loadCrmGov() {
+  try {
+    const r = await fetch('api/a2a-demo/governance');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    const peers = d.peers || [];
+    $('govPeers').innerHTML = '<strong>登録済み Peer（外向き連携先）</strong>' + (peers.length ? peers.map((p) => {
+      const [cls, lbl] = GOV_ST[p.status] || ['gray', p.status];
+      const btns = [];
+      if (p.status === 'active') {
+        btns.push(`<button class="sm" data-peer="${esc(p.name)}" data-act="invite">✉️ 招待送信</button>`);
+        btns.push(`<button class="sm sec" data-peer="${esc(p.name)}" data-act="block">🚫 遮断</button>`);
+      } else if (p.status === 'blocked') {
+        btns.push(`<button class="sm" data-peer="${esc(p.name)}" data-act="unblock">🔓 遮断解除</button>`);
+      } else if (p.status === 'rejected') {
+        btns.push(`<button class="sm" data-peer="${esc(p.name)}" data-act="invite">✉️ 再招待</button>`);
+      } else if (p.status === 'invited') {
+        btns.push(`<a href="/erp/ai-panel" target="_blank" style="font-size:.82rem">ERP側で承認 ↗</a>`);
+      }
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid #e2e8f0;flex-wrap:wrap">
+        <div><strong>${esc(p.name.toUpperCase())} Agent</strong> <span class="badge ${cls}">${esc(lbl)}</span>${p.invite_code ? ` · <code>${esc(p.invite_code)}</code>` : ''}</div>
+        <div style="display:flex;gap:.35rem">${btns.join('')}</div>
+      </div>`;
+    }).join('') : '<div class="meta">Peer なし</div>');
+
+    const invs = d.incoming_invitations || [];
+    $('govInbox').innerHTML = '<strong>📥 受信した招待（他システムからのリクエスト）</strong>' + (invs.length ? invs.map((inv) => {
+      const [cls, lbl] = INV_ST[inv.status] || ['gray', inv.status];
+      const act = inv.status === 'pending'
+        ? `<button class="sm" data-inv="${esc(inv.invite_code)}" data-dec="approve">✅ 承認</button>
+           <button class="sm warn" data-inv="${esc(inv.invite_code)}" data-dec="reject">✖ 拒否</button>`
+        : '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid #e2e8f0;flex-wrap:wrap">
+        <div><strong>${esc(inv.from_agent)}</strong> <span class="badge ${cls}">${esc(lbl)}</span><div class="meta">コード: <code>${esc(inv.invite_code)}</code> · ${esc(inv.note || '')}</div></div>
+        <div style="display:flex;gap:.35rem">${act}</div>
+      </div>`;
+    }).join('') : '<div class="meta" style="margin-top:.35rem">受信した招待はありません（ERP側から招待を送るとここに届きます）</div>');
+
+    $('govPeers').querySelectorAll('button[data-act]').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await post('api/a2a-demo/peers/' + encodeURIComponent(b.dataset.peer) + '/action', {action: b.dataset.act}); await loadCrmGov(); }
+      catch (e) { alert('操作失敗: ' + e.message); b.disabled = false; }
+    }));
+    $('govInbox').querySelectorAll('button[data-inv]').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await post('api/a2a-demo/invitations/' + encodeURIComponent(b.dataset.inv) + '/respond', {decision: b.dataset.dec}); await loadCrmGov(); }
+      catch (e) { alert('応答失敗: ' + e.message); b.disabled = false; }
+    }));
+  } catch (e) {
+    $('govPeers').textContent = '取得エラー: ' + e.message;
+  }
+}
+$('btnGovRefresh').addEventListener('click', loadCrmGov);
+$('btnGovReset').addEventListener('click', async () => { await post('api/a2a-demo/reset'); await loadCrmGov(); });
+loadCrmGov();
 </script>
 </body></html>"""
 

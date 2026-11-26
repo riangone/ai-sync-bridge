@@ -67,6 +67,56 @@ async def a2a_rpc(
     return await bridge.a2a.handle_rpc(principal, payload)
 
 
+class InboundInvitationRequest(BaseModel):
+    invite_code: str = Field(min_length=1, max_length=64)
+    from_agent: str = Field(min_length=1, max_length=120)
+    from_peer_name: str = Field(min_length=1, max_length=50)
+    note: str = Field(default="", max_length=300)
+
+
+class InboundDecisionRequest(BaseModel):
+    decision: str = Field(pattern="^(approved|rejected)$")
+    from_agent: str = Field(default="", max_length=120)
+
+
+@router.post("/a2a/invitations")
+def a2a_receive_invitation(
+    body: InboundInvitationRequest,
+    _: Principal = Depends(_principal_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    if not bridge.a2a.enabled:
+        raise HTTPException(status_code=404, detail="A2A adapter is disabled")
+    inv = bridge.a2a.receive_invitation(
+        invite_code=body.invite_code,
+        from_agent=body.from_agent,
+        from_peer_name=body.from_peer_name,
+        note=body.note,
+    )
+    return {"received": True, "invitation": inv.to_dict()}
+
+
+@router.post("/a2a/invitations/{invite_code}/decision")
+def a2a_receive_invitation_decision(
+    invite_code: str,
+    body: InboundDecisionRequest,
+    _: Principal = Depends(_principal_dep),
+    bridge: BridgeRuntime = Depends(get_bridge),
+):
+    if not bridge.a2a.enabled:
+        raise HTTPException(status_code=404, detail="A2A adapter is disabled")
+    matched = bridge.a2a.receive_invitation_decision(
+        invite_code=invite_code,
+        decision=body.decision,
+        from_agent=body.from_agent,
+    )
+    return {
+        "acknowledged": True,
+        "matched_peer": matched.name if matched else None,
+        "status": matched.status if matched else None,
+    }
+
+
 @router.get("/api/a2a/peers")
 def list_peers(
     _: Principal = Depends(_principal_dep),
@@ -142,6 +192,7 @@ def demo_list_peers(persona: str | None = None, bridge: BridgeRuntime = Depends(
         "discoverable": bridge.a2a.discoverable,
         "agent": bridge.a2a.agent_name,
         "peers": bridge.a2a.peer_summary(principal),
+        "incoming_invitations": bridge.a2a.list_incoming_invitations(),
     }
 
 
@@ -193,6 +244,7 @@ def demo_governance_state(
             )
         ),
         "peers": bridge.a2a.peer_summary(principal),
+        "incoming_invitations": bridge.a2a.list_incoming_invitations(),
     }
 
 
@@ -253,20 +305,6 @@ async def demo_discover(
     peer = bridge.a2a.peers.get(target)
     if not peer:
         raise HTTPException(status_code=404, detail=f"unknown target: {target}")
-    if peer.simulated:
-        return {
-            "target": target,
-            "found": True,
-            "http_status": 200,
-            "card": {
-                "name": f"{peer.name.upper()} Agent (Simulated)",
-                "description": peer.description,
-                "version": "0.2.0",
-                "authentication": {"schemes": ["Bearer", "ApiKey"]},
-                "skills": [{"id": "query_inventory", "name": "Query Inventory"}],
-            },
-            "message": f"模擬Agent ({peer.name}) の AgentCard を確認しました",
-        }
     try:
         card = await bridge.a2a.discover_peer(target)
         return {
@@ -286,15 +324,28 @@ async def demo_discover(
         }
 
 
+class DemoInvitationRespondRequest(BaseModel):
+    decision: str = Field(pattern="^(approve|reject)$")
+
+
 @router.post("/api/a2a/demo/peers/{peer_name}/action")
-def demo_peer_action(
+async def demo_peer_action(
     peer_name: str,
     body: DemoPeerActionRequest,
     _: DemoGateway = Depends(_demo_dep),
     bridge: BridgeRuntime = Depends(get_bridge),
 ):
+    if body.action == "invite":
+        try:
+            res = await bridge.a2a.send_peer_invitation(peer_name)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown peer: {peer_name}") from None
+        return {
+            **res,
+            "peers": bridge.a2a.peer_summary(),
+            "incoming_invitations": bridge.a2a.list_incoming_invitations(),
+        }
     action_to_status = {
-        "invite": "invited",
         "approve": "active",
         "reject": "rejected",
         "block": "blocked",
@@ -309,20 +360,25 @@ def demo_peer_action(
         "status": peer.status,
         "invite_code": peer.invite_code,
         "peers": bridge.a2a.peer_summary(),
+        "incoming_invitations": bridge.a2a.list_incoming_invitations(),
     }
 
 
-@router.post("/api/a2a/demo/peers/invite-sample")
-def demo_invite_sample_peer(
+@router.post("/api/a2a/demo/invitations/{invite_code}/respond")
+async def demo_respond_invitation(
+    invite_code: str,
+    body: DemoInvitationRespondRequest,
     _: DemoGateway = Depends(_demo_dep),
     bridge: BridgeRuntime = Depends(get_bridge),
 ):
-    peer = bridge.a2a.invite_simulated_peer()
+    try:
+        res = await bridge.a2a.respond_to_invitation(invite_code, body.decision)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown invitation: {invite_code}") from None
     return {
-        "peer": peer.name,
-        "status": peer.status,
-        "invite_code": peer.invite_code,
+        **res,
         "peers": bridge.a2a.peer_summary(),
+        "incoming_invitations": bridge.a2a.list_incoming_invitations(),
     }
 
 

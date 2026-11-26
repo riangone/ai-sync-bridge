@@ -52,10 +52,29 @@ class PeerConfig:
     # 連携ライフサイクル状態: active | invited | rejected | blocked
     status: str = "active"
     invite_code: str = ""
-    simulated: bool = False
 
     def allows(self, principal: Principal) -> bool:
         return not self.allowed_roles or bool(self.allowed_roles & set(principal.roles))
+
+
+@dataclass
+class IncomingInvitation:
+    invite_code: str
+    from_agent: str
+    from_peer_name: str
+    status: str = "pending"  # pending | approved | rejected
+    note: str = ""
+    created_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "invite_code": self.invite_code,
+            "from_agent": self.from_agent,
+            "from_peer_name": self.from_peer_name,
+            "status": self.status,
+            "note": self.note,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.created_at)),
+        }
 
 
 @dataclass
@@ -142,6 +161,7 @@ class A2AAdapter:
                 allowed_roles=frozenset(str(r) for r in (p.get("allowed_roles") or ())),
             )
         self._initial_peer_names: set[str] = set(self.peers.keys())
+        self.incoming_invitations: dict[str, IncomingInvitation] = {}
         self._tasks: dict[str, A2ATask] = {}
         self._max_tasks = 500
         # 外向き HTTP の差し替え口(テストや同一プロセス内の Peer で ASGITransport を渡す)
@@ -430,8 +450,6 @@ class A2AAdapter:
                 return name, {"status": "blocked", "error": "peer is blocked by local governance policy"}
             if peer.status != "active":
                 return name, {"status": peer.status, "error": f"peer is {peer.status} (not active)"}
-            if peer.simulated:
-                return name, {"status": "completed", "answer": f"[{peer.name.upper()} 模擬Agent] 接続・委譲テストOK（デモ用模擬Peerのため実DB照会はスキップ）", "metadata": {"acl_filtered": 0, "audit_id": f"sim-{uuid.uuid4().hex[:8]}"}}
             if not peer.allows(principal):
                 return name, {"status": "forbidden", "error": "delegation not permitted for this principal"}
             try:
@@ -478,7 +496,15 @@ class A2AAdapter:
             "peers": peer_results,
         }
 
-    # ---------------- Governance & Lifecycle Demo Helpers ----------------
+    # ---------------- Governance & Real Mutual Invitation ----------------
+    def _self_peer_key(self) -> str:
+        low = self.agent_name.lower()
+        if "crm" in low:
+            return "crm"
+        if "erp" in low:
+            return "erp"
+        return low.split()[0] if low else "agent"
+
     def peer_summary(self, principal: Principal | None = None) -> list[dict[str, Any]]:
         return [
             {
@@ -489,11 +515,14 @@ class A2AAdapter:
                 "allowed": (principal is None or p.allows(principal)) and p.status == "active",
                 "role_allowed": principal is None or p.allows(principal),
                 "auth_configured": bool(p.api_key),
-                "simulated": p.simulated,
                 "invite_code": p.invite_code,
             }
             for p in self.peers.values()
         ]
+
+    def list_incoming_invitations(self) -> list[dict[str, Any]]:
+        invs = sorted(self.incoming_invitations.values(), key=lambda x: x.created_at, reverse=True)
+        return [inv.to_dict() for inv in invs]
 
     def set_peer_status(self, peer_name: str, status: str) -> PeerConfig:
         if status not in ("active", "invited", "rejected", "blocked"):
@@ -513,33 +542,164 @@ class A2AAdapter:
         )
         return peer
 
-    def invite_simulated_peer(
+    async def send_peer_invitation(
         self,
-        name: str = "warehouse",
-        description: str = "倉庫・在庫管理システム Agent（デモ用招待Peer）",
-        allowed_roles: list[str] | None = None,
-    ) -> PeerConfig:
+        peer_name: str,
+        note: str = "",
+        client: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any]:
+        """Send a real authenticated A2A invitation to a configured peer system."""
+        peer = self.peers.get(peer_name)
+        if not peer:
+            raise KeyError(f"Unknown A2A peer: {peer_name}")
         code = f"inv_{uuid.uuid4().hex[:10]}"
-        peer = PeerConfig(
-            name=name,
-            url="https://warehouse.internal.example",
-            api_key="",
-            description=description,
-            allowed_roles=frozenset(allowed_roles or ["admin", "sales"]),
-            status="invited",
-            invite_code=code,
-            simulated=True,
-        )
-        self.peers[name] = peer
+        peer.status = "invited"
+        peer.invite_code = code
+
+        payload = {
+            "invite_code": code,
+            "from_agent": self.agent_name,
+            "from_peer_name": self._self_peer_key(),
+            "note": note or f"{self.agent_name} からの A2A 連携招待リクエスト",
+        }
+        headers = {"Content-Type": "application/json"}
+        if peer.api_key:
+            headers["Authorization"] = f"Bearer {peer.api_key}"
+        endpoint = f"{peer.url}/a2a/invitations"
+
+        delivered = False
+        remote_status = 0
+        try:
+            if client is not None:
+                resp = await client.post(endpoint, json=payload, headers=headers, timeout=peer.timeout_sec)
+            else:
+                async with httpx.AsyncClient(timeout=peer.timeout_sec, transport=self.transport) as c:
+                    resp = await c.post(endpoint, json=payload, headers=headers)
+            remote_status = resp.status_code
+            delivered = resp.status_code == 200
+        except Exception as exc:
+            log.warning("A2A invitation send to %s failed: %s", peer_name, exc)
+
         self.runtime.audit.append(
-            "a2a.governance.invited",
+            "a2a.governance.invitation_sent",
             "demo-governance",
-            detail={"peer": name, "invite_code": code, "simulated": True},
+            detail={"peer": peer_name, "invite_code": code, "delivered": delivered, "remote_status": remote_status},
         )
-        return peer
+        return {
+            "peer": peer.name,
+            "status": peer.status,
+            "invite_code": code,
+            "delivered": delivered,
+            "remote_status": remote_status,
+        }
+
+    def receive_invitation(
+        self,
+        *,
+        invite_code: str,
+        from_agent: str,
+        from_peer_name: str,
+        note: str = "",
+    ) -> IncomingInvitation:
+        inv = IncomingInvitation(
+            invite_code=invite_code,
+            from_agent=from_agent,
+            from_peer_name=from_peer_name,
+            status="pending",
+            note=note,
+        )
+        self.incoming_invitations[invite_code] = inv
+        self.runtime.audit.append(
+            "a2a.governance.invitation_received",
+            from_peer_name,
+            detail={"invite_code": invite_code, "from_agent": from_agent},
+        )
+        return inv
+
+    async def respond_to_invitation(
+        self,
+        invite_code: str,
+        decision: str,
+        client: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any]:
+        """Approve or reject an incoming invitation and notify the sender agent over HTTP."""
+        if decision not in ("approve", "reject"):
+            raise ValueError(f"Unsupported decision: {decision}")
+        inv = self.incoming_invitations.get(invite_code)
+        if not inv:
+            raise KeyError(f"Unknown invitation: {invite_code}")
+        inv.status = "approved" if decision == "approve" else "rejected"
+
+        peer = self.peers.get(inv.from_peer_name)
+        callback_delivered = False
+        callback_status = 0
+        if peer is not None:
+            peer.status = "active" if decision == "approve" else "rejected"
+            if decision == "approve":
+                peer.invite_code = ""
+            headers = {"Content-Type": "application/json"}
+            if peer.api_key:
+                headers["Authorization"] = f"Bearer {peer.api_key}"
+            endpoint = f"{peer.url}/a2a/invitations/{invite_code}/decision"
+            payload = {"decision": inv.status, "from_agent": self.agent_name}
+            try:
+                if client is not None:
+                    resp = await client.post(endpoint, json=payload, headers=headers, timeout=peer.timeout_sec)
+                else:
+                    async with httpx.AsyncClient(timeout=peer.timeout_sec, transport=self.transport) as c:
+                        resp = await c.post(endpoint, json=payload, headers=headers)
+                callback_status = resp.status_code
+                callback_delivered = resp.status_code == 200
+            except Exception as exc:
+                log.warning("A2A invitation decision callback to %s failed: %s", peer.name, exc)
+
+        self.runtime.audit.append(
+            "a2a.governance.invitation_responded",
+            "demo-governance",
+            detail={
+                "invite_code": invite_code,
+                "decision": inv.status,
+                "from_peer": inv.from_peer_name,
+                "callback_delivered": callback_delivered,
+            },
+        )
+        return {
+            "invitation": inv.to_dict(),
+            "callback_delivered": callback_delivered,
+            "callback_status": callback_status,
+        }
+
+    def receive_invitation_decision(
+        self,
+        *,
+        invite_code: str,
+        decision: str,
+        from_agent: str = "",
+    ) -> PeerConfig | None:
+        target_status = "active" if decision == "approved" else "rejected"
+        matched: PeerConfig | None = None
+        for p in self.peers.values():
+            if p.invite_code == invite_code:
+                matched = p
+                break
+        if matched is not None:
+            matched.status = target_status
+            if target_status == "active":
+                matched.invite_code = ""
+        self.runtime.audit.append(
+            "a2a.governance.invitation_decision_received",
+            from_agent or "peer",
+            detail={
+                "invite_code": invite_code,
+                "decision": decision,
+                "matched_peer": matched.name if matched else None,
+            },
+        )
+        return matched
 
     def reset_governance_demo(self) -> None:
         self.discoverable = self._initial_discoverable
+        self.incoming_invitations.clear()
         for name in list(self.peers.keys()):
             if name not in self._initial_peer_names:
                 self.peers.pop(name, None)
@@ -558,16 +718,6 @@ class A2AAdapter:
         peer = self.peers.get(peer_name)
         if not peer:
             raise KeyError(f"Unknown A2A peer: {peer_name}")
-        if peer.simulated:
-            ok = mode == "valid" and bool(peer.api_key)
-            return {
-                "peer": peer.name,
-                "mode": mode,
-                "http_status": 200 if ok else 401,
-                "authenticated": ok,
-                "header_sent": "Authorization: Bearer <simulated>" if mode != "anonymous" else "(なし / 匿名)",
-                "summary": "模擬Peerのためローカル判定" + ("（認証OK）" if ok else "（401 拒否）"),
-            }
         rpc_body = {
             "jsonrpc": "2.0",
             "id": f"auth-probe-{uuid.uuid4().hex[:6]}",

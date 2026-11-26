@@ -107,16 +107,17 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         <div id="aisb-gov-disc-out" style="margin-top:6px"></div>
       </div>
 
-      <!-- ③ 一覧・招待・承認・拒否・遮断 -->
+      <!-- ③ 一覧・相互招待・拒否・遮断 -->
       <div class="aisb-card" style="margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <b>③ 一覧・招待・拒否・遮断 (Lifecycle)</b>
-          <button id="aisb-gov-invite-sample" type="button" style="font-size:10.5px;padding:2px 7px">＋ 倉庫Agentを招待</button>
+          <b>③ 一覧・相互招待・拒否・遮断 (ERP ⇄ CRM)</b>
+          <button id="aisb-gov-refresh" type="button" style="font-size:10.5px;padding:2px 7px">↻ 状態更新</button>
         </div>
         <div style="color:#555;margin:4px 0">
-          Peer の招待→承認→拒否→遮断(Block)を操作できます。<b>CRMを「遮断」した状態で「連携デモ」を実行すると即座にブロックされます。</b>
+          実システム間で招待を送信します。ERP から CRM へ招待を送ると、<a href="/crm/" target="_blank" style="color:#1d4ed8">CRM コンソール</a>側にリアルタイムで届き、承認・拒否が即時反映されます。
         </div>
         <div id="aisb-gov-peers"></div>
+        <div id="aisb-gov-inbox" style="margin-top:8px"></div>
       </div>
 
       <!-- ④ 認証テスト -->
@@ -216,9 +217,65 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         JSON.stringify(d.agent_card, null, 2);
 
       renderGovPeers(d.peers || []);
+      renderGovInbox(d.incoming_invitations || []);
     } catch (e) {
       $("#aisb-gov-peers").innerHTML = `<div style="color:#d03b3b">取得エラー: ${esc(e.message)}</div>`;
     }
+  }
+
+  function renderGovInbox(invs) {
+    const box = $("#aisb-gov-inbox");
+    if (!invs.length) {
+      box.innerHTML = `<div style="font-size:10.5px;color:#64748b;border-top:1px dashed #cbd5e1;padding-top:6px">📥 受信した招待（他システムから）: なし（CRM側から招待を送るとここに表示されます）</div>`;
+      return;
+    }
+    const stMap = {
+      pending: { label: "承認待ち", bg: "#eff6ff", fg: "#1d4ed8" },
+      approved: { label: "承認済", bg: "#e6f7ec", fg: "#0a7d34" },
+      rejected: { label: "拒否済", bg: "#fef2f2", fg: "#b91c1c" },
+    };
+    box.innerHTML = `
+      <div style="border-top:1px dashed #cbd5e1;padding-top:6px">
+        <div style="font-weight:700;color:#1e3a5f;margin-bottom:4px">📥 受信した招待（実システム間リクエスト）</div>
+        ${invs
+          .map((inv) => {
+            const m = stMap[inv.status] || { label: inv.status, bg: "#f3f4f6", fg: "#555" };
+            const badge = `<span style="background:${m.bg};color:${m.fg};padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">${esc(m.label)}</span>`;
+            const actBtns =
+              inv.status === "pending"
+                ? `<button class="aisb-gov-inv-resp" data-code="${esc(inv.invite_code)}" data-dec="approve" type="button" style="font-size:10.5px;padding:2px 6px">✅ 承認</button>
+                   <button class="aisb-gov-inv-resp" data-code="${esc(inv.invite_code)}" data-dec="reject" type="button" style="font-size:10.5px;padding:2px 6px">✖ 拒否</button>`
+                : "";
+            return `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:5px 6px;margin-top:4px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <div><b>${esc(inv.from_agent)}</b> ${badge}</div>
+                <div style="display:flex;gap:4px">${actBtns}</div>
+              </div>
+              <div style="font-size:10.5px;color:#555;margin-top:2px">コード: <code>${esc(inv.invite_code)}</code> · ${esc(inv.note || "")}</div>
+            </div>`;
+          })
+          .join("")}
+      </div>`;
+
+    box.querySelectorAll(".aisb-gov-inv-resp").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const res = await fetch(
+            `${ctx.API_BASE}/api/a2a/demo/invitations/${encodeURIComponent(btn.dataset.code)}/respond`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ decision: btn.dataset.dec }),
+            },
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          await loadGovernance();
+        } catch (e) {
+          alert(`応答失敗: ${e.message}`);
+        }
+      });
+    });
   }
 
   function renderGovPeers(peers) {
@@ -234,17 +291,17 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
         const invTxt = p.invite_code ? ` · 招待コード: <code>${esc(p.invite_code)}</code>` : "";
         const btns = [];
         if (p.status === "invited") {
-          btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="approve" type="button" style="font-size:10.5px;padding:2px 6px">✅ 承認</button>`);
-          btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="reject" type="button" style="font-size:10.5px;padding:2px 6px">✖ 拒否</button>`);
+          btns.push(`<a href="/crm/" target="_blank" style="font-size:10.5px;padding:2px 6px;border:1px solid #2563eb;border-radius:4px;color:#1d4ed8;text-decoration:none">CRM側で承認 ↗</a>`);
         }
         if (p.status === "active") {
+          btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="invite" type="button" style="font-size:10.5px;padding:2px 6px">✉️ 招待送信</button>`);
           btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="block" type="button" style="font-size:10.5px;padding:2px 6px">🚫 遮断(Block)</button>`);
         }
         if (p.status === "blocked") {
           btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="unblock" type="button" style="font-size:10.5px;padding:2px 6px">🔓 遮断解除</button>`);
         }
         if (p.status === "rejected") {
-          btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="invite" type="button" style="font-size:10.5px;padding:2px 6px">✉️ 再招待</button>`);
+          btns.push(`<button class="aisb-gov-act" data-peer="${esc(p.name)}" data-act="invite" type="button" style="font-size:10.5px;padding:2px 6px">✉️ 再招待送信</button>`);
         }
         return `
           <div style="border-top:1px solid #eee;padding-top:6px;margin-top:6px">
@@ -445,10 +502,7 @@ window.AISB.panels.a2a = function renderA2APanel(el, ctx) {
   el.querySelectorAll(".aisb-gov-auth").forEach((b) =>
     b.addEventListener("click", () => runVerifyAuth(b.dataset.mode)),
   );
-  $("#aisb-gov-invite-sample").addEventListener("click", async () => {
-    await fetch(`${ctx.API_BASE}/api/a2a/demo/peers/invite-sample`, { method: "POST" });
-    await loadGovernance();
-  });
+  $("#aisb-gov-refresh").addEventListener("click", () => loadGovernance());
   $("#aisb-gov-reset").addEventListener("click", async () => {
     await fetch(`${ctx.API_BASE}/api/a2a/demo/reset`, { method: "POST" });
     $("#aisb-gov-disc-out").innerHTML = "";
